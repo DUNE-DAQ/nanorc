@@ -76,7 +76,7 @@ class SSHProcessManager(object):
         super(SSHProcessManager, self).__init__()
 
         self.apps = {}
-    
+
     
     def spawn(self, boot_info):
 
@@ -126,7 +126,7 @@ class SSHProcessManager(object):
                 if not is_port_open(info.conf['host'], info.conf['port']):
                     apps_starting += [name]
             if apps_starting:
-                print(f"Waiting for apps {','.join(apps_starting)}")
+                print(f"Waiting for apps {', '.join(apps_starting)}")
             else:
                 print(f"Apps {','.join(self.apps)} started")
                 break

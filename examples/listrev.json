@@ -1,0 +1,78 @@
+  {
+      "data": {
+
+      },
+      "entry_state": "NONE",
+      "exit_state": "INITIAL",
+      "id": "init"
+  },
+  {
+      "data": {
+          "modules": [
+              {
+                  "data": {
+                      "nIntsPerList": 10,
+                      "waitBetweenSendsMsec": 100
+                  },
+                  "match": "rdlg"
+              }
+          ]
+      },
+      "entry_state": "INITIAL",
+      "exit_state": "CONFIGURED",
+      "id": "conf"
+  },
+  {
+      "data": {
+          "modules": [
+              {
+                  "data": {
+                      "disable_data_storage": false,
+                      "run": 333,
+                      "trigger_interval_ticks": 64000000
+                  },
+                  "match": ".*"
+              }
+          ]
+      },
+      "entry_state": "CONFIGURED",
+      "exit_state": "RUNNING",
+      "id": "start"
+  },
+  {
+      "data": {
+          "modules": [
+              {
+                  "match": ".*"
+              }
+          ]
+      },
+      "entry_state": "RUNNING",
+      "exit_state": "CONFIGURED",
+      "id": "stop"
+  },
+  {
+      "data": {
+          "modules": [
+              {
+                  "match": ".*"
+              }
+          ]
+      },
+      "entry_state": "CONFIGURED",
+      "exit_state": "INITIAL",
+      "id": "scrap"
+  },
+  {
+      "data": {
+          "modules": [
+              {
+                  "match": ".*"
+              }
+          ]
+      },
+      "id": "hello"
+  }
+]"
+  }
+}

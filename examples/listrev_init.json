@@ -1,0 +1,75 @@
+{
+  "modules": [
+    {
+        "data": {
+            "qinfos": [
+                {
+                    "dir": "output",
+                    "inst": "orig1",
+                    "name": "q1"
+                },
+                {
+                    "dir": "output",
+                    "inst": "orig2",
+                    "name": "q2"
+                }
+            ]
+        },
+        "inst": "rdlg",
+        "plugin": "RandomDataListGenerator"
+    },
+    {
+        "data": {
+            "qinfos": [
+                {
+                    "dir": "input",
+                    "inst": "orig1",
+                    "name": "input"
+                },
+                {
+                    "dir": "output",
+                    "inst": "giro1",
+                    "name": "output"
+                }
+            ]
+        },
+        "inst": "lr",
+        "plugin": "ListReverser"
+    },
+    {
+        "data": {
+            "qinfos": [
+                {
+                    "dir": "input",
+                    "inst": "giro1",
+                    "name": "reversed_data_input"
+                },
+                {
+                    "dir": "input",
+                    "inst": "orig2",
+                    "name": "original_data_input"
+                }
+            ]
+        },
+        "inst": "lrv",
+        "plugin": "ReversedListValidator"
+    }
+],
+"queues": [
+    {
+        "capacity": 100,
+        "inst": "giro1",
+        "kind": "FollySPSCQueue"
+    },
+    {
+        "capacity": 100,
+        "inst": "orig1",
+        "kind": "FollySPSCQueue"
+    },
+    {
+        "capacity": 100,
+        "inst": "orig2",
+        "kind": "FollySPSCQueue"
+    }
+  ]
+}
