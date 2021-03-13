@@ -6,8 +6,10 @@ import sys
 import socket
 import time
 import json
-import atexit
-import signal
+import cmd
+from rich.console import Console
+from rich.pretty import Pretty
+
 
 from sshpm import SSHProcessManager
 from daqctrl import DAQAppController
@@ -49,35 +51,72 @@ conf_json = '''
 
 boot = json.loads(boot_json)
 
-print(boot)
+
+class NanoRC:
+    """docstring for NanoRC"""
+    def __init__(self, console: Console):
+        super(NanoRC, self).__init__()     
+        self.console = console
+
+        self.pm = SSHProcessManager(console)
 
 
-pm = SSHProcessManager()
+class NanoRCShell(cmd.Cmd):
+    """A Poor's man RC"""
+    prompt = 'rc> '
+    def __init__(self, console: Console, rc: NanoRC):
+        super(NanoRCShell, self).__init__()
+        self.rc = rc
+        self.console = console
 
-# Cleanup before exiting
-def __goodbye():
-    print("Killing all processes before exiting")
+    def do_create(self, arg: str):
+        self.console.print(Pretty(boot))
+
+        self.rc.pm.spawn(boot)
+
+    def do_destroy(self, arg: str):
+        self.rc.pm.terminate()
+
+    def do_exit(self, arg: str):
+        self.rc.pm.terminate()
+        return True
+        
+
+def main():
+
+
+
+    pm = SSHProcessManager()
+
+
+    pm.spawn(boot)
+
+
+
+    dac = DAQAppController(pm.apps, 'examples/')
+
+    for i in range(30):
+        time.sleep(1)
+        print(f'Elapsed {i}s')
     pm.terminate()
+    raise SystemExit(0)
 
-atexit.register(__goodbye)
-signal.signal(signal.SIGTERM, __goodbye)
-signal.signal(signal.SIGINT, __goodbye)
-# ---
+    p.terminate()
 
-pm.spawn(boot)
+if __name__ == '__main__':
+    # try:
+    #     main()
+    # except KeyboardInterrupt:
+    #     # pass
+    #     SSHProcessManager.kill_all_instances()
+    # finally:
+        # exit_gracefully()_name__ == '__main__':
 
-
-
-dac = DAQAppController(pm.apps, 'examples/')
-
-for i in range(15):
-    time.sleep(1)
-    print(f'Elapsed {i}s')
-pm.terminate()
-raise SystemExit(0)
+    console = Console()
+    rc = NanoRC(console)
+    NanoRCShell(console, rc).cmdloop()
 
 
-p.terminate()
 
 
 
