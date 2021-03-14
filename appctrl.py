@@ -95,6 +95,10 @@ class AppSupervisor:
         r = self.commander.send_command(cmd_id, cmd_data, entry_state, exit_state, timeout)
         self.console.print(Pretty(r))
         return r
+
+    def terminate(self):
+        self.commander._kill_listener()
+        del self.commander
         
 # if __name__ == '__main__':
 

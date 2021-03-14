@@ -48,7 +48,7 @@ class NanoRC:
 
     def destroy(self):
         for s in self.apps.values():
-            s._kill_listener()
+            s.terminate()
         self.pm.terminate()
 
 
