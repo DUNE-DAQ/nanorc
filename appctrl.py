@@ -2,6 +2,7 @@ import logging
 import requests
 import queue
 import json
+import socket
 
 from flask import Flask, request, cli
 from multiprocessing import Process, Queue
@@ -71,6 +72,7 @@ class AppCommander(object):
           "entry_state": entry_state,
           "exit_state": exit_state,
         }
+        self.console.print(Pretty(cmd))
 
         headers = {'content-type': 'application/json', 'X-Answer-Port': str(self.listener_port)}
         response = requests.post(self.app_url, data=json.dumps(cmd), headers=headers)
@@ -82,6 +84,7 @@ class AppCommander(object):
             return 'Error'
         return r
 
+
 class AppSupervisor:
     """docstring for AppSupervisor"""
     def __init__(self, console: Console, handle: AppProcessHandle):
@@ -89,11 +92,15 @@ class AppSupervisor:
         self.console = console
         self.handle = handle
         self.commander = AppCommander(console, handle.name, handle.host, handle.port, handle.port+10000)
-        self.last_command = None
+        self.last_sent_command = None
+        self.last_ok_command = None
 
     def send_command(self, cmd_id: str, cmd_data: dict, entry_state: str = 'ANY', exit_state: str = 'ANY', timeout: int=10):
+        self.last_sent_command = cmd_id
         r = self.commander.send_command(cmd_id, cmd_data, entry_state, exit_state, timeout)
         self.console.print(Pretty(r))
+        if r['result'] == 'OK':
+            self.last_ok_command = cmd_id;
         return r
 
     def terminate(self):
