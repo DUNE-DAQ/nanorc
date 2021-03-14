@@ -9,8 +9,11 @@ import threading
 import queue
 from rich.console import Console
 from rich.progress import *
+from rich.table import Table
+
+
 """
-Boot info example
+Boot handle example
 
 {
     "env" : {
@@ -46,7 +49,6 @@ def is_port_open(ip,port):
 
 # ---
 def file_logger(logfile, echo=False):
-
     log = open(logfile, 'w')
 
     def interact(line, stdin):
@@ -59,10 +61,10 @@ def file_logger(logfile, echo=False):
     return interact
 
 
-class AppInfo(object):
-    """docstring for AppInfo"""
+class AppProcessHandle(object):
+    """docstring for AppProcessHandle"""
     def __init__(self, name):
-        super(AppInfo, self).__init__()
+        super(AppProcessHandle, self).__init__()
         self.proc = None
         self.name = name
         self.logfile = None
@@ -75,7 +77,7 @@ class AppInfo(object):
         return str(vars(self))
 
 
-class ProcWatcherThread(threading.Thread):
+class AppProcessWatcherThread(threading.Thread):
 
     def __init__(self, pm, app, proc):
         threading.Thread.__init__(self)
@@ -113,7 +115,7 @@ class SSHProcessManager(object):
         self.__instances.add(self)
 
     def watch(self, name, proc):
-        t = ProcWatcherThread(self, name, proc)
+        t = AppProcessWatcherThread(self, name, proc)
         t.start()
 
         self.watchers.append(t)
@@ -122,7 +124,10 @@ class SSHProcessManager(object):
         print(name, exc.exit_code)
 
 
-    def spawn(self, boot_info):
+    def boot(self, boot_info):
+
+        if self.apps:
+            raise RuntimeError(f"ERROR: apps already booted {' '.join(self.apps.keys())}. Terminate them before booting a new set.")
 
         # Add a check for env and apps in boot_info keys
 
@@ -143,32 +148,31 @@ class SSHProcessManager(object):
                 '-tt',
                 cmd
             ]
-
             log_file = f'log_{app_name}_{app_conf["port"]}.txt'
 
-            info = AppInfo(app_name)
-            info.logfile = log_file
-            info.cmd = cmd
-            info.ssh_args = ssh_args
-            info.host = host
-            info.conf = app_conf.copy()
-            self.apps[app_name] = info
-
+            handle = AppProcessHandle(app_name)
+            handle.logfile = log_file
+            handle.cmd = cmd
+            handle.ssh_args = ssh_args
+            handle.host = host
+            handle.port = app_conf["port"]
+            handle.conf = app_conf.copy()
+            self.apps[app_name] = handle
 
         apps_running = []
-        for name, info in self.apps.items():
-            if is_port_open(info.conf['host'], info.conf['port']):
+        for name, handle in self.apps.items():
+            if is_port_open(handle.host, handle.port):
                 apps_running += [name]
         if apps_running:
             raise RuntimeError(f"ERROR: apps already running? {apps_running}")
 
-        for name, info in self.apps.items():
-            proc = sh.ssh(*info.ssh_args, _out=file_logger(f'log_{app_name}_{app_conf["port"]}.txt'), _bg=True, _bg_exc=False)
+        for name, handle in self.apps.items():
+            proc = sh.ssh(*handle.ssh_args, _out=file_logger(handle.logfile), _bg=True, _bg_exc=False)
             self.watch(name, proc)
-            info.proc = proc
+            handle.proc = proc
 
-       
-        timeout=60
+
+        timeout=30
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -201,20 +205,34 @@ class SSHProcessManager(object):
     def check_apps(self):
         responding = []
         alive = []
-        for name, info in self.apps.items():
+        for name, handle in self.apps.items():
 
-            if info.proc.is_alive():
+            if handle.proc is not None and handle.proc.is_alive():
                 alive += [name]
-            if is_port_open(info.host, info.conf['port']):
+            if handle.proc is not None and is_port_open(handle.host, handle.conf['port']):
                 responding += [name]
         return alive, responding
 
 
+    def status_apps(self):
+        table = Table(title="Apps (process")
+        table.add_column("name", style="magenta")
+        table.add_column("is alive", style="magenta")
+        table.add_column("open port", style="magenta")
+        table.add_column("host", style="magenta")
+
+        alive, resp = self.check_apps()
+
+        for app, handle in self.apps.items():
+            table.add_row(app, str(app in alive), str(app in resp), handle.host)
+        self.console.print(table)
+
+
     def terminate(self):
 
-        for name, info in self.apps.items():
-            if info.proc is not None and info.proc.is_alive():
-                info.proc.terminate()
+        for name, handle in self.apps.items():
+            if handle.proc is not None and handle.proc.is_alive():
+                handle.proc.terminate()
 
         self.apps = {}
 

@@ -1,0 +1,11 @@
+{
+  "modules": [
+      {
+          "data": {
+              "nIntsPerList": 10,
+              "waitBetweenSendsMsec": 100
+          },
+          "match": "rdlg"
+      }
+  ]
+}

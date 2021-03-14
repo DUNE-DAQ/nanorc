@@ -1,0 +1,21 @@
+{
+    "env" : {
+        "DBT_ROOT": "env",
+        "DBT_AREA_ROOT": "env"
+    },
+    "hosts": {
+        "my_pc": "localhost"
+    },
+    "apps" : {
+        "stoca" : {
+            "exec": "daq_application",
+            "host": "my_pc",
+            "port": 12345
+        },
+        "suka": {
+            "exec": "daq_application",
+            "host": "my_pc",
+            "port": 12346
+        }
+    }
+}
