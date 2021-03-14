@@ -1,0 +1,16 @@
+{
+    "modules": [
+        {
+            "match": "qton_trigdec"
+        },
+        {
+            "match": "ntoq_timesync"
+        },
+        {
+            "match": "ntoq_token"
+        },
+        {
+            "match": "tde"
+        }
+    ]
+}
