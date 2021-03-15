@@ -123,7 +123,6 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 # @click_shell.shell(prompt='shonky rc> ', chain=True, on_finished=cleanup, context_settings=CONTEXT_SETTINGS)
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 
-# @click.command()
 @click.pass_context
 @click.argument('cfg_dir', type=click.Path(exists=True))
 def cli(ctx, cfg_dir):
@@ -168,7 +167,7 @@ def conf(rc):
 @cli.command('start')
 @click.argument('run', type=int)
 @click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False)
-@click.option('--trigger_interval_ticks', type=int, default=50000000)
+@click.option('--trigger-interval-ticks', type=int, default=50000000)
 @click.pass_obj
 def start(rc, run, disable_data_storage, trigger_interval_ticks):
     rc.start(run, disable_data_storage, trigger_interval_ticks)
