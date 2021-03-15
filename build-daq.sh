@@ -57,3 +57,7 @@ echo "running dbt-build"
 dbt-build.sh --install
 
 curl -Lo frames.bin https://cernbox.cern.ch/index.php/s/VAqNtn7bwuQtff3/download
+
+# fix alias issue
+cd /tmp/multiproc-rc-demo/daq-buildtools
+git checkout 7a01c1d
