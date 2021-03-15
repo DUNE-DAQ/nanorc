@@ -75,13 +75,34 @@ class NanoRC:
         for n,s in self.apps.items():
             s.send_command('conf', self.cfg.conf[n], 'INITIAL', 'CONFIGURED')
 
-    def start(self, runnum):
-        for n,s in self.apps.items():
-            s.send_command('start', {"run": runnum}, 'CONFIGURED', 'RUNNING')
+    def start(self, run, disable_data_storage, trigger_interval_ticks):
+        runtime_start_data = {
+                "disable_data_storage": disable_data_storage,
+                "run": run,
+                "trigger_interval_ticks": trigger_interval_ticks
+            }
+
+        cfg_start = self.cfg.runtime_start(runtime_start_data)
+        for n in getattr(self.cfg, 'start_order', self.apps.keys()):
+            self.apps[n].send_command('start', cfg_start[n], 'CONFIGURED', 'RUNNING')
+
+        # for n,s in self.apps.items():
+        #     # Botched
+        #     s.send_command('start', self.cfg.runtime_start(runtime_start_data), 'CONFIGURED', 'RUNNING')
 
     def stop(self):
+
+        # Take order from config if defined
+        for n in getattr(self.cfg, 'stop_order', self.apps.keys()):
+            self.apps[n].send_command('stop', self.cfg.stop[n], 'RUNNING', 'CONFIGURED')
+
+    def pause(self):
         for n,s in self.apps.items():
-            s.send_command('stop', {}, 'RUNNING', 'CONFIGURED')
+            s.send_command('pause', {}, 'RUNNING', 'RUNNING')
+
+    def resume(self):
+        for n,s in self.apps.items():
+            s.send_command('resume', {}, 'RUNNING', 'RUNNING')
 
     def scrap(self):
         for n,s in self.apps.items():
@@ -149,16 +170,30 @@ def conf(rc):
     rc.status()
 
 @cli.command('start')
-@click.argument('runnum', type=int)
+@click.argument('run', type=int)
+@click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False)
+@click.option('--trigger_interval_ticks', type=int, default=50000000)
 @click.pass_obj
-def start(rc, runnum):
-    rc.start(runnum)
+def start(rc, run, disable_data_storage, trigger_interval_ticks):
+    rc.start(run, disable_data_storage, trigger_interval_ticks)
     rc.status()
 
 @cli.command('stop')
 @click.pass_obj
 def stop(rc):
     rc.stop()
+    rc.status()
+
+@cli.command('pause')
+@click.pass_obj
+def pause(rc):
+    rc.pause()
+    rc.status()
+
+@cli.command('resume')
+@click.pass_obj
+def resume(rc):
+    rc.resume()
     rc.status()
 
 @cli.command('scrap')

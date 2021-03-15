@@ -1,5 +1,30 @@
 import os.path
 import json
+import copy
+import socket
+
+"""Extract nested values from a JSON tree."""
+
+
+def json_extract(obj, key):
+    """Recursively fetch values from nested JSON."""
+    arr = []
+
+    def extract(obj, arr, key):
+        """Recursively search for values of key in JSON tree."""
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if k == key:
+                    arr.append(v)
+                if isinstance(v, (dict, list)):
+                    extract(v, arr, key)
+        elif isinstance(obj, list):
+            for item in obj:
+                extract(item, arr, key)
+        return arr
+
+    values = extract(obj, arr, key)
+    return values
 
 class ConfigManager:
     """docstring for ConfigManager"""
@@ -9,10 +34,32 @@ class ConfigManager:
 
         self._load()
 
-    def _load(self):
+
+    def _import_cmd_data(self, cmd: str, cfg: dict) -> None:
+        data = {}
+        for f in set(cfg['apps'].values()):
+            fpath = os.path.join(self.cfg_dir, f+'.json')
+            if not os.path.exists(fpath):
+                raise RuntimeError(f"ERROR: {f}.json not found in {self.cfg_dir}")
+
+            with open(fpath, 'r') as jf:
+                try:
+                    j = json.load(jf)
+                    data[f] = j
+                except json.decoder.JSONDecodeError as e:
+                    raise RuntimeError(f"ERROR: failed to load {f}.json") from e 
+
+        x = { a:data[d] for a,d in cfg['apps'].items()}
+        setattr(self, cmd, x)
+
+        if 'order' in cfg:
+            setattr(self, f'{cmd}_order', cfg['order'])
+
+
+    def _load(self) -> None:
 
         cfgs = {}
-        for f in ('boot', 'init', 'conf'):
+        for f in ('boot', 'init', 'conf', 'start', 'stop'):
             fpath = os.path.join(self.cfg_dir, f+'.json')
             if not os.path.exists(fpath):
                 raise RuntimeError(f"ERROR: {f}.json not found in {self.cfg_dir}")
@@ -25,41 +72,34 @@ class ConfigManager:
                     raise RuntimeError(f"ERROR: failed to load {f}.json") from e
 
         # Basic checks
-        assert cfgs['boot']['apps'].keys() == cfgs['init'].keys()
-        assert cfgs['boot']['apps'].keys() == cfgs['conf'].keys()
+        assert cfgs['boot']['apps'].keys() == cfgs['init']['apps'].keys()
+        assert cfgs['boot']['apps'].keys() == cfgs['conf']['apps'].keys()
+        assert cfgs['boot']['apps'].keys() == cfgs['start']['apps'].keys()
+        assert cfgs['boot']['apps'].keys() == cfgs['stop']['apps'].keys()
 
         self.boot = cfgs['boot']
-        # Load init profiles
-        init_data = {}
-        for f in set(cfgs['init'].values()):
-            fpath = os.path.join(self.cfg_dir, f+'.json')
-            if not os.path.exists(fpath):
-                raise RuntimeError(f"ERROR: {f}.json not found in {self.cfg_dir}")
 
-            with open(fpath, 'r') as jf:
-                try:
-                    j = json.load(jf)
-                    init_data[f] = j
-                except json.decoder.JSONDecodeError as e:
-                    raise RuntimeError(f"ERROR: failed to load {f}.json") from e 
+        self._import_cmd_data('init', cfgs['init'])
+        self._import_cmd_data('conf', cfgs['conf'])
+        self._import_cmd_data('start', cfgs['start'])
+        self._import_cmd_data('stop', cfgs['stop'])
 
-        self.init = { a:init_data[d] for a,d in cfgs['init'].items()}
-            
-        # Load init profiles
-        conf_data = {}
-        for f in set(cfgs['conf'].values()):
-            fpath = os.path.join(self.cfg_dir, f+'.json')
-            if not os.path.exists(fpath):
-                raise RuntimeError(f"ERROR: {f}.json not found in {self.cfg_dir}")
 
-            with open(fpath, 'r') as jf:
-                try:
-                    j = json.load(jf)
-                    conf_data[f] = j
-                except json.decoder.JSONDecodeError as e:
-                    raise RuntimeError(f"ERROR: failed to load {f}.json") from e 
+        # Post-process conf
+        # hosts = self.boot['hosts']
+        ips = { n:socket.gethostbyname(h) for n,h in self.boot['hosts'].items()}
+        # Apply real name of hosts
+        for c in json_extract(self.conf, 'sender_config')+json_extract(self.conf, 'receiver_config'):
+            c['address'] = c['address'].format(**ips)
 
-        self.conf = { a:conf_data[d] for a,d in cfgs['conf'].items()}
+
+    def runtime_start(self, data: dict) -> dict:
+        start = copy.deepcopy(self.start)
+
+        for c in json_extract(start, 'modules'):
+            for m in c:
+                m['data'] = data
+        return start
 
 
 
@@ -67,9 +107,15 @@ if __name__ == '__main__':
     from os.path import dirname, join
     from rich.console import Console
     from rich.pretty import Pretty
+    from rich.traceback import Traceback
+
 
     console = Console()
-    cfg = ConfigManager(join(dirname(__file__), 'examples', 'listrev_2x'))
+    try:
+        cfg = ConfigManager(join(dirname(__file__), 'examples', 'minidaqapp'))
+    except Exception as e:
+        console.print(Traceback())
+
     console.print("Boot data :boot:")
     console.print(Pretty(cfg.boot))
 
@@ -78,3 +124,17 @@ if __name__ == '__main__':
 
     console.print("Conf data :boot:")
     console.print(Pretty(cfg.conf))
+
+    console.print("Start data :runner:")
+    console.print(Pretty(cfg.start))
+    console.print("Start order :runner:")
+    console.print(Pretty(cfg.start_order))
+
+    console.print("Stop data :busstop:")
+    console.print(Pretty(cfg.stop))
+    console.print("Stop order :busstop:")
+    console.print(Pretty(cfg.stop_order))
+
+
+    console.print("Start data V:runner:")
+    console.print(Pretty(cfg.runtime_start({'aa': 'bb'})))

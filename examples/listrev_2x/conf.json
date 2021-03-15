@@ -1,4 +1,6 @@
 {
-    "stoca": "listrev_conf",
-    "suka": "listrev_conf"
+    "apps": {
+        "stoca": "data/listrev_conf",
+        "suka": "data/listrev_conf"
+    }
 }

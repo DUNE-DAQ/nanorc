@@ -5,7 +5,7 @@
                 "msg_module_name": "TriggerDecisionNQ",
                 "msg_type": "dunedaq::dfmessages::TriggerDecision",
                 "sender_config": {
-                    "address": "tcp://127.0.0.1:12345",
+                    "address": "tcp://{trg_pc}:12345",
                     "ipm_plugin_type": "ZmqSender",
                     "stype": "msgpack"
                 }
@@ -17,7 +17,7 @@
                 "msg_module_name": "TriggerDecisionTokenNQ",
                 "msg_type": "dunedaq::dfmessages::TriggerDecisionToken",
                 "receiver_config": {
-                    "address": "tcp://127.0.0.1:12346",
+                    "address": "tcp://{ru_pc}:12346",
                     "ipm_plugin_type": "ZmqReceiver"
                 }
             },
@@ -28,7 +28,7 @@
                 "msg_module_name": "TimeSyncNQ",
                 "msg_type": "dunedaq::dfmessages::TimeSync",
                 "receiver_config": {
-                    "address": "tcp://127.0.0.1:12347",
+                    "address": "tcp://{ru_pc}:12347",
                     "ipm_plugin_type": "ZmqReceiver"
                 }
             },

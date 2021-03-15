@@ -65,23 +65,25 @@ class AppCommander(object):
           return False
 
 
-    def send_command(self, cmd_id: str, cmd_data: dict, entry_state: str = 'ANY', exit_state: str = 'ANY', timeout: int=10):
+    def send_command(self, cmd_id: str, cmd_data: dict, entry_state: str = 'ANY', exit_state: str = 'ANY', timeout: int=60):
         cmd = {
           "id": cmd_id,
           "data": cmd_data,
           "entry_state": entry_state,
           "exit_state": exit_state,
         }
-        self.console.print(Pretty(cmd))
+        self.console.print(f"Sending {cmd_id} to {self.app}", Pretty(cmd))
 
         headers = {'content-type': 'application/json', 'X-Answer-Port': str(self.listener_port)}
         response = requests.post(self.app_url, data=json.dumps(cmd), headers=headers)
         try:
             r = self.reply_queue.get(timeout=timeout)
-        except queue.Empty:
+            self.console.print(f"Received reply from {self.app} to {cmd_id}", Pretty(r))
+
+        except queue.Empty as e:
             # Proper error handling, please
-            print('Bugger')
-            return 'Error'
+            self.console.print('Bugger')
+            raise RuntimeError(f"Timeout while waiting for a reply from {app} for command {cmd_id} ")
         return r
 
 
@@ -98,7 +100,6 @@ class AppSupervisor:
     def send_command(self, cmd_id: str, cmd_data: dict, entry_state: str = 'ANY', exit_state: str = 'ANY', timeout: int=10):
         self.last_sent_command = cmd_id
         r = self.commander.send_command(cmd_id, cmd_data, entry_state, exit_state, timeout)
-        self.console.print(Pretty(r))
         if r['result'] == 'OK':
             self.last_ok_command = cmd_id;
         return r

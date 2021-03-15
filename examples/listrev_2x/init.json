@@ -1,4 +1,6 @@
 {
-    "stoca": "listrev_init",
-    "suka": "listrev_init"
+    "apps": {
+        "stoca": "data/listrev_init",
+        "suka": "data/listrev_init"
+    }
 }

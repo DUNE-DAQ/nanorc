@@ -141,7 +141,8 @@ class SSHProcessManager(object):
             cmd_fac = f'rest://localhost:{app_conf["port"]}'
             host = hosts[app_conf["host"]]
 
-            cmd=f'cd {env_vars["DBT_AREA_ROOT"]}; source {env_vars["DBT_ROOT"]}/dbt-setup-env.sh; dbt-setup-runtime-environment; {app_conf["exec"]} --name {app_name} -c {cmd_fac}'
+            # cmd=f'export DUNEDAQ_ERS_VERBOSITY_LEVEL=5; cd {env_vars["DBT_AREA_ROOT"]}; source {env_vars["DBT_ROOT"]}/dbt-setup-env.sh; dbt-setup-runtime-environment; {app_conf["exec"]} --name {app_name} -c {cmd_fac}'
+            cmd=f'export DUNEDAQ_ERS_VERBOSITY_LEVEL=1; cd {env_vars["DBT_AREA_ROOT"]}; source {env_vars["DBT_ROOT"]}/dbt-setup-env.sh; dbt-setup-runtime-environment; {app_conf["exec"]} --name {app_name} -c {cmd_fac}'
 
             ssh_args = [
                 host,
@@ -182,9 +183,9 @@ class SSHProcessManager(object):
             TimeElapsedColumn(),
             console=self.console,
         ) as progress:
-            total = progress.add_task("[yellow]Started apps", total=len(apps))
+            total = progress.add_task("[yellow]# apps started", total=len(apps))
             apps_tasks = { a:progress.add_task(f"[blue]{a}", total=1) for a in self.apps}
-            waiting = progress.add_task("[yellow]Timeout", total=timeout)
+            waiting = progress.add_task("[yellow]timeout", total=timeout)
 
             for _ in range(timeout):
                 progress.update(waiting, advance=1)
