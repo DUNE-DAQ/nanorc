@@ -31,7 +31,7 @@ class NanoRC:
         self.apps = None
 
     def __del__(self):
-        self.destroy()
+        self.terminate()
 
     def status(self) -> None:
 
@@ -52,7 +52,7 @@ class NanoRC:
             table.add_row(app, str(alive), str(ping), sup.handle.host, sup.last_sent_command, sup.last_ok_command)
         self.console.print(table)
 
-    def create(self) -> None:
+    def boot(self) -> None:
         
         self.console.print(Pretty(self.cfg.boot))
 
@@ -64,7 +64,7 @@ class NanoRC:
 
         self.apps = { n:AppSupervisor(self.console, h) for n,h in self.pm.apps.items() }
 
-    def destroy(self):
+    def terminate(self):
         if self.apps:
             for s in self.apps.values():
                 s.terminate()
@@ -147,10 +147,10 @@ def cli(ctx, cfg_dir):
 def status(rc):
     rc.status()
 
-@cli.command('create')
+@cli.command('boot')
 @click.pass_obj
-def create(rc):
-    rc.create()
+def boot(rc):
+    rc.boot()
     rc.status()
 
 @cli.command('init')
@@ -198,10 +198,10 @@ def scrap(rc):
     rc.scrap()
     rc.status()
 
-@cli.command('destroy')
+@cli.command('terminate')
 @click.pass_obj
-def destroy(rc):
-    rc.destroy()
+def terminate(rc):
+    rc.terminate()
     rc.status()
 
 

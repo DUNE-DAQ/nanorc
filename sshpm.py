@@ -148,6 +148,7 @@ class SSHProcessManager(object):
             ssh_args = [
                 host,
                 '-tt',
+                '-o StrictHostKeyChecking=no',
                 cmd
             ]
             log_file = f'log_{app_name}_{app_conf["port"]}.txt'
