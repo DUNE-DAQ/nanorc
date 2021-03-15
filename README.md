@@ -6,6 +6,8 @@ Poor's man Run Control for DUNE DAQ applications
 
 This tutorial will guide you through the one-host minidaq example.
 
+This tutorial assumes you run on a linux host with /cvmfs mounted, such as lxplus.
+
 ### Setup
 First, pick a folder you really like and set up a build environment there as per instructions at
 https://github.com/DUNE-DAQ/minidaqapp/wiki/Instructions-for-setting-up-a-v2.4.0-development-environment
@@ -96,3 +98,11 @@ Received reply from trgemu to resume
 └────────┴──────┴───────┴────────────┴──────────┴─────────────┘
 shonky rc>
 ```
+
+In case you experience timeout problems booting applications or sending commands, consider changing the `hosts` values
+from `localhost` to the hostname of your machine. This has to do with SSH authentication.
+
+### Viewing logs
+
+Logs are kept in the working directory at the time you started the NanoRC cli.  
+They are named `log_<name>_<port>.txt`.
