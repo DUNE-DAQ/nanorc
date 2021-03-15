@@ -12,7 +12,7 @@ cd `dirname "${BASH_SOURCE[0]:-$0}"`
 echo "starting setup"
 
 # tmp_dir=$(mktemp -d -t ci-XXXXXXXXXX)
-tmp_dir=/tmp/multiproc-rc-demo
+tmp_dir=/tmp/nanorc-buildenv
 mkdir -p $tmp_dir
 cd $tmp_dir
 echo "setting up daq application in $tmp_dir"
@@ -59,5 +59,5 @@ dbt-build.sh --install
 curl -Lo frames.bin https://cernbox.cern.ch/index.php/s/VAqNtn7bwuQtff3/download
 
 # fix alias issue
-cd /tmp/multiproc-rc-demo/daq-buildtools
+cd $tmp_dir/daq-buildtools
 git checkout 7a01c1d
