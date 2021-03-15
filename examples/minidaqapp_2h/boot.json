@@ -1,0 +1,22 @@
+{
+    "env" : {
+        "DBT_ROOT": "env",
+        "DBT_AREA_ROOT": "env"
+    },
+    "hosts": {
+        "ru_pc": "np04-srv-028",
+        "trg_pc": "np04-srv-024"
+    },
+    "apps" : {
+        "ruemu" : {
+            "exec": "daq_application",
+            "host": "ru_pc",
+            "port": 3333
+        },
+        "trgemu": {
+            "exec": "daq_application",
+            "host": "trg_pc",
+            "port": 3334
+        }
+    }
+}

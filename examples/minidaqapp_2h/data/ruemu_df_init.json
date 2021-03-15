@@ -1,0 +1,243 @@
+{
+    "modules": [
+        {
+            "data": {
+                "qinfos": [
+                    {
+                        "dir": "output",
+                        "inst": "trigger_decision_from_netq",
+                        "name": "output"
+                    }
+                ]
+            },
+            "inst": "ntoq_trigdec",
+            "plugin": "NetworkToQueue"
+        },
+        {
+            "data": {
+                "qinfos": [
+                    {
+                        "dir": "input",
+                        "inst": "token_q",
+                        "name": "input"
+                    }
+                ]
+            },
+            "inst": "qton_token",
+            "plugin": "QueueToNetwork"
+        },
+        {
+            "data": {
+                "qinfos": [
+                    {
+                        "dir": "input",
+                        "inst": "time_sync_q",
+                        "name": "input"
+                    }
+                ]
+            },
+            "inst": "qton_timesync",
+            "plugin": "QueueToNetwork"
+        },
+        {
+            "data": {
+                "qinfos": [
+                    {
+                        "dir": "input",
+                        "inst": "trigger_decision_from_netq",
+                        "name": "trigger_decision_input_queue"
+                    },
+                    {
+                        "dir": "output",
+                        "inst": "trigger_decision_copy_for_bookkeeping",
+                        "name": "trigger_decision_for_event_building"
+                    },
+                    {
+                        "dir": "output",
+                        "inst": "data_requests_0",
+                        "name": "data_request_0_output_queue"
+                    },
+                    {
+                        "dir": "output",
+                        "inst": "data_requests_1",
+                        "name": "data_request_1_output_queue"
+                    }
+                ]
+            },
+            "inst": "rqg",
+            "plugin": "RequestGenerator"
+        },
+        {
+            "data": {
+                "qinfos": [
+                    {
+                        "dir": "input",
+                        "inst": "trigger_decision_copy_for_bookkeeping",
+                        "name": "trigger_decision_input_queue"
+                    },
+                    {
+                        "dir": "output",
+                        "inst": "trigger_record_q",
+                        "name": "trigger_record_output_queue"
+                    },
+                    {
+                        "dir": "input",
+                        "inst": "data_fragments_q",
+                        "name": "data_fragment_input_queue"
+                    }
+                ]
+            },
+            "inst": "ffr",
+            "plugin": "FragmentReceiver"
+        },
+        {
+            "data": {
+                "qinfos": [
+                    {
+                        "dir": "input",
+                        "inst": "trigger_record_q",
+                        "name": "trigger_record_input_queue"
+                    },
+                    {
+                        "dir": "output",
+                        "inst": "token_q",
+                        "name": "token_output_queue"
+                    }
+                ]
+            },
+            "inst": "datawriter",
+            "plugin": "DataWriter"
+        },
+        {
+            "data": {
+                "qinfos": [
+                    {
+                        "dir": "input",
+                        "inst": "wib_link_0",
+                        "name": "raw_input"
+                    },
+                    {
+                        "dir": "output",
+                        "inst": "time_sync_q",
+                        "name": "timesync"
+                    },
+                    {
+                        "dir": "input",
+                        "inst": "data_requests_0",
+                        "name": "requests"
+                    },
+                    {
+                        "dir": "output",
+                        "inst": "data_fragments_q",
+                        "name": "fragments"
+                    }
+                ]
+            },
+            "inst": "datahandler_0",
+            "plugin": "DataLinkHandler"
+        },
+        {
+            "data": {
+                "qinfos": [
+                    {
+                        "dir": "input",
+                        "inst": "wib_link_1",
+                        "name": "raw_input"
+                    },
+                    {
+                        "dir": "output",
+                        "inst": "time_sync_q",
+                        "name": "timesync"
+                    },
+                    {
+                        "dir": "input",
+                        "inst": "data_requests_1",
+                        "name": "requests"
+                    },
+                    {
+                        "dir": "output",
+                        "inst": "data_fragments_q",
+                        "name": "fragments"
+                    }
+                ]
+            },
+            "inst": "datahandler_1",
+            "plugin": "DataLinkHandler"
+        },
+        {
+            "data": {
+                "qinfos": [
+                    {
+                        "dir": "output",
+                        "inst": "wib_link_0",
+                        "name": "output_0"
+                    },
+                    {
+                        "dir": "output",
+                        "inst": "wib_link_1",
+                        "name": "output_1"
+                    }
+                ]
+            },
+            "inst": "fake_source",
+            "plugin": "FakeCardReader"
+        }
+    ],
+    "queues": [
+        {
+            "capacity": 1000,
+            "inst": "data_fragments_q",
+            "kind": "FollyMPMCQueue"
+        },
+        {
+            "capacity": 100,
+            "inst": "data_requests_0",
+            "kind": "FollySPSCQueue"
+        },
+        {
+            "capacity": 100,
+            "inst": "data_requests_1",
+            "kind": "FollySPSCQueue"
+        },
+        {
+            "capacity": 100,
+            "inst": "time_sync_q",
+            "kind": "FollyMPMCQueue"
+        },
+        {
+            "capacity": 100,
+            "inst": "token_q",
+            "kind": "FollySPSCQueue"
+        },
+        {
+            "capacity": 100,
+            "inst": "trigger_decision_copy_for_bookkeeping",
+            "kind": "FollySPSCQueue"
+        },
+        {
+            "capacity": 100,
+            "inst": "trigger_decision_from_netq",
+            "kind": "FollySPSCQueue"
+        },
+        {
+            "capacity": 100,
+            "inst": "trigger_decision_q",
+            "kind": "FollySPSCQueue"
+        },
+        {
+            "capacity": 100,
+            "inst": "trigger_record_q",
+            "kind": "FollySPSCQueue"
+        },
+        {
+            "capacity": 100000,
+            "inst": "wib_link_0",
+            "kind": "FollySPSCQueue"
+        },
+        {
+            "capacity": 100000,
+            "inst": "wib_link_1",
+            "kind": "FollySPSCQueue"
+        }
+    ]
+}

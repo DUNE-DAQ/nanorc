@@ -1,0 +1,83 @@
+{
+    "modules": [
+        {
+            "data": {
+                "qinfos": [
+                    {
+                        "dir": "input",
+                        "inst": "trigger_decision_to_netq",
+                        "name": "input"
+                    }
+                ]
+            },
+            "inst": "qton_trigdec",
+            "plugin": "QueueToNetwork"
+        },
+        {
+            "data": {
+                "qinfos": [
+                    {
+                        "dir": "output",
+                        "inst": "token_from_netq",
+                        "name": "output"
+                    }
+                ]
+            },
+            "inst": "ntoq_token",
+            "plugin": "NetworkToQueue"
+        },
+        {
+            "data": {
+                "qinfos": [
+                    {
+                        "dir": "output",
+                        "inst": "time_sync_from_netq",
+                        "name": "output"
+                    }
+                ]
+            },
+            "inst": "ntoq_timesync",
+            "plugin": "NetworkToQueue"
+        },
+        {
+            "data": {
+                "qinfos": [
+                    {
+                        "dir": "input",
+                        "inst": "time_sync_from_netq",
+                        "name": "time_sync_source"
+                    },
+                    {
+                        "dir": "input",
+                        "inst": "token_from_netq",
+                        "name": "token_source"
+                    },
+                    {
+                        "dir": "output",
+                        "inst": "trigger_decision_to_netq",
+                        "name": "trigger_decision_sink"
+                    }
+                ]
+            },
+            "inst": "tde",
+            "plugin": "TriggerDecisionEmulator"
+        }
+    ],
+    "queues": [
+        {
+            "capacity": 100,
+            "inst": "time_sync_from_netq",
+            "kind": "FollySPSCQueue"
+        },
+        {
+            "capacity": 20,
+            "inst": "token_from_netq",
+            "kind": "FollySPSCQueue"
+        },
+        {
+            "capacity": 20,
+            "inst": "trigger_decision_to_netq",
+            "kind": "FollySPSCQueue"
+        }
+    ]
+}

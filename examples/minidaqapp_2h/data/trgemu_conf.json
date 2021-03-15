@@ -1,0 +1,58 @@
+{
+    "modules": [
+        {
+            "data": {
+                "msg_module_name": "TriggerDecisionNQ",
+                "msg_type": "dunedaq::dfmessages::TriggerDecision",
+                "sender_config": {
+                    "address": "tcp://{trg_pc}:12345",
+                    "ipm_plugin_type": "ZmqSender",
+                    "stype": "msgpack"
+                }
+            },
+            "match": "qton_trigdec"
+        },
+        {
+            "data": {
+                "msg_module_name": "TriggerDecisionTokenNQ",
+                "msg_type": "dunedaq::dfmessages::TriggerDecisionToken",
+                "receiver_config": {
+                    "address": "tcp://{ru_pc}:12346",
+                    "ipm_plugin_type": "ZmqReceiver"
+                }
+            },
+            "match": "ntoq_token"
+        },
+        {
+            "data": {
+                "msg_module_name": "TimeSyncNQ",
+                "msg_type": "dunedaq::dfmessages::TimeSync",
+                "receiver_config": {
+                    "address": "tcp://{ru_pc}:12347",
+                    "ipm_plugin_type": "ZmqReceiver"
+                }
+            },
+            "match": "ntoq_timesync"
+        },
+        {
+            "data": {
+                "clock_frequency_hz": 50000000,
+                "links": [
+                    0,
+                    1
+                ],
+                "max_links_in_request": 2,
+                "max_readout_window_ticks": 50000,
+                "min_links_in_request": 2,
+                "min_readout_window_ticks": 50000,
+                "repeat_trigger_count": 1,
+                "stop_burst_count": 0,
+                "trigger_delay_ticks": 50000000,
+                "trigger_interval_ticks": 50000000,
+                "trigger_offset": 0,
+                "trigger_window_offset": 25000
+            },
+            "match": "tde"
+        }
+    ]
+}
