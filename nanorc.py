@@ -13,6 +13,7 @@ from rich.table import Table
 from rich.console import Console
 from rich.pretty import Pretty
 from rich.traceback import Traceback
+from rich.progress import *
 
 from sshpm import SSHProcessManager
 from cfgmgr import ConfigManager
@@ -28,6 +29,9 @@ class NanoRC:
 
         self.pm = SSHProcessManager(console)
         self.apps = None
+
+    def __del__(self):
+        self.destroy()
 
     def status(self) -> None:
 
@@ -110,22 +114,14 @@ class NanoRC:
 
 
 
-def cleanup(ctx):
-    ctx.obj.destroy()
-
 # ------------------------------------------------------------------------------
 # Add -h as default help option
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 # ------------------------------------------------------------------------------
 
 # ------------------------------------------------------------------------------
-# @shell(
-#     prompt=click.style('ipbb', fg='blue') + '> ',
-#     intro='Starting IPBus Builder...',
-#     context_settings=CONTEXT_SETTINGS
-# )
-# @click.group(context_settings=CONTEXT_SETTINGS)
-@click_shell.shell(prompt='shonky rc> ', on_finished=cleanup, context_settings=CONTEXT_SETTINGS)
+# @click_shell.shell(prompt='shonky rc> ', chain=True, on_finished=cleanup, context_settings=CONTEXT_SETTINGS)
+@click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 
 # @click.command()
 @click.pass_context
@@ -207,6 +203,29 @@ def scrap(rc):
 def destroy(rc):
     rc.destroy()
     rc.status()
+
+
+@cli.command('wait')
+@click.pass_obj
+@click.argument('seconds', type=int)
+def wait(rc, seconds):
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TimeRemainingColumn(),
+        TimeElapsedColumn(),
+        console=rc.console,
+    ) as progress:
+        waiting = progress.add_task("[yellow]waiting", total=seconds)
+
+        for _ in range(seconds):
+            progress.update(waiting, advance=1)
+
+            time.sleep(1)
+
 
 if __name__ == '__main__':
     cli()

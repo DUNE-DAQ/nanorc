@@ -83,7 +83,7 @@ class AppCommander(object):
         except queue.Empty as e:
             # Proper error handling, please
             self.console.print('Bugger')
-            raise RuntimeError(f"Timeout while waiting for a reply from {app} for command {cmd_id} ")
+            raise RuntimeError(f"Timeout while waiting for a reply from {self.app} for command {cmd_id} ")
         return r
 
 

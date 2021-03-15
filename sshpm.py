@@ -121,7 +121,8 @@ class SSHProcessManager(object):
         self.watchers.append(t)
 
     def notify_error(self, name, exc):
-        print(name, exc.exit_code)
+        self.console.print(name, exc)
+        self.event_queue.put((name, exc))
 
 
     def boot(self, boot_info):
