@@ -50,7 +50,7 @@ class AppCommander(object):
 
         app.add_url_rule('/response', 'index', index, methods = ['POST'])
         
-        flask_srv = Process(target=app.run, kwargs={'port': port})
+        flask_srv = Process(target=app.run, kwargs={'host': '0.0.0.0', 'port': port})
         flask_srv.start()
         return flask_srv
 
