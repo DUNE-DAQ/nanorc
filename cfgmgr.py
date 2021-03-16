@@ -71,7 +71,9 @@ class ConfigManager:
                 except json.decoder.JSONDecodeError as e:
                     raise RuntimeError(f"ERROR: failed to load {f}.json") from e
 
-        # Basic checks
+        # Consistency check.
+        # Note to self: some commands (pause/resume) are meant to be for some applications only
+        # This check needs to be softened then
         assert cfgs['boot']['apps'].keys() == cfgs['init']['apps'].keys()
         assert cfgs['boot']['apps'].keys() == cfgs['conf']['apps'].keys()
         assert cfgs['boot']['apps'].keys() == cfgs['start']['apps'].keys()
@@ -86,7 +88,10 @@ class ConfigManager:
 
 
         # Post-process conf
+        # Replace localhost wiht 
+        self.boot['hosts'] =  { n:(h if h is not in ('localhost', '127.0.0.1') else socket.gethostname()) for n,h in self.boot['hosts'].items() }
         # hosts = self.boot['hosts']
+        
         ips = { n:socket.gethostbyname(h) for n,h in self.boot['hosts'].items()}
         # Apply real name of hosts
         for c in json_extract(self.conf, 'sender_config')+json_extract(self.conf, 'receiver_config'):
