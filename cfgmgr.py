@@ -89,8 +89,8 @@ class ConfigManager:
 
         # Post-process conf
         # Boot:
-        self.boot['hosts'] =  { n:(h if (h is not in ('localhost', '127.0.0.1')) else socket.gethostname()) for n,h in self.boot['hosts'].items() }
-        
+        self.boot['hosts'] =  { n:(h if (not h in ('localhost', '127.0.0.1')) else socket.gethostname()) for n,h in self.boot['hosts'].items() }
+
         # Conf:
         ips = { n:socket.gethostbyname(h) for n,h in self.boot['hosts'].items()}
         # Set sender and receiver address to ips
