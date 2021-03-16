@@ -121,7 +121,7 @@ class SSHProcessManager(object):
         self.watchers.append(t)
 
     def notify_error(self, name, exc):
-        self.console.print(name, exc)
+        self.console.log(name, exc)
         self.event_queue.put((name, exc))
 
 
@@ -228,7 +228,7 @@ class SSHProcessManager(object):
 
         for app, handle in self.apps.items():
             table.add_row(app, str(app in alive), str(app in resp), handle.host)
-        self.console.print(table)
+        self.console.log(table)
 
 
     def terminate(self):
@@ -247,8 +247,3 @@ def __goodbye(*args, **kwargs):
     SSHProcessManager.kill_all_instances()
 
 atexit.register(__goodbye)
-
-# 
-# signal.signal(signal.SIGTERM, __goodbye)
-# signal.signal(signal.SIGINT, __goodbye)
-# ---

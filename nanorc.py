@@ -21,7 +21,8 @@ from appctrl import AppSupervisor
 
         
 class NanoRC:
-    """docstring for NanoRC"""
+    """A Shonky RC for DUNE DAQ"""
+
     def __init__(self, console: Console, cfg_dir: str):
         super(NanoRC, self).__init__()     
         self.console = console
@@ -29,9 +30,6 @@ class NanoRC:
 
         self.pm = SSHProcessManager(console)
         self.apps = None
-
-    def __del__(self):
-        self.terminate()
 
     def status(self) -> None:
 
@@ -54,12 +52,12 @@ class NanoRC:
 
     def boot(self) -> None:
         
-        self.console.print(Pretty(self.cfg.boot))
+        self.console.log(Pretty(self.cfg.boot))
 
         try:
             self.pm.boot(self.cfg.boot)
         except Exception as e:
-            self.console.print(Traceback())
+            self.console.log(Traceback())
             return
 
         self.apps = { n:AppSupervisor(self.console, h) for n,h in self.pm.apps.items() }
@@ -90,10 +88,6 @@ class NanoRC:
         for n in getattr(self.cfg, 'start_order', self.apps.keys()):
             self.apps[n].send_command('start', cfg_start[n], 'CONFIGURED', 'RUNNING')
 
-        # for n,s in self.apps.items():
-        #     # Botched
-        #     s.send_command('start', self.cfg.runtime_start(runtime_start_data), 'CONFIGURED', 'RUNNING')
-
     def stop(self):
 
         # Take order from config if defined
@@ -120,7 +114,6 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 # ------------------------------------------------------------------------------
 
 # ------------------------------------------------------------------------------
-# @click_shell.shell(prompt='shonky rc> ', chain=True, on_finished=cleanup, context_settings=CONTEXT_SETTINGS)
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 
 @click.pass_context
@@ -131,15 +124,23 @@ def cli(ctx, cfg_dir):
     grid = Table(title='Shonky RC', show_header=False)
     grid.add_column()
     grid.add_row("This is an admittedly shonky RC to run DUNE-DAQ applications.")
+    grid.add_row("If commanded it will do your biddings")
+    grid.add_row("If trusted it will stab you in the back.")
     grid.add_row("Use it wisely!")
+
     console.print(grid)
     try:
         rc = NanoRC(console, cfg_dir)
     except Exception as e:
-        console.print(Traceback())
+        console.log(Traceback())
         raise click.Abort()
     ctx.obj = rc
-    # NanoRCShell(console, rc).cmdloop()
+    
+    def cleanup_rc():
+        console.log("Terminating RC")
+        rc.terminate()
+
+    ctx.call_on_close(cleanup_rc)    
 
 @cli.command('status')
 @click.pass_obj
@@ -227,8 +228,8 @@ def wait(rc, seconds):
 
 
 if __name__ == '__main__':
-    cli()
 
+    cli()
 
 
 

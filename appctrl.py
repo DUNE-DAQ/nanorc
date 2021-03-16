@@ -72,17 +72,17 @@ class AppCommander(object):
           "entry_state": entry_state,
           "exit_state": exit_state,
         }
-        self.console.print(f"Sending {cmd_id} to {self.app}", Pretty(cmd))
+        self.console.log(f"Sending {cmd_id} to {self.app}", Pretty(cmd))
 
         headers = {'content-type': 'application/json', 'X-Answer-Port': str(self.listener_port)}
         response = requests.post(self.app_url, data=json.dumps(cmd), headers=headers)
         try:
             r = self.reply_queue.get(timeout=timeout)
-            self.console.print(f"Received reply from {self.app} to {cmd_id}", Pretty(r))
+            self.console.log(f"Received reply from {self.app} to {cmd_id}", Pretty(r))
 
         except queue.Empty as e:
             # Proper error handling, please
-            self.console.print('Bugger')
+            self.console.log('Bugger')
             raise RuntimeError(f"Timeout while waiting for a reply from {self.app} for command {cmd_id} ")
         return r
 
