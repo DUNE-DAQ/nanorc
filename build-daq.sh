@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 # we can't use safe mode, shitty scripts being called
 # set -o errexit -o nounset -o pipefail
-shopt -s expand_aliases # script uses aliases, does't work in non-interactive shells unless explicitly enabled
-# shitty scripts
 # IFS=$'\n\t\v'
-cd `dirname "${BASH_SOURCE[0]:-$0}"`
+shopt -s expand_aliases # script uses aliases, does't work in non-interactive shells unless explicitly enabled
 
 # Constructed from
 # https://github.com/DUNE-DAQ/minidaqapp/wiki/Instructions-for-setting-up-a-v2.4.0-development-environment
@@ -12,10 +10,12 @@ cd `dirname "${BASH_SOURCE[0]:-$0}"`
 echo "starting setup"
 
 # tmp_dir=$(mktemp -d -t ci-XXXXXXXXXX)
-tmp_dir=/tmp/nanorc-buildenv
+# default is not $PWD, very likely to be AFS share (very slow)
+tmp_dir=${1:-"/tmp/$USER/nanorc-buildenv"}
+
+echo "setting up daq application in $tmp_dir"
 mkdir -p $tmp_dir
 cd $tmp_dir
-echo "setting up daq application in $tmp_dir"
 
 echo "sourcing daq built tools"
 git clone https://github.com/DUNE-DAQ/daq-buildtools.git -b v2.2.1
