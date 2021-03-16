@@ -42,12 +42,12 @@ class NanoRC:
         table.add_column("alive", style="magenta")
         table.add_column("pings", style="magenta")
         table.add_column("last cmd", style="magenta")
-        table.add_column("last cmd ok", style="magenta")
+        table.add_column("last succ. cmd", style="magenta")
 
         for app, sup in self.apps.items():
             alive = sup.handle.proc.is_alive()
             ping = sup.commander.ping()
-            table.add_row(app, str(alive), str(ping), sup.handle.host, sup.last_sent_command, sup.last_ok_command)
+            table.add_row(app, sup.handle.host, str(alive), str(ping),  sup.last_sent_command, sup.last_ok_command)
         self.console.print(table)
 
     def boot(self) -> None:
@@ -137,7 +137,7 @@ def cli(ctx, cfg_dir):
     ctx.obj = rc
     
     def cleanup_rc():
-        console.log("Terminating RC")
+        console.log("Terminating RC before exiting")
         rc.terminate()
 
     ctx.call_on_close(cleanup_rc)    

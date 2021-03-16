@@ -88,17 +88,25 @@ class ConfigManager:
 
 
         # Post-process conf
-        # Replace localhost wiht 
-        self.boot['hosts'] =  { n:(h if h is not in ('localhost', '127.0.0.1') else socket.gethostname()) for n,h in self.boot['hosts'].items() }
-        # hosts = self.boot['hosts']
+        # Boot:
+        self.boot['hosts'] =  { n:(h if (h is not in ('localhost', '127.0.0.1')) else socket.gethostname()) for n,h in self.boot['hosts'].items() }
         
+        # Conf:
         ips = { n:socket.gethostbyname(h) for n,h in self.boot['hosts'].items()}
-        # Apply real name of hosts
+        # Set sender and receiver address to ips
         for c in json_extract(self.conf, 'sender_config')+json_extract(self.conf, 'receiver_config'):
             c['address'] = c['address'].format(**ips)
 
 
     def runtime_start(self, data: dict) -> dict:
+        """
+        Generates runtime start parameter set        
+        :param      data:  The data
+        :type       data:  dict
+        
+        :returns:   Complete parameter set.
+        :rtype:     dict
+        """
         start = copy.deepcopy(self.start)
 
         for c in json_extract(start, 'modules'):
