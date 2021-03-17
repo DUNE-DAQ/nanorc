@@ -127,7 +127,6 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
-
 @click.pass_context
 @click.argument('cfg_dir', type=click.Path(exists=True))
 def cli(ctx, cfg_dir):
@@ -136,8 +135,8 @@ def cli(ctx, cfg_dir):
     grid = Table(title='Shonky RC', show_header=False)
     grid.add_column()
     grid.add_row("This is an admittedly shonky RC to run DUNE-DAQ applications.")
-    grid.add_row("If commanded it will do your biddings")
-    grid.add_row("If trusted it will stab you in the back.")
+    grid.add_row("Give a command and it will do your biddings,")
+    grid.add_row("  but trust it and it will betray you!")
     grid.add_row("Use it wisely!")
 
     console.print(grid)
