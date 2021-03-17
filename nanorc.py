@@ -70,10 +70,12 @@ class NanoRC:
         self.pm.terminate()
 
     def init(self):
+        # Init sent to all
         for n,s in self.apps.items():
             s.send_command('init', self.cfg.init[n], 'NONE', 'INITIAL')
 
     def conf(self):
+        # Conf sent to all
         for n,s in self.apps.items():
             s.send_command('conf', self.cfg.conf[n], 'INITIAL', 'CONFIGURED')
 
@@ -84,9 +86,10 @@ class NanoRC:
                 "trigger_interval_ticks": trigger_interval_ticks
             }
 
-        cfg_start = self.cfg.runtime_start(runtime_start_data)
+        start_data = self.cfg.runtime_start(runtime_start_data)
+        # Start sent to apps in pre-defined order
         for n in getattr(self.cfg, 'start_order', self.apps.keys()):
-            self.apps[n].send_command('start', cfg_start[n], 'CONFIGURED', 'RUNNING')
+            self.apps[n].send_command('start', start_data[n], 'CONFIGURED', 'RUNNING')
 
     def stop(self):
 
@@ -95,14 +98,23 @@ class NanoRC:
             self.apps[n].send_command('stop', self.cfg.stop[n], 'RUNNING', 'CONFIGURED')
 
     def pause(self):
-        for n,s in self.apps.items():
-            s.send_command('pause', {}, 'RUNNING', 'RUNNING')
+        # Pause sent only to some apps, what about order?
+        for n in self.cfg.pause.keys():
+            self.apps[n].send_command('pause', {}, 'RUNNING', 'RUNNING')
 
-    def resume(self):
-        for n,s in self.apps.items():
-            s.send_command('resume', {}, 'RUNNING', 'RUNNING')
+    def resume(self, trigger_interval_ticks):
+        runtime_resume_data = {
+            "trigger_interval_ticks": trigger_interval_ticks
+        }
+
+        resume_data = self.cfg.runtime_resume(runtime_resume_data)
+
+        # Resume sent only to some apps, what about order?
+        for n in resume_data.keys():
+            self.apps[n].send_command('resume', resume_data[n], 'RUNNING', 'RUNNING')
 
     def scrap(self):
+        # Scrap sent to all
         for n,s in self.apps.items():
             s.send_command('scrap', {}, 'CONFIGURED', 'INITIAL')
 
@@ -167,11 +179,14 @@ def conf(rc):
 
 @cli.command('start')
 @click.argument('run', type=int)
-@click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False)
-@click.option('--trigger-interval-ticks', type=int, default=50000000)
+@click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')
+# @click.option('--trigger-interval-ticks', type=int, default=50000000, help='Trigger separation in ticks')
 @click.pass_obj
-def start(rc, run, disable_data_storage, trigger_interval_ticks):
-    rc.start(run, disable_data_storage, trigger_interval_ticks)
+def start(rc, run, disable_data_storage):
+    """
+    Starts the run
+    """
+    rc.start(run, disable_data_storage, 50000000) # FIXME: how?
     rc.status()
 
 @cli.command('stop')
@@ -187,9 +202,10 @@ def pause(rc):
     rc.status()
 
 @cli.command('resume')
+@click.option('--trigger-interval-ticks', type=int, default=50000000, help='Trigger separation in ticks')
 @click.pass_obj
-def resume(rc):
-    rc.resume()
+def resume(rc, trigger_interval_ticks):
+    rc.resume(trigger_interval_ticks)
     rc.status()
 
 @cli.command('scrap')
@@ -229,7 +245,7 @@ def wait(rc, seconds):
 
 if __name__ == '__main__':
 
-    cli()
+    cli(show_default=True)
 
 
 

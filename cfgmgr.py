@@ -59,7 +59,8 @@ class ConfigManager:
     def _load(self) -> None:
 
         cfgs = {}
-        for f in ('boot', 'init', 'conf', 'start', 'stop'):
+        cmds = ['init', 'conf', 'start', 'stop', 'pause', 'resume', 'scrap']
+        for f in ['boot']+cmds:
             fpath = os.path.join(self.cfg_dir, f+'.json')
             if not os.path.exists(fpath):
                 raise RuntimeError(f"ERROR: {f}.json not found in {self.cfg_dir}")
@@ -74,18 +75,16 @@ class ConfigManager:
         # Consistency check.
         # Note to self: some commands (pause/resume) are meant to be for some applications only
         # This check needs to be softened then
-        assert cfgs['boot']['apps'].keys() == cfgs['init']['apps'].keys()
-        assert cfgs['boot']['apps'].keys() == cfgs['conf']['apps'].keys()
-        assert cfgs['boot']['apps'].keys() == cfgs['start']['apps'].keys()
-        assert cfgs['boot']['apps'].keys() == cfgs['stop']['apps'].keys()
+        # assert cfgs['boot']['apps'].keys() == cfgs['init']['apps'].keys()
+        # assert cfgs['boot']['apps'].keys() == cfgs['conf']['apps'].keys()
+        # assert cfgs['boot']['apps'].keys() == cfgs['start']['apps'].keys()
+        # assert cfgs['boot']['apps'].keys() == cfgs['stop']['apps'].keys()
 
         self.boot = cfgs['boot']
 
-        self._import_cmd_data('init', cfgs['init'])
-        self._import_cmd_data('conf', cfgs['conf'])
-        self._import_cmd_data('start', cfgs['start'])
-        self._import_cmd_data('stop', cfgs['stop'])
-
+        for c in cmds:
+            self._import_cmd_data(c, cfgs[c])
+    
 
         # Post-process conf
         # Boot:
@@ -114,6 +113,21 @@ class ConfigManager:
                 m['data'] = data
         return start
 
+    def runtime_resume(self, data: dict) -> dict:
+        """
+        Generates runtime resume parameter set        
+        :param      data:  The data
+        :type       data:  dict
+        
+        :returns:   Complete parameter set.
+        :rtype:     dict
+        """
+        resume = copy.deepcopy(self.resume)
+
+        for c in json_extract(resume, 'modules'):
+            for m in c:
+                m['data'] = data
+        return resume
 
 
 if __name__ == '__main__':
