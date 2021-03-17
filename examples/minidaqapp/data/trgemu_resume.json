@@ -1,0 +1,10 @@
+{
+    "modules": [
+        {
+            "data": {
+                "trigger_interval_ticks": 50000000
+            },
+            "match": "tde"
+        }
+    ]
+}

@@ -85,7 +85,7 @@
                     "name": "data_store",
                     "type": "HDF5DataStore"
                 },
-                "initial_token_count": 10
+                "initial_token_count": 0
             },
             "match": "datawriter"
         },

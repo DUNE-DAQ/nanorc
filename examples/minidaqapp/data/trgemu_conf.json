@@ -37,6 +37,7 @@
         {
             "data": {
                 "clock_frequency_hz": 50000000,
+                "initial_token_count": 10,
                 "links": [
                     0,
                     1
