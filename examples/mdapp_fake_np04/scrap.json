@@ -1,0 +1,6 @@
+{
+    "apps": {
+        "ruemu_df": "data/ruemu_df_scrap",
+        "trgemu": "data/trgemu_scrap"
+    }
+}

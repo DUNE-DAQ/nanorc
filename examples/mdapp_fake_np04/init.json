@@ -1,6 +1,6 @@
 {
     "apps": {
-        "ruemu": "data/ruemu_df_init",
+        "ruemu_df": "data/ruemu_df_init",
         "trgemu": "data/trgemu_init"
     }
 }

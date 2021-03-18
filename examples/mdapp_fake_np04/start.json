@@ -1,10 +1,10 @@
 {
     "apps": {
-        "ruemu": "data/ruemu_df_start",
+        "ruemu_df": "data/ruemu_df_start",
         "trgemu": "data/trgemu_start"
     },
     "order": [
-        "ruemu",
-        "trgemu"        
+        "ruemu_df",
+        "trgemu"
     ]
 }
