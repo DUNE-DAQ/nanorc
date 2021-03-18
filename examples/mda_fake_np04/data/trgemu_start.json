@@ -4,7 +4,7 @@
             "data": {
                 "disable_data_storage": false,
                 "run": 333,
-                "trigger_interval_ticks": 50000000
+                "trigger_interval_ticks": 64000000
             },
             "match": "qton_trigdec"
         },
@@ -12,7 +12,7 @@
             "data": {
                 "disable_data_storage": false,
                 "run": 333,
-                "trigger_interval_ticks": 50000000
+                "trigger_interval_ticks": 64000000
             },
             "match": "ntoq_token"
         },
@@ -20,7 +20,7 @@
             "data": {
                 "disable_data_storage": false,
                 "run": 333,
-                "trigger_interval_ticks": 50000000
+                "trigger_interval_ticks": 64000000
             },
             "match": "ntoq_timesync"
         },
@@ -28,7 +28,7 @@
             "data": {
                 "disable_data_storage": false,
                 "run": 333,
-                "trigger_interval_ticks": 50000000
+                "trigger_interval_ticks": 64000000
             },
             "match": "tde"
         }

@@ -5,7 +5,7 @@
                 "msg_module_name": "TriggerDecisionNQ",
                 "msg_type": "dunedaq::dfmessages::TriggerDecision",
                 "receiver_config": {
-                    "address": "tcp://{trg_pc}:12345",
+                    "address": "tcp://{host_trg}:5555",
                     "ipm_plugin_type": "ZmqReceiver"
                 }
             },
@@ -16,7 +16,7 @@
                 "msg_module_name": "TriggerDecisionTokenNQ",
                 "msg_type": "dunedaq::dfmessages::TriggerDecisionToken",
                 "sender_config": {
-                    "address": "tcp://{ru_pc}:12346",
+                    "address": "tcp://{host_rudf}:6666",
                     "ipm_plugin_type": "ZmqSender",
                     "stype": "msgpack"
                 }
@@ -28,7 +28,7 @@
                 "msg_module_name": "TimeSyncNQ",
                 "msg_type": "dunedaq::dfmessages::TimeSync",
                 "sender_config": {
-                    "address": "tcp://{ru_pc}:12347",
+                    "address": "tcp://{host_rudf}:7777",
                     "ipm_plugin_type": "ZmqSender",
                     "stype": "msgpack"
                 }
@@ -85,7 +85,7 @@
                     "name": "data_store",
                     "type": "HDF5DataStore"
                 },
-                "initial_token_count": 10
+                "initial_token_count": 0
             },
             "match": "datawriter"
         },

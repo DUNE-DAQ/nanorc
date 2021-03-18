@@ -1,0 +1,22 @@
+{
+    "apps": {
+        "ruemu_df": {
+            "exec": "daq_application",
+            "host": "host_rudf",
+            "port": 3334
+        },
+        "trgemu": {
+            "exec": "daq_application",
+            "host": "host_trg",
+            "port": 3333
+        }
+    },
+    "env": {
+        "DBT_AREA_ROOT": "env",
+        "DBT_ROOT": "env"
+    },
+    "hosts": {
+        "host_rudf": "np04-srv-028",
+        "host_trg": "np04-srv-024"
+    }
+}
