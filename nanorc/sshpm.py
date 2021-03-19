@@ -7,11 +7,12 @@ import atexit
 import signal
 import threading
 import queue
+import signal
 from rich.console import Console
 from rich.progress import *
 from rich.table import Table
 
-
+from prctl import set_pdeathsig
 """
 Boot handle example
 
@@ -110,6 +111,7 @@ class SSHProcessManager(object):
         self.apps = {}
         self.watchers = []
         self.event_queue = queue.Queue()
+        self.terminating = False
         # Add self to the list of instances
         self.__instances.add(self)
 
@@ -177,7 +179,8 @@ class SSHProcessManager(object):
                 _out=file_logger(handle.logfile),
                 _bg=True,
                 _bg_exc=False,
-                _new_session=False
+                _new_session=True,
+                _preexec_fn=lambda: set_pdeathsig(signal.SIGTERM)
             )
             self.watch(name, proc)
             handle.proc = proc
@@ -240,9 +243,13 @@ class SSHProcessManager(object):
 
 
     def terminate(self):
+
         for name, handle in self.apps.items():
             if handle.proc is not None and handle.proc.is_alive():
-                handle.proc.terminate()
+                try:
+                    handle.proc.terminate()
+                except OSError:
+                   pass
         self.apps = {}
 
     def kill(self):
@@ -260,4 +267,4 @@ def __goodbye(*args, **kwargs):
     SSHProcessManager.kill_all_instances()
 
 
-atexit.register(__goodbye)
+# atexit.register(__goodbye)
