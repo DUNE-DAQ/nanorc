@@ -102,7 +102,7 @@ class SSHProcessManager(object):
     def kill_all_instances(cls):
         instances = set(cls.__instances)
         for i in instances:
-            i.terminate()
+            i.kill()
 
     def __init__(self, console: Console):
         super(SSHProcessManager, self).__init__()
@@ -112,6 +112,11 @@ class SSHProcessManager(object):
         self.event_queue = queue.Queue()
         # Add self to the list of instances
         self.__instances.add(self)
+
+    def __del__(self):
+        if self in self.__instances:
+            self.__instances.remove(self)
+        self.kill()
 
     def watch(self, name, proc):
         t = AppProcessWatcherThread(self, name, proc)
@@ -232,14 +237,19 @@ class SSHProcessManager(object):
             table.add_row(app, str(app in alive), str(app in resp), handle.host)
         self.console.log(table)
 
-    def terminate(self):
 
+    def terminate(self):
         for name, handle in self.apps.items():
             if handle.proc is not None and handle.proc.is_alive():
                 handle.proc.terminate()
-
         self.apps = {}
 
+    def kill(self):
+        for name, handle in self.apps.items():
+            if handle.proc is not None and handle.proc.is_alive():
+                handle.proc.kill()
+
+        self.apps = {}
 
 # Cleanup before exiting
 def __goodbye(*args, **kwargs):

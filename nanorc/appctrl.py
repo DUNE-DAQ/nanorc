@@ -8,7 +8,7 @@ from flask import Flask, request, cli
 from multiprocessing import Process, Queue
 from rich.console import Console
 from rich.pretty import Pretty
-from sshpm import AppProcessHandle
+from .sshpm import AppProcessHandle
 
 
 log = logging.getLogger("werkzeug")
