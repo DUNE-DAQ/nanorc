@@ -68,12 +68,17 @@ def cli(ctx, obj, traceback, cfg_dir):
         print("NanoRC context cleanup: Terminating RC before exiting")
         rc.terminate()
 
-    # def terminate_process(signal_number, frame):
-    #     print(f'Signal {signal_number}Terminating children processes')
-    #     rc.terminate()
+    def terminate_process(signal_number, frame):
+        print(f'Signal {signal_number} caught: Terminating children processes')
+        try:
+            print("Killing everything")
+            rc.pm.kill()
+            print("Killed everything")
+        except:
+            print("Something went wrong")
 
     # signal.signal(signal.SIGTERM, terminate_process)
-    # signal.signal(signal.SIGHUP, terminate_process)
+    signal.signal(signal.SIGHUP, terminate_process)
 
     ctx.call_on_close(cleanup_rc)    
     obj.rc = rc

@@ -177,6 +177,7 @@ class SSHProcessManager(object):
                 _out=file_logger(handle.logfile),
                 _bg=True,
                 _bg_exc=False,
+                _new_session=False
             )
             self.watch(name, proc)
             handle.proc = proc
@@ -247,8 +248,10 @@ class SSHProcessManager(object):
     def kill(self):
         for name, handle in self.apps.items():
             if handle.proc is not None and handle.proc.is_alive():
-                handle.proc.kill()
-
+                try:
+                    handle.proc.kill()
+                except OSError:
+                   pass
         self.apps = {}
 
 # Cleanup before exiting
