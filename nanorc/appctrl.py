@@ -87,7 +87,7 @@ class AppCommander(object):
             "X-Answer-Port": str(self.listener_port),
         }
         response = requests.post(self.app_url, data=json.dumps(cmd), headers=headers)
-        self.console.log("Response: {}")
+        self.console.log("Response: {response}")
         try:
             r = self.reply_queue.get(timeout=timeout)
             self.console.log(f"Received reply from {self.app} to {cmd_id}", Pretty(r))
