@@ -26,46 +26,46 @@ def json_extract(obj, key):
     values = extract(obj, arr, key)
     return values
 
+
 class ConfigManager:
     """docstring for ConfigManager"""
+
     def __init__(self, cfg_dir):
         super(ConfigManager, self).__init__()
         self.cfg_dir = cfg_dir
 
         self._load()
 
-
     def _import_cmd_data(self, cmd: str, cfg: dict) -> None:
         data = {}
-        for f in set(cfg['apps'].values()):
-            fpath = os.path.join(self.cfg_dir, f+'.json')
+        for f in set(cfg["apps"].values()):
+            fpath = os.path.join(self.cfg_dir, f + ".json")
             if not os.path.exists(fpath):
                 raise RuntimeError(f"ERROR: {f}.json not found in {self.cfg_dir}")
 
-            with open(fpath, 'r') as jf:
+            with open(fpath, "r") as jf:
                 try:
                     j = json.load(jf)
                     data[f] = j
                 except json.decoder.JSONDecodeError as e:
-                    raise RuntimeError(f"ERROR: failed to load {f}.json") from e 
+                    raise RuntimeError(f"ERROR: failed to load {f}.json") from e
 
-        x = { a:data[d] for a,d in cfg['apps'].items()}
+        x = {a: data[d] for a, d in cfg["apps"].items()}
         setattr(self, cmd, x)
 
-        if 'order' in cfg:
-            setattr(self, f'{cmd}_order', cfg['order'])
-
+        if "order" in cfg:
+            setattr(self, f"{cmd}_order", cfg["order"])
 
     def _load(self) -> None:
 
         cfgs = {}
-        cmds = ['init', 'conf', 'start', 'stop', 'pause', 'resume', 'scrap']
-        for f in ['boot']+cmds:
-            fpath = os.path.join(self.cfg_dir, f+'.json')
+        cmds = ["init", "conf", "start", "stop", "pause", "resume", "scrap"]
+        for f in ["boot"] + cmds:
+            fpath = os.path.join(self.cfg_dir, f + ".json")
             if not os.path.exists(fpath):
                 raise RuntimeError(f"ERROR: {f}.json not found in {self.cfg_dir}")
 
-            with open(fpath, 'r') as jf:
+            with open(fpath, "r") as jf:
                 try:
                     j = json.load(jf)
                     cfgs[f] = j
@@ -80,66 +80,68 @@ class ConfigManager:
         # assert cfgs['boot']['apps'].keys() == cfgs['start']['apps'].keys()
         # assert cfgs['boot']['apps'].keys() == cfgs['stop']['apps'].keys()
 
-        self.boot = cfgs['boot']
+        self.boot = cfgs["boot"]
 
         for c in cmds:
             self._import_cmd_data(c, cfgs[c])
-    
 
         # Post-process conf
         # Boot:
-        self.boot['hosts'] =  { n:(h if (not h in ('localhost', '127.0.0.1')) else socket.gethostname()) for n,h in self.boot['hosts'].items() }
+        self.boot["hosts"] = {
+            n: (h if (not h in ("localhost", "127.0.0.1")) else socket.gethostname())
+            for n, h in self.boot["hosts"].items()
+        }
 
         # Conf:
-        ips = { n:socket.gethostbyname(h) for n,h in self.boot['hosts'].items()}
+        ips = {n: socket.gethostbyname(h) for n, h in self.boot["hosts"].items()}
         # Set sender and receiver address to ips
-        for c in json_extract(self.conf, 'sender_config')+json_extract(self.conf, 'receiver_config'):
-            c['address'] = c['address'].format(**ips)
-
+        for c in json_extract(self.conf, "sender_config") + json_extract(
+            self.conf, "receiver_config"
+        ):
+            c["address"] = c["address"].format(**ips)
 
     def runtime_start(self, data: dict) -> dict:
         """
-        Generates runtime start parameter set        
+        Generates runtime start parameter set
         :param      data:  The data
         :type       data:  dict
-        
+
         :returns:   Complete parameter set.
         :rtype:     dict
         """
         start = copy.deepcopy(self.start)
 
-        for c in json_extract(start, 'modules'):
+        for c in json_extract(start, "modules"):
             for m in c:
-                m['data'] = data
+                m["data"] = data
         return start
 
     def runtime_resume(self, data: dict) -> dict:
         """
-        Generates runtime resume parameter set        
+        Generates runtime resume parameter set
         :param      data:  The data
         :type       data:  dict
-        
+
         :returns:   Complete parameter set.
         :rtype:     dict
         """
         resume = copy.deepcopy(self.resume)
 
-        for c in json_extract(resume, 'modules'):
+        for c in json_extract(resume, "modules"):
             for m in c:
-                m['data'] = data
+                m["data"] = data
         return resume
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from os.path import dirname, join
     from rich.console import Console
     from rich.pretty import Pretty
     from rich.traceback import Traceback
 
-
     console = Console()
     try:
-        cfg = ConfigManager(join(dirname(__file__), 'examples', 'minidaqapp'))
+        cfg = ConfigManager(join(dirname(__file__), "examples", "minidaqapp"))
     except Exception as e:
         console.print(Traceback())
 
@@ -162,6 +164,5 @@ if __name__ == '__main__':
     console.print("Stop order :busstop:")
     console.print(Pretty(cfg.stop_order))
 
-
     console.print("Start data V:runner:")
-    console.print(Pretty(cfg.runtime_start({'aa': 'bb'})))
+    console.print(Pretty(cfg.runtime_start({"aa": "bb"})))

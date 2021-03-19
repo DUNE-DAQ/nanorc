@@ -13,12 +13,22 @@ from rich.table import Table
 from rich.console import Console
 from rich.pretty import Pretty
 from rich.traceback import Traceback
+from rich.layout import Layout
 from rich.progress import *
+from rich.style import Style
 
 from sshpm import SSHProcessManager
 from cfgmgr import ConfigManager
 from appctrl import AppSupervisor
 
+class NanoContext:
+    """docstring for NanoContext"""
+    def __init__(self, console):
+        super(NanoContext, self).__init__()
+        self.console = console
+        self.print_traceback = False
+        self.rc = None
+        
         
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
@@ -31,6 +41,7 @@ class NanoRC:
         self.pm = SSHProcessManager(console)
         self.apps = None
 
+
     def status(self) -> None:
 
         if not self.apps:
@@ -41,14 +52,54 @@ class NanoRC:
         table.add_column("host", style="magenta")
         table.add_column("alive", style="magenta")
         table.add_column("pings", style="magenta")
-        table.add_column("last cmd", style="magenta")
-        table.add_column("last succ. cmd", style="magenta")
+        table.add_column("last cmd")
+        table.add_column("last succ. cmd", style="green")
 
         for app, sup in self.apps.items():
             alive = sup.handle.proc.is_alive()
             ping = sup.commander.ping()
-            table.add_row(app, sup.handle.host, str(alive), str(ping),  sup.last_sent_command, sup.last_ok_command)
+            last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
+            table.add_row(
+                app, 
+                sup.handle.host,
+                str(alive),
+                str(ping),
+                Text(str(sup.last_sent_command), style=('bold red' if last_cmd_failed else '')),
+                sup.last_ok_command
+            )
         self.console.print(table)
+
+
+    def send_many(self, cmd: str, data: dict, state_entry: str, state_exit: str, sequence: list = None, raise_on_fail: bool =False):
+        """
+        Sends many commands to all applications
+        
+        :param      cmd:            The command
+        :type       cmd:            str
+        :param      data:           The data
+        :type       data:           dict
+        :param      state_entry:    The state entry
+        :type       state_entry:    str
+        :param      state_exit:     The state exit
+        :type       state_exit:     str
+        :param      sequence:       The sequence
+        :type       sequence:       list
+        :param      raise_on_fail:  Raise an exception if any application fails
+        :type       raise_on_fail:  bool
+        """
+
+        # Loop over data keys if no sequence is specified or all apps, if data is emoty
+        if not sequence:
+            sequence = data.keys() if data else self.apps.keys()
+
+        ok, failed = {}, {}
+        for n in sequence:
+            r = self.apps[n].send_command(cmd, data[n] if data else {}, state_entry, state_exit)
+            (ok if r['success'] else failed)[n] = r
+        if raise_on_fail and failed:
+            raise RuntimeError(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
+        return ok, failed
+
 
     def boot(self) -> None:
         
@@ -62,6 +113,7 @@ class NanoRC:
 
         self.apps = { n:AppSupervisor(self.console, h) for n,h in self.pm.apps.items() }
 
+
     def terminate(self):
         if self.apps:
             for s in self.apps.values():
@@ -69,17 +121,30 @@ class NanoRC:
             self.apps = None
         self.pm.terminate()
 
+
     def init(self):
-        # Init sent to all
-        for n,s in self.apps.items():
-            s.send_command('init', self.cfg.init[n], 'NONE', 'INITIAL')
+        """
+        Initializes the applications.
+        """
+        ok, failed = self.send_many('init', self.cfg.init, 'NONE', 'INITIAL', raise_on_fail=True)
 
     def conf(self):
-        # Conf sent to all
-        for n,s in self.apps.items():
-            s.send_command('conf', self.cfg.conf[n], 'INITIAL', 'CONFIGURED')
+        """
+        Sends configure command to the applications.
+        """
+        ok, failed = self.send_many('conf', self.cfg.conf, 'INITIAL', 'CONFIGURED', raise_on_fail=True)
 
-    def start(self, run, disable_data_storage, trigger_interval_ticks):
+    def start(self, run: int, disable_data_storage: bool, trigger_interval_ticks: int):
+        """
+        Sends start command to the applications
+        
+        :param      run:                     The run
+        :type       run:                     int
+        :param      disable_data_storage:    The disable data storage
+        :type       disable_data_storage:    bool
+        :param      trigger_interval_ticks:  The trigger interval ticks
+        :type       trigger_interval_ticks:  int
+        """
         runtime_start_data = {
                 "disable_data_storage": disable_data_storage,
                 "run": run,
@@ -87,36 +152,49 @@ class NanoRC:
             }
 
         start_data = self.cfg.runtime_start(runtime_start_data)
-        # Start sent to apps in pre-defined order
-        for n in getattr(self.cfg, 'start_order', self.apps.keys()):
-            self.apps[n].send_command('start', start_data[n], 'CONFIGURED', 'RUNNING')
+        app_seq = getattr(self.cfg, 'start_order', None)
+        ok, failed = self.send_many('start', start_data, 'CONFIGURED', 'RUNNING', sequence=app_seq, raise_on_fail=True)
+
 
     def stop(self):
+        """
+        Sends stop command
+        """
 
-        # Take order from config if defined
-        for n in getattr(self.cfg, 'stop_order', self.apps.keys()):
-            self.apps[n].send_command('stop', self.cfg.stop[n], 'RUNNING', 'CONFIGURED')
+        app_seq = getattr(self.cfg, 'stop_order', None)
+        ok, failed = self.send_many('stop', self.cfg.stop, 'RUNNING', 'CONFIGURED', sequence=app_seq, raise_on_fail=True)
+
 
     def pause(self):
-        # Pause sent only to some apps, what about order?
-        for n in self.cfg.pause.keys():
-            self.apps[n].send_command('pause', {}, 'RUNNING', 'RUNNING')
+        """
+        Sends pause command
+        """
+        app_seq = getattr(self.cfg, 'pause_order', None)
+        ok, failed = self.send_many('pause', None, 'RUNNING', 'RUNNING', app_seq, raise_on_fail=True)
 
-    def resume(self, trigger_interval_ticks):
+
+    def resume(self, trigger_interval_ticks: int):
+        """
+        Sends resume command
+        
+        :param      trigger_interval_ticks:  The trigger interval ticks
+        :type       trigger_interval_ticks:  int
+        """
         runtime_resume_data = {
             "trigger_interval_ticks": trigger_interval_ticks
         }
 
         resume_data = self.cfg.runtime_resume(runtime_resume_data)
 
-        # Resume sent only to some apps, what about order?
-        for n in resume_data.keys():
-            self.apps[n].send_command('resume', resume_data[n], 'RUNNING', 'RUNNING')
+        app_seq = getattr(self.cfg, 'resume_order', None)
+        ok, failed = self.send_many('resume', resume_data, 'RUNNING', 'RUNNING', sequence=app_seq, raise_on_fail=True)
+
 
     def scrap(self):
-        # Scrap sent to all
-        for n,s in self.apps.items():
-            s.send_command('scrap', {}, 'CONFIGURED', 'INITIAL')
+        """
+        Send scrap command
+        """
+        ok, failed = self.send_many('scrap', None, 'CONFIGURED', 'INITIAL', raise_on_fail=True)
 
 
 
@@ -127,103 +205,108 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
+@click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
+@click.pass_obj
 @click.pass_context
 @click.argument('cfg_dir', type=click.Path(exists=True))
-def cli(ctx, cfg_dir):
+def cli(ctx, obj, traceback, cfg_dir):
 
-    console = Console()
+    obj.print_traceback = traceback
+
     grid = Table(title='Shonky RC', show_header=False)
     grid.add_column()
     grid.add_row("This is an admittedly shonky RC to run DUNE-DAQ applications.")
-    grid.add_row("Give a command and it will do your biddings,")
+    grid.add_row("  Give it a command and it will do your biddings,")
     grid.add_row("  but trust it and it will betray you!")
-    grid.add_row("Use it wisely!")
+    grid.add_row("Handle wiht care!")
 
     console.print(grid)
+
     try:
         rc = NanoRC(console, cfg_dir)
     except Exception as e:
-        console.log(Traceback())
+        obj.console.log(Traceback())
         raise click.Abort()
-    ctx.obj = rc
-    
+        
     def cleanup_rc():
         console.log("Terminating RC before exiting")
         rc.terminate()
 
     ctx.call_on_close(cleanup_rc)    
+    obj.rc = rc
+
 
 @cli.command('status')
 @click.pass_obj
-def status(rc):
-    rc.status()
+def status(obj):
+    obj.rc.status()
 
 @cli.command('boot')
 @click.pass_obj
-def boot(rc):
-    rc.boot()
-    rc.status()
+def boot(obj):
+    obj.rc.boot()
+    obj.rc.status()
 
 @cli.command('init')
 @click.pass_obj
-def init(rc):
-    rc.init()
-    rc.status()
+def init(obj):
+    obj.rc.init()
+    obj.rc.status()
 
 @cli.command('conf')
 @click.pass_obj
-def conf(rc):
-    rc.conf()
-    rc.status()
+def conf(obj):
+    obj.rc.conf()
+    obj.rc.status()
 
 @cli.command('start')
 @click.argument('run', type=int)
 @click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')
 # @click.option('--trigger-interval-ticks', type=int, default=50000000, help='Trigger separation in ticks')
 @click.pass_obj
-def start(rc, run, disable_data_storage):
+def start(obj, run, disable_data_storage):
     """
     Starts the run
     """
-    rc.start(run, disable_data_storage, 50000000) # FIXME: how?
-    rc.status()
+    obj.rc.start(run, disable_data_storage, 50000000) # FIXME: how?
+    obj.rc.status()
 
 @cli.command('stop')
 @click.pass_obj
-def stop(rc):
-    rc.stop()
-    rc.status()
+def stop(obj):
+    obj.rc.stop()
+    obj.rc.status()
 
 @cli.command('pause')
 @click.pass_obj
-def pause(rc):
-    rc.pause()
-    rc.status()
+def pause(obj):
+    obj.rc.pause()
+    obj.rc.status()
 
 @cli.command('resume')
 @click.option('--trigger-interval-ticks', type=int, default=50000000, help='Trigger separation in ticks')
 @click.pass_obj
-def resume(rc, trigger_interval_ticks):
-    rc.resume(trigger_interval_ticks)
-    rc.status()
+def resume(obj, trigger_interval_ticks):
+    obj.rc.resume(trigger_interval_ticks)
+    obj.rc.status()
 
 @cli.command('scrap')
 @click.pass_obj
-def scrap(rc):
-    rc.scrap()
-    rc.status()
+def scrap(obj):
+    obj.rc.scrap()
+    obj.rc.status()
 
 @cli.command('terminate')
 @click.pass_obj
-def terminate(rc):
-    rc.terminate()
-    rc.status()
+def terminate(obj):
+    obj.rc.terminate()
+    obj.rc.status()
 
 
 @cli.command('wait')
 @click.pass_obj
 @click.argument('seconds', type=int)
-def wait(rc, seconds):
+def wait(obj, seconds):
 
     with Progress(
         SpinnerColumn(),
@@ -232,7 +315,7 @@ def wait(rc, seconds):
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         TimeRemainingColumn(),
         TimeElapsedColumn(),
-        console=rc.console,
+        console=obj.console,
     ) as progress:
         waiting = progress.add_task("[yellow]waiting", total=seconds)
 
@@ -244,7 +327,18 @@ def wait(rc, seconds):
 
 if __name__ == '__main__':
 
-    cli(show_default=True)
+    console = Console()
+    obj = NanoContext(console)
+
+    try:
+        cli(obj=obj, show_default=True)
+    except Exception as e:
+        console.log("[bold red]Exception caught[/bold red]")
+        if not obj.print_traceback:
+            console.log(e)
+        else:
+            console.print_exception()
+
 
 
 
