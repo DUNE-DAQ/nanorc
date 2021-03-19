@@ -13,7 +13,6 @@ import cmd
 import click
 import click_shell
 import os.path
-import signal
 
 from rich.table import Table
 from rich.console import Console
@@ -48,9 +47,9 @@ def cli(ctx, obj, traceback, cfg_dir):
 
     obj.print_traceback = traceback
 
-    grid = Table(title='Shonky RC', show_header=False)
+    grid = Table(title='Shonky NanoRC', show_header=False)
     grid.add_column()
-    grid.add_row("This is an admittedly shonky RC to run DUNE-DAQ applications.")
+    grid.add_row("This is an admittedly shonky tiny RC to run DUNE-DAQ applications.")
     grid.add_row("  Give it a command and it will do your biddings,")
     grid.add_row("  but trust it and it will betray you!")
     grid.add_row("Handle wiht care!")
@@ -67,13 +66,6 @@ def cli(ctx, obj, traceback, cfg_dir):
         # console.log("Terminating RC before exiting")
         print("NanoRC context cleanup: Terminating RC before exiting")
         rc.terminate()
-
-    # def terminate_process(signal_number, frame):
-    #     print(f'Signal {signal_number}Terminating children processes')
-    #     rc.terminate()
-
-    # signal.signal(signal.SIGTERM, terminate_process)
-    # signal.signal(signal.SIGHUP, terminate_process)
 
     ctx.call_on_close(cleanup_rc)    
     obj.rc = rc
@@ -169,18 +161,8 @@ def wait(obj, seconds):
 
 if __name__ == '__main__':
 
-    # Register sigterm handler
-    # def terminate_process(signal_number, frame):
-    #     console.print(f'({signal_number}) terminating the process')
-    #     raise SystemExit()
-
-    # signal.signal(signal.SIGTERM, terminate_process)
-    # signal.signal(signal.SIGHUP, terminate_process)
-
     console = Console()
     obj = NanoContext(console)
-
-    # cli(obj=obj, show_default=True)
 
     try:
         cli(obj=obj, show_default=True)

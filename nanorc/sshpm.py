@@ -7,34 +7,35 @@ import atexit
 import signal
 import threading
 import queue
+import signal
 from rich.console import Console
 from rich.progress import *
 from rich.table import Table
 
 
-"""
-Boot handle example
+# # ------------------------------------------------
+# # pexpect.spawn(...,preexec_fn=on_parent_exit('SIGTERM'))
+from ctypes import cdll
 
-{
-    "env" : {
-        "DBT_ROOT": "env",
-        "DBT_AREA_ROOT": "env"
-    },
-    "apps" : {
-        "stoca" : {
-            "exec": "daq_application",
-            "host": "localhost",
-            "port": 12345
-        },
-        "suka": {
-            "exec": "daq_application",
-            "host": "localhost",
-            "port": 12346
-        }
-    }
-}
-"""
+# Constant taken from http://linux.die.net/include/linux/prctl.h
+PR_SET_PDEATHSIG = 1
 
+class PrCtlError(Exception):
+    pass
+
+
+def on_parent_exit(signum):
+    """
+    Return a function to be run in a child process which will trigger
+    SIGNAME to be sent when the parent process dies
+    """
+    def set_parent_exit_signal():
+        # http://linux.die.net/man/2/prctl
+        result = cdll['libc.so.6'].prctl(PR_SET_PDEATHSIG, signum)
+        if result != 0:
+            raise PrCtlError('prctl failed with error code %s' % result)
+    return set_parent_exit_signal
+# # ------------------------------------------------
 
 # ---
 def is_port_open(ip, port):
@@ -110,6 +111,7 @@ class SSHProcessManager(object):
         self.apps = {}
         self.watchers = []
         self.event_queue = queue.Queue()
+        self.terminating = False
         # Add self to the list of instances
         self.__instances.add(self)
 
@@ -177,6 +179,9 @@ class SSHProcessManager(object):
                 _out=file_logger(handle.logfile),
                 _bg=True,
                 _bg_exc=False,
+                _new_session=True,
+                # _preexec_fn=lambda: set_pdeathsig(signal.SIGTERM),
+                _preexec_fn=on_parent_exit(signal.SIGTERM),
             )
             self.watch(name, proc)
             handle.proc = proc
@@ -239,16 +244,22 @@ class SSHProcessManager(object):
 
 
     def terminate(self):
+
         for name, handle in self.apps.items():
             if handle.proc is not None and handle.proc.is_alive():
-                handle.proc.terminate()
+                try:
+                    handle.proc.terminate()
+                except OSError:
+                   pass
         self.apps = {}
 
     def kill(self):
         for name, handle in self.apps.items():
             if handle.proc is not None and handle.proc.is_alive():
-                handle.proc.kill()
-
+                try:
+                    handle.proc.kill()
+                except OSError:
+                   pass
         self.apps = {}
 
 # Cleanup before exiting
@@ -257,4 +268,4 @@ def __goodbye(*args, **kwargs):
     SSHProcessManager.kill_all_instances()
 
 
-atexit.register(__goodbye)
+# atexit.register(__goodbye)
