@@ -13,4 +13,22 @@ def cmd1():
 
 
 if __name__ == '__main__':
-    dummy()
+    # dummy()
+    # 
+    import logging
+    from rich.logging import RichHandler
+    from rich.pretty import Pretty
+
+    logging.basicConfig(
+        level="INFO",
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[RichHandler(rich_tracebacks=True, markup=True)]
+    )
+
+    log = logging.getLogger("rich")
+    log.info({"aa": "bb"})
+    try:
+        print(1 / 0)
+    except Exception:
+        log.exception("unable print!")

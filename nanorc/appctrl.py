@@ -31,6 +31,7 @@ class AppCommander(object):
         self.listener_port = reply_port
         self.reply_queue = Queue()
         self.listener = self._create_listener(reply_port)
+        self.log = logging.getLogger(app)
 
     def __del__(self):
         self._kill_listener()
@@ -74,27 +75,30 @@ class AppCommander(object):
         exit_state: str = "ANY",
         timeout: int = 60,
     ):
+        # USe moo schema here
         cmd = {
             "id": cmd_id,
             "data": cmd_data,
             "entry_state": entry_state,
             "exit_state": exit_state,
         }
-        self.console.log(f"Sending {cmd_id} to {self.app} ({self.app_url})", Pretty(cmd))
+        self.log.info(f"Sending {cmd_id} to {self.app} ({self.app_url})")
+        self.log.info(cmd)
 
         headers = {
             "content-type": "application/json",
             "X-Answer-Port": str(self.listener_port),
         }
         response = requests.post(self.app_url, data=json.dumps(cmd), headers=headers)
-        self.console.log(f"Response: {response}")
+        self.log.info(f"Response: {response}")
         try:
             r = self.reply_queue.get(timeout=timeout)
-            self.console.log(f"Received reply from {self.app} to {cmd_id}", Pretty(r))
+            self.log.info(f"Received reply from {self.app} to {cmd_id}")
+            self.log.info(r)
 
         except queue.Empty as e:
             # Proper error handling, please
-            self.console.log("Bugger")
+            self.log.error("Bugger")
             raise RuntimeError(
                 f"Timeout while waiting for a reply from {self.app} for command {cmd_id} "
             )

@@ -59,11 +59,10 @@ def cli(ctx, obj, traceback, cfg_dir):
     try:
         rc = NanoRC(console, cfg_dir)
     except Exception as e:
-        obj.console.log(Traceback())
+        logging.getLogger("rich").exception("Failed to build NanoRC")
         raise click.Abort()
         
     def cleanup_rc():
-        # console.log("Terminating RC before exiting")
         print("NanoRC context cleanup: Terminating RC before exiting")
         rc.terminate()
 
@@ -160,6 +159,16 @@ def wait(obj, seconds):
             time.sleep(1)
 
 if __name__ == '__main__':
+
+    import logging
+    from rich.logging import RichHandler
+
+    logging.basicConfig(
+        level="INFO",
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[RichHandler(rich_tracebacks=True)]
+    )
 
     console = Console()
     obj = NanoContext(console)

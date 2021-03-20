@@ -152,7 +152,8 @@ class SSHProcessManager(object):
             host = hosts[app_conf["host"]]
 
             # cmd=f'export DUNEDAQ_ERS_VERBOSITY_LEVEL=5; cd {env_vars["DBT_AREA_ROOT"]}; source {env_vars["DBT_ROOT"]}/dbt-setup-env.sh; dbt-setup-runtime-environment; {app_conf["exec"]} --name {app_name} -c {cmd_fac}'
-            cmd = f'export DUNEDAQ_ERS_VERBOSITY_LEVEL=1; cd {env_vars["DBT_AREA_ROOT"]}; source {env_vars["DBT_ROOT"]}/dbt-setup-env.sh; dbt-setup-runtime-environment; {app_conf["exec"]} --name {app_name} -c {cmd_fac}'
+            cmd = f'export DUNEDAQ_ERS_VERBOSITY_LEVEL=1; cd {env_vars["DBT_AREA_ROOT"]}; source dbt-setup-env.sh; dbt-setup-runtime-environment; {app_conf["exec"]} --name {app_name} -c {cmd_fac}'
+            # cmd = f'export DUNEDAQ_ERS_VERBOSITY_LEVEL=5; export PATH={env_vars["PATH"]}; export LD_LIBRARY_PATH={env_vars["LD_LIBRARY_PATH"]}; export CET_PLUGIN_PATH={env_vars["CET_PLUGIN_PATH"]}; {app_conf["exec"]} --name {app_name} -c {cmd_fac}'
 
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no", cmd]
             log_file = f'log_{app_name}_{app_conf["port"]}.txt'
