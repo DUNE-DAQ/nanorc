@@ -1,3 +1,4 @@
+import logging
 from rich.console import Console
 from rich.style import Style
 from rich.pretty import Pretty
@@ -13,6 +14,7 @@ class NanoRC:
 
     def __init__(self, console: Console, cfg_dir: str):
         super(NanoRC, self).__init__()     
+        self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
         self.cfg = ConfigManager(cfg_dir)
 
@@ -69,7 +71,6 @@ class NanoRC:
         # Loop over data keys if no sequence is specified or all apps, if data is emoty
         if not sequence:
             sequence = data.keys() if data else self.apps.keys()
-
         ok, failed = {}, {}
         for n in sequence:
             r = self.apps[n].send_command(cmd, data[n] if data else {}, state_entry, state_exit)
@@ -81,12 +82,12 @@ class NanoRC:
 
     def boot(self) -> None:
         
-        self.console.log(Pretty(self.cfg.boot))
+        self.log.info(str(self.cfg.boot))
 
         try:
             self.pm.boot(self.cfg.boot)
         except Exception as e:
-            self.console.log(Traceback())
+            self.console.print_exception()
             return
 
         self.apps = { n:AppSupervisor(self.console, h) for n,h in self.pm.apps.items() }

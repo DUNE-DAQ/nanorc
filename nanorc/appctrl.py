@@ -75,7 +75,7 @@ class AppCommander(object):
         exit_state: str = "ANY",
         timeout: int = 60,
     ):
-        # USe moo schema here
+        # Use moo schema here?
         cmd = {
             "id": cmd_id,
             "data": cmd_data,
@@ -83,7 +83,7 @@ class AppCommander(object):
             "exit_state": exit_state,
         }
         self.log.info(f"Sending {cmd_id} to {self.app} ({self.app_url})")
-        self.log.info(cmd)
+        self.log.info(json.dumps(cmd, sort_keys=True, indent=2))
 
         headers = {
             "content-type": "application/json",
@@ -94,7 +94,7 @@ class AppCommander(object):
         try:
             r = self.reply_queue.get(timeout=timeout)
             self.log.info(f"Received reply from {self.app} to {cmd_id}")
-            self.log.info(r)
+            self.log.info(json.dumps(r, sort_keys=True, indent=2))
 
         except queue.Empty as e:
             # Proper error handling, please

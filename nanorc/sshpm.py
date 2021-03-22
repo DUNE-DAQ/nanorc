@@ -145,18 +145,21 @@ class SSHProcessManager(object):
         env_vars = {
             k: (os.environ[k] if v == "env" else v) for k, v in boot_info["env"].items()
         }
+        env_vars['NANO_SESSION_DIR'] = os.getcwd()
 
         for app_name, app_conf in apps.items():
 
             cmd_fac = f'rest://localhost:{app_conf["port"]}'
+            info_srv = f'file://info_{app_name}_{app_conf["port"]}.json'
+            log_file = f'log_{app_name}_{app_conf["port"]}.txt'
+            exec_cmd = f'{app_conf["exec"]} --name {app_name} -c {cmd_fac} -i {info_srv}'
             host = hosts[app_conf["host"]]
 
-            # cmd=f'export DUNEDAQ_ERS_VERBOSITY_LEVEL=5; cd {env_vars["DBT_AREA_ROOT"]}; source {env_vars["DBT_ROOT"]}/dbt-setup-env.sh; dbt-setup-runtime-environment; {app_conf["exec"]} --name {app_name} -c {cmd_fac}'
-            cmd = f'export DUNEDAQ_ERS_VERBOSITY_LEVEL=1; cd {env_vars["DBT_AREA_ROOT"]}; source dbt-setup-env.sh; dbt-setup-runtime-environment; {app_conf["exec"]} --name {app_name} -c {cmd_fac}'
-            # cmd = f'export DUNEDAQ_ERS_VERBOSITY_LEVEL=5; export PATH={env_vars["PATH"]}; export LD_LIBRARY_PATH={env_vars["LD_LIBRARY_PATH"]}; export CET_PLUGIN_PATH={env_vars["CET_PLUGIN_PATH"]}; {app_conf["exec"]} --name {app_name} -c {cmd_fac}'
+            # cmd=f'export DUNEDAQ_ERS_VERBOSITY_LEVEL=5; cd {env_vars["DBT_AREA_ROOT"]}; source {env_vars["DBT_ROOT"]}/dbt-setup-env.sh; dbt-setup-runtime-environment; {exec_cmd}'
+            cmd = f'export DUNEDAQ_ERS_VERBOSITY_LEVEL=1; cd {env_vars["DBT_AREA_ROOT"]}; source dbt-setup-env.sh; dbt-setup-runtime-environment; cd {env_vars["NANO_SESSION_DIR"]}; {exec_cmd}'
+            # cmd = f'export DUNEDAQ_ERS_VERBOSITY_LEVEL=5; export PATH={env_vars["PATH"]}; export LD_LIBRARY_PATH={env_vars["LD_LIBRARY_PATH"]}; export CET_PLUGIN_PATH={env_vars["CET_PLUGIN_PATH"]}; {exec_cmd}'
 
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no", cmd]
-            log_file = f'log_{app_name}_{app_conf["port"]}.txt'
 
             handle = AppProcessHandle(app_name)
             handle.logfile = log_file
