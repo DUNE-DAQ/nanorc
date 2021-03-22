@@ -211,13 +211,13 @@ class SSHProcessManager(object):
 
                 alive, resp = self.check_apps()
                 # progress.log(alive, resp)
-                if resp == list(self.apps.keys()):
-                    progress.update(waiting, visible=False)
-                    break
                 for a, t in apps_tasks.items():
                     if a in resp:
                         progress.update(t, completed=1)
                 progress.update(total, completed=len(resp))
+                if resp == list(self.apps.keys()):
+                    progress.update(waiting, visible=False)
+                    break
                 time.sleep(1)
 
     def check_apps(self):
@@ -248,7 +248,6 @@ class SSHProcessManager(object):
 
 
     def terminate(self):
-
         for name, handle in self.apps.items():
             if handle.proc is not None and handle.proc.is_alive():
                 try:
