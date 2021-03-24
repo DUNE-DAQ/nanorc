@@ -52,7 +52,7 @@ def cli(ctx, obj, traceback, cfg_dir):
     grid.add_row("This is an admittedly shonky tiny RC to run DUNE-DAQ applications.")
     grid.add_row("  Give it a command and it will do your biddings,")
     grid.add_row("  but trust it and it will betray you!")
-    grid.add_row("Handle wiht care!")
+    grid.add_row("Handle it with care!")
 
     console.print(grid)
 
@@ -101,6 +101,9 @@ def conf(obj):
 def start(obj, run, disable_data_storage):
     """
     Starts the run
+
+    RUN: run number
+    
     """
     obj.rc.start(run, disable_data_storage, 50000000) # FIXME: how?
     obj.rc.status()

@@ -1,12 +1,3 @@
-#!/usr/bin/env python
-
-
-# with open("info_trgemu_3333.json", "r") as f:
-#     f.readlines()
-
-#     while True:
-#         f.readlines()
-
 import os
 import time
 import json
@@ -17,13 +8,9 @@ from rich.console import Console
 from rich.table import Table
 from rich.layout import Layout
 from rich.live import Live
-from rich.columns import Columns
-from rich.panel import Panel
 from multiprocessing import Queue
 
 
-
-console = Console()
 
 # ---
 def flatten_json(y) -> dict:
@@ -95,7 +82,7 @@ def json_get_path(j, path) -> dict:
 def info_to_table(info, name) -> Table:
     # print(info)
 
-    t = Table(title=name, show_header=False, show_edge=False, padding=(1,0))
+    t = Table(title=name, show_header=False, show_edge=False, padding=(0,0))
     t.add_column('block')
 
     ext = json_extract(info, 'time')
@@ -110,7 +97,7 @@ def info_to_table(info, name) -> Table:
 def info_block_to_table(bpath, bclass, btime, bdata) -> Table:
     print(bdata)
     title = f"{bpath}[{bclass}] {btime}"
-    t = Table(title=title, show_header=False, pad_edge=True, show_edge=False)
+    t = Table(title=title, show_header=False)
     for k,v in flatten_json(bdata).items():
         if k == 'class_name':
             continue
@@ -118,7 +105,7 @@ def info_block_to_table(bpath, bclass, btime, bdata) -> Table:
     return t
 
 # ---
-def make_layout() -> Layout:
+def make_layout(apps) -> Layout:
     """Define the layout."""
     layout = Layout(name="root")
 
@@ -133,6 +120,8 @@ def make_layout() -> Layout:
         direction="horizontal",
     )
 
+    app_layouts = [Layout(name=app) for app in apps]
+    layout["body"].split(*app_layouts, direction="horizontal")
     layout["side"].split(Layout(name="box1"), Layout(name="box2"))
     return layout
 
@@ -167,68 +156,3 @@ class InfoThread(threading.Thread):
                     self.queue.put(j)
         print("Farewell!")
 
-
-def old():
-    fname = "info_ruemu_df_3334.json"
-    # fname = "info_trgemu_3333.json"
-    with open(fname, 'rb') as f:
-        f.seek(-2, os.SEEK_END)
-        while f.read(1) != b'\n':
-            f.seek(-2, os.SEEK_CUR)
-        last_line = f.readline().decode()
-        j = json.loads(last_line[:-1])
-
-        t = info_to_table(j, 'ruemu_df')
-        console.log(t)
-
-        layout = make_layout()
-        layout['body'].update(t)
-        # console.print(layout)
-
-        # with Live(layout, refresh_per_second=2, screen=True):
-        while True:
-            time.sleep(1)
-            l = f.readline().decode()
-            if l:
-                j = json.loads(l[:-1])
-                t = info_to_table(j, 'ruemu_df')
-                console.log(t)
-                # layout['body'].update(t)
-
-
-
-def main():
-
-    t_trgemu = InfoThread("info_trgemu_3333.json", 1)
-    t_trgemu.start()
-
-    t_ruemu_df = InfoThread("info_ruemu_df_3334.json", 1)
-    t_ruemu_df.start()
-    layout = make_layout()
-    tables = {}
-    try:
-        with Live(layout, refresh_per_second=2, screen=True):
-            while True:
-
-                for app, trd in [("trgemu", t_trgemu), ("ruemu_df", t_ruemu_df)]:
-                    j = None
-                    try:
-                        j = trd.queue.get(block=False)
-                    except:
-                        pass
-                    if j is not None: 
-                        t = info_to_table(j, app)
-                        tables[app] = Panel(t, expand=True)
-                layout["body"].update(Columns(tables.values()))
-                time.sleep(1)
-
-    except KeyboardInterrupt:
-        t_trgemu.running = False
-        t_ruemu_df.running = False
-        t_trgemu.join()
-        t_ruemu_df.join()
-
-
-
-if __name__ == '__main__':
-    main()
