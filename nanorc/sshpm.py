@@ -134,7 +134,7 @@ class SSHProcessManager(object):
 
         if self.apps:
             raise RuntimeError(
-                f"ERROR: apps already booted {' '.join(self.apps.keys())}. Terminate them before booting a new set."
+                f"ERROR: apps have already been booted {' '.join(self.apps.keys())}. Terminate them all before booting a new set."
             )
 
         # Add a check for env and apps in boot_info keys
@@ -149,15 +149,17 @@ class SSHProcessManager(object):
 
         for app_name, app_conf in apps.items():
 
-            cmd_fac = f'rest://localhost:{app_conf["port"]}'
-            info_srv = f'file://info_{app_name}_{app_conf["port"]}.json'
-            log_file = f'log_{app_name}_{app_conf["port"]}.txt'
-            exec_cmd = f'{app_conf["exec"]} --name {app_name} -c {cmd_fac} -i {info_srv}'
             host = hosts[app_conf["host"]]
 
-            # cmd=f'export DUNEDAQ_ERS_VERBOSITY_LEVEL=5; cd {env_vars["DBT_AREA_ROOT"]}; source {env_vars["DBT_ROOT"]}/dbt-setup-env.sh; dbt-setup-runtime-environment; {exec_cmd}'
-            cmd = f'export DUNEDAQ_ERS_VERBOSITY_LEVEL=1; cd {env_vars["DBT_AREA_ROOT"]}; source dbt-setup-env.sh; dbt-setup-runtime-environment; cd {env_vars["NANO_SESSION_DIR"]}; {exec_cmd}'
-            # cmd = f'export DUNEDAQ_ERS_VERBOSITY_LEVEL=5; export PATH={env_vars["PATH"]}; export LD_LIBRARY_PATH={env_vars["LD_LIBRARY_PATH"]}; export CET_PLUGIN_PATH={env_vars["CET_PLUGIN_PATH"]}; {exec_cmd}'
+            app_vars = {}
+            app_vars.update(env_vars)
+            app_vars.update({
+                "APP_NAME": app_name,
+                "APP_PORT": app_conf["port"]
+                })
+            cmd=';'.join([ f"export {n}={v}" for n,v in app_vars.items()] + boot_info['exec'][app_conf['exec']]['cmd'])
+
+            log_file = f'log_{app_name}_{app_conf["port"]}.txt'
 
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no", cmd]
 
