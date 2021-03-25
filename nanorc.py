@@ -13,8 +13,10 @@ import cmd
 import click
 import click_shell
 import os.path
+import logging
 
 from rich.table import Table
+from rich.panel import Panel
 from rich.console import Console
 from rich.traceback import Traceback
 from rich.progress import *
@@ -37,24 +39,43 @@ class NanoContext:
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 # ------------------------------------------------------------------------------
 
+
+loglevels = {
+    'CRITICAL': logging.CRITICAL,
+    'ERROR': logging.ERROR,
+    'WARNING': logging.WARNING,
+    'INFO': logging.INFO,
+    'DEBUG': logging.DEBUG,
+    'NOTSET': logging.NOTSET,
+}
+
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
+@click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default=None, help='Set the log level')
+@click.argument('cfg_dir', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-@click.argument('cfg_dir', type=click.Path(exists=True))
-def cli(ctx, obj, traceback, cfg_dir):
+def cli(ctx, obj, traceback, loglevel, cfg_dir):
 
     obj.print_traceback = traceback
 
-    grid = Table(title='Shonky NanoRC', show_header=False)
+    grid = Table(title='Shonky NanoRC', show_header=False, show_edge=False)
     grid.add_column()
-    grid.add_row("This is an admittedly shonky tiny RC to run DUNE-DAQ applications.")
+    grid.add_row("This is an admittedly shonky nanp RC to control DUNE-DAQ applications.")
     grid.add_row("  Give it a command and it will do your biddings,")
     grid.add_row("  but trust it and it will betray you!")
-    grid.add_row("Handle it with care!")
+    grid.add_row("Use it with care!")
 
-    console.print(grid)
+    console.print(Panel.fit(grid))
+
+
+    if loglevel:
+        level = loglevels[loglevel]
+        logger = logging.getLogger()
+        logger.setLevel(level)
+        for handler in logger.handlers:
+            handler.setLevel(level)
 
     try:
         rc = NanoRC(console, cfg_dir)
@@ -103,7 +124,7 @@ def start(obj, run, disable_data_storage):
     Starts the run
 
     RUN: run number
-    
+
     """
     obj.rc.start(run, disable_data_storage, 50000000) # FIXME: how?
     obj.rc.status()
@@ -163,7 +184,6 @@ def wait(obj, seconds):
 
 if __name__ == '__main__':
 
-    import logging
     from rich.logging import RichHandler
 
     logging.basicConfig(

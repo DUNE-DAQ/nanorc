@@ -98,7 +98,7 @@ class AppCommander(object):
 
         except queue.Empty as e:
             # Proper error handling, please
-            self.log.error("Bugger")
+            self.log.error(f"Timeout while waiting for a reply from {self.app} for command {cmd_id}")
             raise RuntimeError(
                 f"Timeout while waiting for a reply from {self.app} for command {cmd_id} "
             )
