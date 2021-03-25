@@ -1,11 +1,26 @@
 {
+    "daq_application_ups" : {
+        "cmd": [
+            "export DUNEDAQ_ERS_VERBOSITY_LEVEL=1;",
+            "CMD_FAC=rest://localhost:${APP_PORT}",
+            "INFO_SVC=file://info_${APP_ID}_${APP_PORT}.json",
+            "cd ${DBT_AREA_ROOT};",
+            "source dbt-setup-env.sh;",
+            "dbt-setup-runtime-environment;",
+            "cd ${NANO_SESSION_DIR};",
+            "daq_application --name ${APP_ID} -c ${CMD_FAC} -i ${INFO_SVC}"
+        ]
+    },
     "daq_application" : {
+        "env":{
+            "CET_PLUGIN_PATH": "env",
+            "DUNEDAQ_SHARE_PATH": "env",
+            "LD_LIBRARY_PATH": "env",
+            "PATH": "env"
+        },
         "cmd": [
             "CMD_FAC=rest://localhost:${APP_PORT}",
             "INFO_SVC=file://info_${APP_NAME}_${APP_PORT}.json",
-            "cd ${DBT_AREA_ROOT}",
-            "source dbt-setup-env.sh",
-            "dbt-setup-runtime-environment",
             "cd ${NANO_SESSION_DIR}",
             "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}"
         ]

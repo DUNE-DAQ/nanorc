@@ -150,9 +150,11 @@ class SSHProcessManager(object):
         for app_name, app_conf in apps.items():
 
             host = hosts[app_conf["host"]]
+            exec_vars = boot_info['exec'][app_conf['exec']]['env']
 
             app_vars = {}
             app_vars.update(env_vars)
+            app_vars.update(exec_vars)
             app_vars.update({
                 "APP_NAME": app_name,
                 "APP_PORT": app_conf["port"]
@@ -186,7 +188,6 @@ class SSHProcessManager(object):
                 _bg=True,
                 _bg_exc=False,
                 _new_session=True,
-                # _preexec_fn=lambda: set_pdeathsig(signal.SIGTERM),
                 _preexec_fn=on_parent_exit(signal.SIGTERM),
             )
             self.watch(name, proc)

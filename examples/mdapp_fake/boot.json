@@ -12,7 +12,6 @@
         }
     },
     "env": {
-        "DBT_AREA_ROOT": "env",
         "DUNEDAQ_ERS_VERBOSITY_LEVEL": 1
     },
     "hosts": {
