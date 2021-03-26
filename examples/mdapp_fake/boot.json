@@ -20,20 +20,22 @@
     },
     "exec": {
         "daq_application_ups" : {
+            "comment": "Application profile using dbt-setup to setup environment",
             "env": {
                "DBT_AREA_ROOT": "getenv" 
             },
             "cmd": [
                 "CMD_FAC=rest://localhost:${APP_PORT}",
                 "INFO_SVC=file://info_${APP_ID}_${APP_PORT}.json",
-                "cd ${DBT_AREA_ROOT};",
-                "source dbt-setup-env.sh;",
-                "dbt-setup-runtime-environment;",
-                "cd ${NANO_SESSION_DIR};",
+                "cd ${DBT_AREA_ROOT}",
+                "source dbt-setup-env.sh",
+                "dbt-setup-runtime-environment",
+                "cd ${NANO_SESSION_DIR}",
                 "daq_application --name ${APP_ID} -c ${CMD_FAC} -i ${INFO_SVC}"
             ]
         },
         "daq_application" : {
+            "comment": "Application profile using basic PATH variables (more efficient)",
             "env":{
                 "CET_PLUGIN_PATH": "getenv",
                 "DUNEDAQ_SHARE_PATH": "getenv",
