@@ -77,6 +77,8 @@ class NanoRC:
             (ok if r['success'] else failed)[n] = r
         if raise_on_fail and failed:
             self.log.error(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
+            for a,r in failed.items():
+                self.log.error(f"{a}: {r}")
             raise RuntimeError(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
         return ok, failed
 

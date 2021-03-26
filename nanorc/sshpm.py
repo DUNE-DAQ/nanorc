@@ -8,6 +8,7 @@ import signal
 import threading
 import queue
 import signal
+import logging
 from rich.console import Console
 from rich.progress import *
 from rich.table import Table
@@ -108,10 +109,12 @@ class SSHProcessManager(object):
     def __init__(self, console: Console):
         super(SSHProcessManager, self).__init__()
         self.console = console
+        self.log = logging.getLogger(__name__)
         self.apps = {}
         self.watchers = []
         self.event_queue = queue.Queue()
         self.terminating = False
+
         # Add self to the list of instances
         self.__instances.add(self)
 
@@ -127,7 +130,7 @@ class SSHProcessManager(object):
         self.watchers.append(t)
 
     def notify_error(self, name, exc):
-        self.console.log(name, exc)
+        self.log.info(name+str(exc))
         self.event_queue.put((name, exc))
 
     def boot(self, boot_info):
@@ -142,6 +145,7 @@ class SSHProcessManager(object):
         apps = boot_info["apps"]
         hosts = boot_info["hosts"]
 
+        # Move to cfgmgr!
         env_vars = {
             k: (os.environ[k] if v == "env" else v) for k, v in boot_info["env"].items()
         }
@@ -150,7 +154,11 @@ class SSHProcessManager(object):
         for app_name, app_conf in apps.items():
 
             host = hosts[app_conf["host"]]
-            exec_vars = boot_info['exec'][app_conf['exec']]['env']
+
+            # Move to cfgmgr!
+            exec_vars = {
+                k: (os.environ[k] if v == "env" else v) for k, v in boot_info['exec'][app_conf['exec']]['env'].items()
+            }
 
             app_vars = {}
             app_vars.update(env_vars)
@@ -247,7 +255,7 @@ class SSHProcessManager(object):
 
         for app, handle in self.apps.items():
             table.add_row(app, str(app in alive), str(app in resp), handle.host)
-        self.console.log(table)
+        self.console.print(table)
 
 
     def terminate(self):
