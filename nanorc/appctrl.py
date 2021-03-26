@@ -12,11 +12,13 @@ from rich.pretty import Pretty
 from .sshpm import AppProcessDescriptor
 
 
-# log = logging.getLogger("werkzeug")
-# log.setLevel(logging.ERROR)
-# cli.show_server_banner = lambda *_: None
+log = logging.getLogger("werkzeug")
+log.setLevel(logging.ERROR)
+cli.show_server_banner = lambda *_: None
 
 class ResponseDispatcher(threading.Thread):
+
+    STOP="RESPONSE_QUEUE_STOP"
 
     def __init__(self, listener):
         threading.Thread.__init__(self)
@@ -26,13 +28,13 @@ class ResponseDispatcher(threading.Thread):
 
         while True:
             r = self.listener.reponse_queue.get()
-            if r == "RESPONSE_QUEUE_STOP":
+            if r == self.STOP:
                 break
 
             self.listener.notify(r)
 
     def stop(self):
-        self.listener.reponse_queue.put_nowait("RESPONSE_QUEUE_STOP")
+        self.listener.reponse_queue.put_nowait(self.STOP)
         self.join()
 
 class ResponseListener:
@@ -68,6 +70,9 @@ class ResponseListener:
         return flask_srv
 
     def terminate(self):
+        """
+        Terminate the listener
+        """
         if self.flask:
             self.flask.terminate()
             self.flask.join()
@@ -94,7 +99,7 @@ class ResponseListener:
 
     def unregister(self, app: str):
         """
-        De-regiser a notification handler
+        De-register a notification handler
         
         :param      app:  The application
         :type       app:  str
@@ -124,7 +129,7 @@ class AppCommander:
     """docstring for DAQAppController"""
 
     def __init__(
-        self, console: Console, app: str, host: str, port: int, reply_port: int
+        self, console: Console, app: str, host: str, port: int, response_port: int
     ):
         self.log = logging.getLogger(app)
         self.console = console
@@ -132,34 +137,15 @@ class AppCommander:
         self.app_host = host
         self.app_port = port
         self.app_url = f"http://{self.app_host}:{str(self.app_port)}/command"
-        self.listener_port = reply_port
+        self.listener_port = response_port
         self.reponse_queue = Queue()
-        self.listener = self._create_listener(reply_port)
+        # self.listener = self._create_listener(response_port)
 
     def __del__(self):
-        self._kill_listener()
+        pass
 
-    def _kill_listener(self):
-        if self.listener:
-            self.listener.terminate()
-            self.listener.join()
-        self.listener = None
-
-    def _create_listener(self, port: int) -> Process:
-        app = Flask(__name__)
-
-        # @app.route('/response', methods = ['POST'])
-        def index():
-            json = request.get_json(force=True)
-            # enqueue command reply
-            self.reponse_queue.put(json)
-            return "Response received"
-
-        app.add_url_rule("/response", "index", index, methods=["POST"])
-
-        flask_srv = Process(target=app.run, kwargs={"host": "0.0.0.0", "port": port})
-        flask_srv.start()
-        return flask_srv
+    def notify(self, response):
+        self.reponse_queue.put(response)
 
     def ping(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -209,16 +195,17 @@ class AppCommander:
 
 
 class AppSupervisor:
-    """docstring for AppSupervisor"""
+    """Lightweight application supervisor"""
 
-    def __init__(self, console: Console, desc: AppProcessDescriptor):
+    def __init__(self, console: Console, desc: AppProcessDescriptor, listener: ResponseListener):
         self.console = console
         self.desc = desc
         self.commander = AppCommander(
-            console, desc.name, desc.host, desc.port, desc.port + 10000
+            console, desc.name, desc.host, desc.port, listener.port
         )
         self.last_sent_command = None
         self.last_ok_command = None
+        listener.register(desc.name, self.commander)
 
     def send_command(
         self,
@@ -237,7 +224,6 @@ class AppSupervisor:
         return r
 
     def terminate(self):
-        self.commander._kill_listener()
         del self.commander
 
 

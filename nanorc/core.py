@@ -6,7 +6,7 @@ from rich.table import Table
 from rich.text import Text
 from .sshpm import SSHProcessManager
 from .cfgmgr import ConfigManager
-from .appctrl import AppSupervisor
+from .appctrl import AppSupervisor, ResponseListener
 from rich.traceback import Traceback
 
 class NanoRC:
@@ -20,13 +20,13 @@ class NanoRC:
 
         self.pm = SSHProcessManager(console)
         self.apps = None
-
+        self.listener = None
 
     def status(self) -> None:
         """
         Displays the status of the applications
 
-        :returns:   { description_of_the_return_value }
+        :returns:   Nothing
         :rtype:     None
         """
 
@@ -102,17 +102,21 @@ class NanoRC:
             self.console.print_exception()
             return
 
-        # self.listener = ResponseListener(56789)
-        self.apps = { n:AppSupervisor(self.console, d) for n,d in self.pm.apps.items() }
-
+        self.listener = ResponseListener(56789)
+        self.apps = { n:AppSupervisor(self.console, d, self.listener) for n,d in self.pm.apps.items() }
 
     def terminate(self):
         if self.apps:
-            for s in self.apps.values():
+            for n,s in self.apps.items():
                 s.terminate()
+                if self.listener:
+                    self.listener.unregister(n)
             self.apps = None
+        if self.listener:
+            self.listener.terminate()
+
         self.pm.terminate()
-        # self.listener.terminate()
+    
 
 
     def init(self):
