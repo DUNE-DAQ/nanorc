@@ -58,8 +58,7 @@ class ConfigManager:
 
     def _load(self) -> None:
 
-
-        pm_cfg = ["boot", "exec"]
+        pm_cfg = ["boot"]
         rc_cmds = ["init", "conf", "start", "stop", "pause", "resume", "scrap"]
         cfgs = {}
         for f in pm_cfg + rc_cmds:
@@ -75,8 +74,6 @@ class ConfigManager:
                     raise RuntimeError(f"ERROR: failed to load {f}.json") from e
 
         self.boot = cfgs["boot"]
-        self.boot["exec"] = cfgs["exec"]
-
 
         for c in rc_cmds:
             self._import_cmd_data(c, cfgs[c])
