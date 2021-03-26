@@ -144,12 +144,6 @@ class SSHProcessManager(object):
 
         apps = boot_info["apps"]
         hosts = boot_info["hosts"]
-
-        # Move to cfgmgr!
-        # env_vars = {
-            # k: (os.environ[k] if v == "getenv" else v) for k, v in boot_info["env"].items()
-        # }
-        # env_vars['APP_WD'] = os.getcwd()
         env_vars = boot_info["env"]
 
         for app_name, app_conf in apps.items():
@@ -157,10 +151,6 @@ class SSHProcessManager(object):
             host = hosts[app_conf["host"]]
 
             exec_vars = boot_info['exec'][app_conf['exec']]['env']
-            # Move to cfgmgr!
-            # exec_vars = {
-                # k: (os.environ[k] if v == "getenv" else v) for k, v in boot_info['exec'][app_conf['exec']]['env'].items()
-            # }
 
             app_vars = {}
             app_vars.update(env_vars)
