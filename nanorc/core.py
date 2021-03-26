@@ -23,6 +23,12 @@ class NanoRC:
 
 
     def status(self) -> None:
+        """
+        Displays the status of the applications
+
+        :returns:   { description_of_the_return_value }
+        :rtype:     None
+        """
 
         if not self.apps:
             return
@@ -36,12 +42,12 @@ class NanoRC:
         table.add_column("last succ. cmd", style="green")
 
         for app, sup in self.apps.items():
-            alive = sup.handle.proc.is_alive()
+            alive = sup.desc.proc.is_alive()
             ping = sup.commander.ping()
             last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
             table.add_row(
                 app, 
-                sup.handle.host,
+                sup.desc.host,
                 str(alive),
                 str(ping),
                 Text(str(sup.last_sent_command), style=('bold red' if last_cmd_failed else '')),
@@ -84,6 +90,9 @@ class NanoRC:
 
 
     def boot(self) -> None:
+        """
+        Boots applications
+        """
         
         self.log.info(str(self.cfg.boot))
 
@@ -93,7 +102,8 @@ class NanoRC:
             self.console.print_exception()
             return
 
-        self.apps = { n:AppSupervisor(self.console, h) for n,h in self.pm.apps.items() }
+        # self.listener = ResponseListener(56789)
+        self.apps = { n:AppSupervisor(self.console, d) for n,d in self.pm.apps.items() }
 
 
     def terminate(self):
@@ -102,6 +112,7 @@ class NanoRC:
                 s.terminate()
             self.apps = None
         self.pm.terminate()
+        # self.listener.terminate()
 
 
     def init(self):

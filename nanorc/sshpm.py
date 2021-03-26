@@ -63,11 +63,11 @@ def file_logger(logfile, echo=False):
     return interact
 
 
-class AppProcessHandle(object):
-    """docstring for AppProcessHandle"""
+class AppProcessDescriptor(object):
+    """docstring for AppProcessDescriptor"""
 
     def __init__(self, name):
-        super(AppProcessHandle, self).__init__()
+        super(AppProcessDescriptor, self).__init__()
         self.proc = None
         self.name = name
         self.logfile = None
@@ -166,33 +166,33 @@ class SSHProcessManager(object):
 
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no", cmd]
 
-            handle = AppProcessHandle(app_name)
-            handle.logfile = log_file
-            handle.cmd = cmd
-            handle.ssh_args = ssh_args
-            handle.host = host
-            handle.port = app_conf["port"]
-            handle.conf = app_conf.copy()
-            self.apps[app_name] = handle
+            desc = AppProcessDescriptor(app_name)
+            desc.logfile = log_file
+            desc.cmd = cmd
+            desc.ssh_args = ssh_args
+            desc.host = host
+            desc.port = app_conf["port"]
+            desc.conf = app_conf.copy()
+            self.apps[app_name] = desc
 
         apps_running = []
-        for name, handle in self.apps.items():
-            if is_port_open(handle.host, handle.port):
+        for name, desc in self.apps.items():
+            if is_port_open(desc.host, desc.port):
                 apps_running += [name]
         if apps_running:
             raise RuntimeError(f"ERROR: apps already running? {apps_running}")
 
-        for name, handle in self.apps.items():
+        for name, desc in self.apps.items():
             proc = sh.ssh(
-                *handle.ssh_args,
-                _out=file_logger(handle.logfile),
+                *desc.ssh_args,
+                _out=file_logger(desc.logfile),
                 _bg=True,
                 _bg_exc=False,
                 _new_session=True,
                 _preexec_fn=on_parent_exit(signal.SIGTERM),
             )
             self.watch(name, proc)
-            handle.proc = proc
+            desc.proc = proc
 
         timeout = 30
         with Progress(
@@ -227,12 +227,12 @@ class SSHProcessManager(object):
     def check_apps(self):
         responding = []
         alive = []
-        for name, handle in self.apps.items():
+        for name, desc in self.apps.items():
 
-            if handle.proc is not None and handle.proc.is_alive():
+            if desc.proc is not None and desc.proc.is_alive():
                 alive += [name]
-            if handle.proc is not None and is_port_open(
-                handle.host, handle.conf["port"]
+            if desc.proc is not None and is_port_open(
+                desc.host, desc.conf["port"]
             ):
                 responding += [name]
         return alive, responding
@@ -246,25 +246,25 @@ class SSHProcessManager(object):
 
         alive, resp = self.check_apps()
 
-        for app, handle in self.apps.items():
-            table.add_row(app, str(app in alive), str(app in resp), handle.host)
+        for app, desc in self.apps.items():
+            table.add_row(app, str(app in alive), str(app in resp), desc.host)
         self.console.print(table)
 
 
     def terminate(self):
-        for name, handle in self.apps.items():
-            if handle.proc is not None and handle.proc.is_alive():
+        for name, desc in self.apps.items():
+            if desc.proc is not None and desc.proc.is_alive():
                 try:
-                    handle.proc.terminate()
+                    desc.proc.terminate()
                 except OSError:
                    pass
         self.apps = {}
 
     def kill(self):
-        for name, handle in self.apps.items():
-            if handle.proc is not None and handle.proc.is_alive():
+        for name, desc in self.apps.items():
+            if desc.proc is not None and desc.proc.is_alive():
                 try:
-                    handle.proc.kill()
+                    desc.proc.kill()
                 except OSError:
                    pass
         self.apps = {}
