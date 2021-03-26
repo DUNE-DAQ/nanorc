@@ -85,6 +85,14 @@ class ConfigManager:
             for n, h in self.boot["hosts"].items()
         }
 
+        self.boot["env"] = {
+            k: (os.environ[k] if v == "getenv" else v) for k, v in self.boot["env"].items()
+        }
+
+        for exec_spec in self.boot["exec"].values():
+            exec_spec["env"] = {
+                k: (os.environ[k] if v == "getenv" else v) for k, v in exec_spec["env"].items()
+            }
         # Conf:
         ips = {n: socket.gethostbyname(h) for n, h in self.boot["hosts"].items()}
         # Set sender and receiver address to ips

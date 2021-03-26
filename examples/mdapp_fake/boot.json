@@ -30,7 +30,7 @@
                 "cd ${DBT_AREA_ROOT}",
                 "source dbt-setup-env.sh",
                 "dbt-setup-runtime-environment",
-                "cd ${NANO_SESSION_DIR}",
+                "cd ${APP_WD}",
                 "daq_application --name ${APP_ID} -c ${CMD_FAC} -i ${INFO_SVC}"
             ]
         },
@@ -45,7 +45,7 @@
             "cmd": [
                 "CMD_FAC=rest://localhost:${APP_PORT}",
                 "INFO_SVC=file://info_${APP_NAME}_${APP_PORT}.json",
-                "cd ${NANO_SESSION_DIR}",
+                "cd ${APP_WD}",
                 "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}"
             ]
         }

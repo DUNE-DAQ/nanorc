@@ -13,13 +13,11 @@ First, pick a folder you really like and set up a build environment there as per
 https://github.com/DUNE-DAQ/minidaqapp/wiki/Instructions-for-setting-up-a-v2.4.0-development-environment
 
 The location of said folder should be set in the `DBT_AREA_ROOT` variable.  
-The location of the daq-buildtools folder should be set in the `DBT_ROOT` variable.  
 ```bash
-$ export DBT_ROOT=??
 $ export DBT_AREA_ROOT=??
 ```
 
-Checkout the develop branch of daq-buildtools after finishing the build. You need a fix for running later (commit `7a01c1d`).
+Checkout the develop branch of daq-buildtools after finishing the build.
 
 In case of trouble, you can use `build-daq.sh` as reference.
 
