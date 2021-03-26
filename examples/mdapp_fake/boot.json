@@ -20,8 +20,10 @@
     },
     "exec": {
         "daq_application_ups" : {
+            "env": {
+               "DBT_AREA_ROOT": "getenv" 
+            },
             "cmd": [
-                "export DUNEDAQ_ERS_VERBOSITY_LEVEL=1;",
                 "CMD_FAC=rest://localhost:${APP_PORT}",
                 "INFO_SVC=file://info_${APP_ID}_${APP_PORT}.json",
                 "cd ${DBT_AREA_ROOT};",
@@ -33,10 +35,10 @@
         },
         "daq_application" : {
             "env":{
-                "CET_PLUGIN_PATH": "env",
-                "DUNEDAQ_SHARE_PATH": "env",
-                "LD_LIBRARY_PATH": "env",
-                "PATH": "env"
+                "CET_PLUGIN_PATH": "getenv",
+                "DUNEDAQ_SHARE_PATH": "getenv",
+                "LD_LIBRARY_PATH": "getenv",
+                "PATH": "getenv"
             },
             "cmd": [
                 "CMD_FAC=rest://localhost:${APP_PORT}",

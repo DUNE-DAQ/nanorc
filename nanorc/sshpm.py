@@ -147,7 +147,7 @@ class SSHProcessManager(object):
 
         # Move to cfgmgr!
         env_vars = {
-            k: (os.environ[k] if v == "env" else v) for k, v in boot_info["env"].items()
+            k: (os.environ[k] if v == "getenv" else v) for k, v in boot_info["env"].items()
         }
         env_vars['NANO_SESSION_DIR'] = os.getcwd()
 
@@ -157,7 +157,7 @@ class SSHProcessManager(object):
 
             # Move to cfgmgr!
             exec_vars = {
-                k: (os.environ[k] if v == "env" else v) for k, v in boot_info['exec'][app_conf['exec']]['env'].items()
+                k: (os.environ[k] if v == "getenv" else v) for k, v in boot_info['exec'][app_conf['exec']]['env'].items()
             }
 
             app_vars = {}
