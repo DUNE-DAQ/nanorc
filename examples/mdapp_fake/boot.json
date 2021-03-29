@@ -12,11 +12,42 @@
         }
     },
     "env": {
-        "DBT_AREA_ROOT": "env",
-        "DBT_ROOT": "env"
+        "DUNEDAQ_ERS_VERBOSITY_LEVEL": 1
     },
     "hosts": {
         "host_rudf": "localhost",
         "host_trg": "localhost"
+    },
+    "exec": {
+        "daq_application_ups" : {
+            "comment": "Application profile using dbt-setup to setup environment",
+            "env": {
+               "DBT_AREA_ROOT": "getenv" 
+            },
+            "cmd": [
+                "CMD_FAC=rest://localhost:${APP_PORT}",
+                "INFO_SVC=file://info_${APP_ID}_${APP_PORT}.json",
+                "cd ${DBT_AREA_ROOT}",
+                "source dbt-setup-env.sh",
+                "dbt-setup-runtime-environment",
+                "cd ${APP_WD}",
+                "daq_application --name ${APP_ID} -c ${CMD_FAC} -i ${INFO_SVC}"
+            ]
+        },
+        "daq_application" : {
+            "comment": "Application profile using basic PATH variables (more efficient)",
+            "env":{
+                "CET_PLUGIN_PATH": "getenv",
+                "DUNEDAQ_SHARE_PATH": "getenv",
+                "LD_LIBRARY_PATH": "getenv",
+                "PATH": "getenv"
+            },
+            "cmd": [
+                "CMD_FAC=rest://localhost:${APP_PORT}",
+                "INFO_SVC=file://info_${APP_NAME}_${APP_PORT}.json",
+                "cd ${APP_WD}",
+                "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}"
+            ]
+        }
     }
 }

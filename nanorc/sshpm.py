@@ -8,6 +8,7 @@ import signal
 import threading
 import queue
 import signal
+import logging
 from rich.console import Console
 from rich.progress import *
 from rich.table import Table
@@ -108,10 +109,12 @@ class SSHProcessManager(object):
     def __init__(self, console: Console):
         super(SSHProcessManager, self).__init__()
         self.console = console
+        self.log = logging.getLogger(__name__)
         self.apps = {}
         self.watchers = []
         self.event_queue = queue.Queue()
         self.terminating = False
+
         # Add self to the list of instances
         self.__instances.add(self)
 
@@ -127,37 +130,39 @@ class SSHProcessManager(object):
         self.watchers.append(t)
 
     def notify_error(self, name, exc):
-        self.console.log(name, exc)
+        self.log.info(name+str(exc))
         self.event_queue.put((name, exc))
 
     def boot(self, boot_info):
 
         if self.apps:
             raise RuntimeError(
-                f"ERROR: apps already booted {' '.join(self.apps.keys())}. Terminate them before booting a new set."
+                f"ERROR: apps have already been booted {' '.join(self.apps.keys())}. Terminate them all before booting a new set."
             )
 
         # Add a check for env and apps in boot_info keys
 
         apps = boot_info["apps"]
         hosts = boot_info["hosts"]
-
-        env_vars = {
-            k: (os.environ[k] if v == "env" else v) for k, v in boot_info["env"].items()
-        }
-        env_vars['NANO_SESSION_DIR'] = os.getcwd()
+        env_vars = boot_info["env"]
 
         for app_name, app_conf in apps.items():
 
-            cmd_fac = f'rest://localhost:{app_conf["port"]}'
-            info_srv = f'file://info_{app_name}_{app_conf["port"]}.json'
-            log_file = f'log_{app_name}_{app_conf["port"]}.txt'
-            exec_cmd = f'{app_conf["exec"]} --name {app_name} -c {cmd_fac} -i {info_srv}'
             host = hosts[app_conf["host"]]
 
-            # cmd=f'export DUNEDAQ_ERS_VERBOSITY_LEVEL=5; cd {env_vars["DBT_AREA_ROOT"]}; source {env_vars["DBT_ROOT"]}/dbt-setup-env.sh; dbt-setup-runtime-environment; {exec_cmd}'
-            cmd = f'export DUNEDAQ_ERS_VERBOSITY_LEVEL=1; cd {env_vars["DBT_AREA_ROOT"]}; source dbt-setup-env.sh; dbt-setup-runtime-environment; cd {env_vars["NANO_SESSION_DIR"]}; {exec_cmd}'
-            # cmd = f'export DUNEDAQ_ERS_VERBOSITY_LEVEL=5; export PATH={env_vars["PATH"]}; export LD_LIBRARY_PATH={env_vars["LD_LIBRARY_PATH"]}; export CET_PLUGIN_PATH={env_vars["CET_PLUGIN_PATH"]}; {exec_cmd}'
+            exec_vars = boot_info['exec'][app_conf['exec']]['env']
+
+            app_vars = {}
+            app_vars.update(env_vars)
+            app_vars.update(exec_vars)
+            app_vars.update({
+                "APP_NAME": app_name,
+                "APP_PORT": app_conf["port"],
+                "APP_WD": os.getcwd()
+                })
+            cmd=';'.join([ f"export {n}={v}" for n,v in app_vars.items()] + boot_info['exec'][app_conf['exec']]['cmd'])
+
+            log_file = f'log_{app_name}_{app_conf["port"]}.txt'
 
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no", cmd]
 
@@ -184,7 +189,6 @@ class SSHProcessManager(object):
                 _bg=True,
                 _bg_exc=False,
                 _new_session=True,
-                # _preexec_fn=lambda: set_pdeathsig(signal.SIGTERM),
                 _preexec_fn=on_parent_exit(signal.SIGTERM),
             )
             self.watch(name, proc)
@@ -244,7 +248,7 @@ class SSHProcessManager(object):
 
         for app, handle in self.apps.items():
             table.add_row(app, str(app in alive), str(app in resp), handle.host)
-        self.console.log(table)
+        self.console.print(table)
 
 
     def terminate(self):

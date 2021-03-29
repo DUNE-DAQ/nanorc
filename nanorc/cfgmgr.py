@@ -58,9 +58,10 @@ class ConfigManager:
 
     def _load(self) -> None:
 
+        pm_cfg = ["boot"]
+        rc_cmds = ["init", "conf", "start", "stop", "pause", "resume", "scrap"]
         cfgs = {}
-        cmds = ["init", "conf", "start", "stop", "pause", "resume", "scrap"]
-        for f in ["boot"] + cmds:
+        for f in pm_cfg + rc_cmds:
             fpath = os.path.join(self.cfg_dir, f + ".json")
             if not os.path.exists(fpath):
                 raise RuntimeError(f"ERROR: {f}.json not found in {self.cfg_dir}")
@@ -72,17 +73,9 @@ class ConfigManager:
                 except json.decoder.JSONDecodeError as e:
                     raise RuntimeError(f"ERROR: failed to load {f}.json") from e
 
-        # Consistency check.
-        # Note to self: some commands (pause/resume) are meant to be for some applications only
-        # This check needs to be softened then
-        # assert cfgs['boot']['apps'].keys() == cfgs['init']['apps'].keys()
-        # assert cfgs['boot']['apps'].keys() == cfgs['conf']['apps'].keys()
-        # assert cfgs['boot']['apps'].keys() == cfgs['start']['apps'].keys()
-        # assert cfgs['boot']['apps'].keys() == cfgs['stop']['apps'].keys()
-
         self.boot = cfgs["boot"]
 
-        for c in cmds:
+        for c in rc_cmds:
             self._import_cmd_data(c, cfgs[c])
 
         # Post-process conf
@@ -92,6 +85,14 @@ class ConfigManager:
             for n, h in self.boot["hosts"].items()
         }
 
+        self.boot["env"] = {
+            k: (os.environ[k] if v == "getenv" else v) for k, v in self.boot["env"].items()
+        }
+
+        for exec_spec in self.boot["exec"].values():
+            exec_spec["env"] = {
+                k: (os.environ[k] if v == "getenv" else v) for k, v in exec_spec["env"].items()
+            }
         # Conf:
         ips = {n: socket.gethostbyname(h) for n, h in self.boot["hosts"].items()}
         # Set sender and receiver address to ips
