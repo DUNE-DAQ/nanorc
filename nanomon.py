@@ -10,7 +10,6 @@
 import os
 import time
 import json
-import keyboard
 import threading
 
 from rich.console import Console
@@ -19,6 +18,8 @@ from rich.layout import Layout
 from rich.live import Live
 from rich.columns import Columns
 from rich.panel import Panel
+from rich.text import Text
+from rich.align import Align
 from multiprocessing import Queue
 
 
@@ -125,15 +126,15 @@ def make_layout() -> Layout:
     layout.split(
         Layout(name="header", size=3),
         Layout(name="main", ratio=1),
-        Layout(name="footer", size=7),
+        Layout(name="footer", size=5),
     )
     layout["main"].split(
         Layout(name="side"),
-        Layout(name="body", ratio=2, minimum_size=60),
+        Layout(name="body", ratio=2, minimum_size=40),
         direction="horizontal",
     )
 
-    layout["side"].split(Layout(name="box1"), Layout(name="box2"))
+    # layout["side"].split(Layout(name="box1"), Layout(name="box2"))
     return layout
 
 class InfoThread(threading.Thread):
@@ -168,32 +169,31 @@ class InfoThread(threading.Thread):
         print("Farewell!")
 
 
-def old():
-    fname = "info_ruemu_df_3334.json"
-    # fname = "info_trgemu_3333.json"
-    with open(fname, 'rb') as f:
-        f.seek(-2, os.SEEK_END)
-        while f.read(1) != b'\n':
-            f.seek(-2, os.SEEK_CUR)
-        last_line = f.readline().decode()
-        j = json.loads(last_line[:-1])
+# def old():
+#     fname = "info_ruemu_df_3334.json"
+#     # fname = "info_trgemu_3333.json"
+#     with open(fname, 'rb') as f:
+#         f.seek(-2, os.SEEK_END)
+#         while f.read(1) != b'\n':
+#             f.seek(-2, os.SEEK_CUR)
+#         last_line = f.readline().decode()
+#         j = json.loads(last_line[:-1])
 
-        t = info_to_table(j, 'ruemu_df')
-        console.log(t)
+#         t = info_to_table(j, 'ruemu_df')
+#         console.log(t)
 
-        layout = make_layout()
-        layout['body'].update(t)
-        # console.print(layout)
+#         layout = make_layout()
+#         layout['body'].update(t)
+#         # console.print(layout)
 
-        # with Live(layout, refresh_per_second=2, screen=True):
-        while True:
-            time.sleep(1)
-            l = f.readline().decode()
-            if l:
-                j = json.loads(l[:-1])
-                t = info_to_table(j, 'ruemu_df')
-                console.log(t)
-                # layout['body'].update(t)
+#         # with Live(layout, refresh_per_second=2, screen=True):
+#         while True:
+#             time.sleep(1)
+#             l = f.readline().decode()
+#             if l:
+#                 j = json.loads(l[:-1])
+#                 t = info_to_table(j, 'ruemu_df')
+#                 console.log(t)
 
 
 
@@ -204,7 +204,11 @@ def main():
 
     t_ruemu_df = InfoThread("info_ruemu_df_3334.json", 1)
     t_ruemu_df.start()
+
     layout = make_layout()
+    layout["header"].update(Panel(Text("nano Opmon", justify="center")))
+    layout["footer"].update(Panel(Text("extra infos will go here", justify="center")))
+    layout["side"].update(Panel(Text("app status will go here", justify="center")))
     tables = {}
     try:
         with Live(layout, refresh_per_second=2, screen=True):
