@@ -102,7 +102,7 @@ class NanoRC:
             self.console.print_exception()
             return
 
-        self.listener = ResponseListener(56789)
+        self.listener = ResponseListener(self.cfg.boot["response_listener"]["port"])
         self.apps = { n:AppSupervisor(self.console, d, self.listener) for n,d in self.pm.apps.items() }
 
     def terminate(self):

@@ -11,6 +11,9 @@
             "port": 3333
         }
     },
+    "response_listener": {
+        "port": 56789
+    },
     "env": {
         "DUNEDAQ_ERS_VERBOSITY_LEVEL": 1
     },
