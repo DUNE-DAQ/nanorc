@@ -114,7 +114,7 @@ class ConfigManager:
 
         for c in json_extract(start, "modules"):
             for m in c:
-                m["data"] = data
+                m["data"].update(data)
         return start
 
     def runtime_resume(self, data: dict) -> dict:
@@ -130,7 +130,7 @@ class ConfigManager:
 
         for c in json_extract(resume, "modules"):
             for m in c:
-                m["data"] = data
+                m["data"].update(data)
         return resume
 
 

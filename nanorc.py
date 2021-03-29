@@ -126,7 +126,7 @@ def start(obj, run, disable_data_storage):
     RUN: run number
 
     """
-    obj.rc.start(run, disable_data_storage, 50000000) # FIXME: how?
+    obj.rc.start(run, disable_data_storage, None) # FIXME: how?
     obj.rc.status()
 
 @cli.command('stop')
@@ -142,7 +142,7 @@ def pause(obj):
     obj.rc.status()
 
 @cli.command('resume')
-@click.option('--trigger-interval-ticks', type=int, default=50000000, help='Trigger separation in ticks')
+@click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.pass_obj
 def resume(obj, trigger_interval_ticks):
     obj.rc.resume(trigger_interval_ticks)

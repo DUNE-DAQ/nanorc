@@ -9,6 +9,8 @@ from .cfgmgr import ConfigManager
 from .appctrl import AppSupervisor, ResponseListener
 from rich.traceback import Traceback
 
+from typing import Union
+
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
@@ -131,7 +133,7 @@ class NanoRC:
         """
         ok, failed = self.send_many('conf', self.cfg.conf, 'INITIAL', 'CONFIGURED', raise_on_fail=True)
 
-    def start(self, run: int, disable_data_storage: bool, trigger_interval_ticks: int):
+    def start(self, run: int, disable_data_storage: bool, trigger_interval_ticks: Union[int, None]):
         """
         Sends start command to the applications
         
@@ -145,8 +147,10 @@ class NanoRC:
         runtime_start_data = {
                 "disable_data_storage": disable_data_storage,
                 "run": run,
-                "trigger_interval_ticks": trigger_interval_ticks
             }
+
+        if not trigger_interval_ticks is None:
+            runtime_start_data["trigger_interval_ticks"] = trigger_interval_ticks
 
         start_data = self.cfg.runtime_start(runtime_start_data)
         app_seq = getattr(self.cfg, 'start_order', None)
@@ -170,16 +174,17 @@ class NanoRC:
         ok, failed = self.send_many('pause', None, 'RUNNING', 'RUNNING', app_seq, raise_on_fail=True)
 
 
-    def resume(self, trigger_interval_ticks: int):
+    def resume(self, trigger_interval_ticks: Union[int, None]):
         """
         Sends resume command
         
         :param      trigger_interval_ticks:  The trigger interval ticks
         :type       trigger_interval_ticks:  int
         """
-        runtime_resume_data = {
-            "trigger_interval_ticks": trigger_interval_ticks
-        }
+        runtime_resume_data = {}
+
+        if not trigger_interval_ticks is None:
+            runtime_resume_data["trigger_interval_ticks"] = trigger_interval_ticks
 
         resume_data = self.cfg.runtime_resume(runtime_resume_data)
 
