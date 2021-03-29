@@ -6,7 +6,7 @@ from rich.table import Table
 from rich.text import Text
 from .sshpm import SSHProcessManager
 from .cfgmgr import ConfigManager
-from .appctrl import AppSupervisor
+from .appctrl import AppSupervisor, ResponseListener
 from rich.traceback import Traceback
 
 class NanoRC:
@@ -20,9 +20,15 @@ class NanoRC:
 
         self.pm = SSHProcessManager(console)
         self.apps = None
-
+        self.listener = None
 
     def status(self) -> None:
+        """
+        Displays the status of the applications
+
+        :returns:   Nothing
+        :rtype:     None
+        """
 
         if not self.apps:
             return
@@ -36,12 +42,12 @@ class NanoRC:
         table.add_column("last succ. cmd", style="green")
 
         for app, sup in self.apps.items():
-            alive = sup.handle.proc.is_alive()
+            alive = sup.desc.proc.is_alive()
             ping = sup.commander.ping()
             last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
             table.add_row(
                 app, 
-                sup.handle.host,
+                sup.desc.host,
                 str(alive),
                 str(ping),
                 Text(str(sup.last_sent_command), style=('bold red' if last_cmd_failed else '')),
@@ -84,6 +90,9 @@ class NanoRC:
 
 
     def boot(self) -> None:
+        """
+        Boots applications
+        """
         
         self.log.info(str(self.cfg.boot))
 
@@ -93,15 +102,21 @@ class NanoRC:
             self.console.print_exception()
             return
 
-        self.apps = { n:AppSupervisor(self.console, h) for n,h in self.pm.apps.items() }
-
+        self.listener = ResponseListener(self.cfg.boot["response_listener"]["port"])
+        self.apps = { n:AppSupervisor(self.console, d, self.listener) for n,d in self.pm.apps.items() }
 
     def terminate(self):
         if self.apps:
-            for s in self.apps.values():
+            for n,s in self.apps.items():
                 s.terminate()
+                if self.listener:
+                    self.listener.unregister(n)
             self.apps = None
+        if self.listener:
+            self.listener.terminate()
+
         self.pm.terminate()
+    
 
 
     def init(self):
