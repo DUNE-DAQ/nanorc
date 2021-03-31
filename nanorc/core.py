@@ -9,7 +9,7 @@ from .cfgmgr import ConfigManager
 from .appctrl import AppSupervisor, ResponseListener
 from rich.traceback import Traceback
 
-from typing import Union
+from typing import Union, NoReturn
 
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
@@ -24,10 +24,10 @@ class NanoRC:
         self.apps = None
         self.listener = None
 
-    def status(self) -> None:
+    def status(self) -> NoReturn:
         """
         Displays the status of the applications
-
+        
         :returns:   Nothing
         :rtype:     None
         """
@@ -58,7 +58,7 @@ class NanoRC:
         self.console.print(table)
 
 
-    def send_many(self, cmd: str, data: dict, state_entry: str, state_exit: str, sequence: list = None, raise_on_fail: bool =False):
+    def send_many(self, cmd: str, data: dict, state_entry: str, state_exit: str, sequence: list = None, raise_on_fail: bool=False):
         """
         Sends many commands to all applications
         
@@ -91,7 +91,7 @@ class NanoRC:
         return ok, failed
 
 
-    def boot(self) -> None:
+    def boot(self) -> NoReturn:
         """
         Boots applications
         """
@@ -107,7 +107,7 @@ class NanoRC:
         self.listener = ResponseListener(self.cfg.boot["response_listener"]["port"])
         self.apps = { n:AppSupervisor(self.console, d, self.listener) for n,d in self.pm.apps.items() }
 
-    def terminate(self):
+    def terminate(self) -> NoReturn:
         if self.apps:
             for n,s in self.apps.items():
                 s.terminate()
@@ -121,19 +121,19 @@ class NanoRC:
     
 
 
-    def init(self):
+    def init(self) -> NoReturn:
         """
         Initializes the applications.
         """
         ok, failed = self.send_many('init', self.cfg.init, 'NONE', 'INITIAL', raise_on_fail=True)
 
-    def conf(self):
+    def conf(self) -> NoReturn:
         """
         Sends configure command to the applications.
         """
         ok, failed = self.send_many('conf', self.cfg.conf, 'INITIAL', 'CONFIGURED', raise_on_fail=True)
 
-    def start(self, run: int, disable_data_storage: bool, trigger_interval_ticks: Union[int, None]):
+    def start(self, run: int, disable_data_storage: bool, trigger_interval_ticks: Union[int, None]) -> NoReturn:
         """
         Sends start command to the applications
         
@@ -157,7 +157,7 @@ class NanoRC:
         ok, failed = self.send_many('start', start_data, 'CONFIGURED', 'RUNNING', sequence=app_seq, raise_on_fail=True)
 
 
-    def stop(self):
+    def stop(self) -> NoReturn:
         """
         Sends stop command
         """
@@ -166,7 +166,7 @@ class NanoRC:
         ok, failed = self.send_many('stop', self.cfg.stop, 'RUNNING', 'CONFIGURED', sequence=app_seq, raise_on_fail=True)
 
 
-    def pause(self):
+    def pause(self) -> NoReturn:
         """
         Sends pause command
         """
@@ -174,7 +174,7 @@ class NanoRC:
         ok, failed = self.send_many('pause', None, 'RUNNING', 'RUNNING', app_seq, raise_on_fail=True)
 
 
-    def resume(self, trigger_interval_ticks: Union[int, None]):
+    def resume(self, trigger_interval_ticks: Union[int, None]) -> NoReturn:
         """
         Sends resume command
         
@@ -192,7 +192,7 @@ class NanoRC:
         ok, failed = self.send_many('resume', resume_data, 'RUNNING', 'RUNNING', sequence=app_seq, raise_on_fail=True)
 
 
-    def scrap(self):
+    def scrap(self) -> NoReturn:
         """
         Send scrap command
         """
