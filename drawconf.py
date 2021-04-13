@@ -3,7 +3,7 @@
 
 import json
 import click
-import os.path
+import os
 
 from graphviz import Digraph
 
@@ -34,7 +34,7 @@ def cli(output_file, json_dir):
                 try:
                     j = json.load(jf)
                 except json.decoder.JSONDecodeError as e:
-                    raise RuntimeError(f"ERROR: failed to load {f}.json") from e
+                    raise RuntimeError(f"ERROR: failed to load {filename}") from e
 
             # print("Parsing module configuration")
             qmap = {}
@@ -85,7 +85,7 @@ def cli(output_file, json_dir):
             try:
                 j = json.load(jf)
             except json.decoder.JSONDecodeError as e:
-                raise RuntimeError(f"ERROR: failed to load {f}.json") from e
+                raise RuntimeError(f"ERROR: failed to load {filename}") from e
         
         for modcfg in j["modules"]:    
             modname = modcfg["match"]
