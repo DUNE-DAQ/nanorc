@@ -18,6 +18,7 @@ def cli(output_file, json_dir):
     
     print("Creating main Digraph")
     conf = Digraph(name=json_dir)
+    conf.graph_attr['rankdir']='LR'
 
     netsenders = []
     netrecvrs = []
