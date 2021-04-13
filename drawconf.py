@@ -36,7 +36,7 @@ def cli(output_file, json_dir):
                 except json.decoder.JSONDecodeError as e:
                     raise RuntimeError(f"ERROR: failed to load {f}.json") from e
 
-            print("Parsing module configuration")
+            # print("Parsing module configuration")
             qmap = {}
             for modcfg in j["modules"]:
                 modinst = modcfg["inst"]
@@ -61,9 +61,9 @@ def cli(output_file, json_dir):
 
                 procconf.node(f"{procname}_{modinst}", label=f"{modinst}\n{modplug}")
 
-            print("Creating queue links")
+            # print("Creating queue links")
             for qinst in qmap:
-                print(f"Queue {qinst}")
+                # print(f"Queue {qinst}")
                 qcfg = qmap[qinst]
                 procconf.node(f"{procname}_{qinst}", shape="point", width='0.01', height='0.01', xlabel=f"{qinst}")
                 
@@ -90,27 +90,27 @@ def cli(output_file, json_dir):
         for modcfg in j["modules"]:    
             modname = modcfg["match"]
             if modname in netrecvrs:
-                print(f"{modname} is a NetworkToQueue instance!")
+                # print(f"{modname} is a NetworkToQueue instance!")
                 netedge = modcfg["data"]["receiver_config"]["address"]
                 if not netedge in netedges:
                     netedges[netedge] = { "src": "", "sink": "", "label": "" }
 
-                print(f"Setting sink of network edge {netedge} to {procname}_{modname}")
+                # print(f"Setting sink of network edge {netedge} to {procname}_{modname}")
                 netedges[netedge]["sink"] = f"{procname}_{modname}"
                 netedges[netedge]["label"] = modcfg["data"]["msg_module_name"]
             if modname in netsenders:
-                print(f"{modname} is a QueueToNetwork instance!")
+                # print(f"{modname} is a QueueToNetwork instance!")
                 netedge = modcfg["data"]["sender_config"]["address"]
                 if not netedge in netedges:
                     netedges[netedge] = { "src": "", "sink": "" }
-                print(f"Setting src of network edge {netedge} to {procname}_{modname}")
+                # print(f"Setting src of network edge {netedge} to {procname}_{modname}")
                 netedges[netedge]["src"] = f"{procname}_{modname}"
     
     for netedge in netedges:
         src = netedges[netedge]["src"]
         sink = netedges[netedge]["sink"]
         label = netedges[netedge]["label"]
-        print(f"Setting up {netedge} to connect {src} to {sink}")
+        # print(f"Setting up {netedge} to connect {src} to {sink}")
         
         conf.edge(src, sink, label=f"{label}\n{netedge}")
 
