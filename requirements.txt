@@ -5,3 +5,4 @@ ipdb==0.13.6
 ipython==7.21.0
 rich==9.13.0
 sh==1.14.1
+graphviz==0.16
