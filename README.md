@@ -19,6 +19,7 @@ dbt-create.sh dunedaq-v2.4.0 nanorc-demo
 cd nanorc-demo/
 dbt-setup-runtime-environment
 ```
+This part is subject to change, check [the daq-buildtools instructions](https://dune-daq-sw.readthedocs.io/en/latest/packages/daq-buildtools/).
 
 Next, install nanorc:
 
@@ -56,7 +57,7 @@ In the `nanorc-demo` directory:
 └────────────────────────────────────────────────────────────────────┘
 shonky rc> 
 ```
-To see the comments available use `help`.
+To see the commands available use `help`.
 
 ```
 shonky rc> help
