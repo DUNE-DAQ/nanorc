@@ -1,46 +1,63 @@
-# Nano RC
+# Nano RC (Not ANOther Run Control)
 
-Poor's man Run Control for DUNE DAQ applications
+Poor man's Run Control for DUNE DAQ applications
 
 ## How to run me
 
 This tutorial will guide you through the one-host minidaq example.
 
-This tutorial assumes you run on a linux host with /cvmfs mounted, such as lxplus.
+This tutorial assumes you run on a linux host with /cvmfs mounted, such as lxplus at CERN.
 
 ### Setup
-First, pick a folder you really like and set up a build environment there as per instructions at
-https://github.com/DUNE-DAQ/minidaqapp/wiki/Instructions-for-setting-up-a-v2.4.0-development-environment
 
-The location of said folder should be set in the `DBT_AREA_ROOT` variable.  
+First, set up a working area:
+
 ```bash
-$ export DBT_AREA_ROOT=??
+git clone https://github.com/DUNE-DAQ/daq-buildtools.git -b dunedaq-v2.4.0
+source daq-buildtools/dbt-setup-env.sh
+dbt-create.sh dunedaq-v2.4.0 nanorc-demo
+cd nanorc-demo/
+dbt-setup-runtime-environment
 ```
 
-Checkout the develop branch of daq-buildtools after finishing the build.
+Next, install nanorc:
 
-In case of trouble, you can use `build-daq.sh` as reference.
-
-Now setup requirements for nanorc:
 ```bash
-$ cd $DBT_AREA_ROOT
-$ dbt-setup-runtime-environment
-$ pip install -r <nanorc dir>/requirements.txt
+git clone https://github.com/DUNE-DAQ/nanorc.git -b v1.0.0
+pip install -r nanorc/requirements.txt
 ```
+Get the example data file:
+
+```bash
+curl https://cernbox.cern.ch/index.php/s/VAqNtn7bwuQtff3/download -o frames.bin
+```
+
+Generate the default configuration:
+
+```bash 
+python -m minidaqapp.nanorc.mdapp_gen mdapp_fake
+```
+
+Now you're ready to run.
 
 ### Running the NanoRC
 
-Assuming you're running in the virtualenv created by the Setup section:
-```bash
-$ <nanorc dir>/nanorc.py examples/minidaqapp
-                            Shonky RC                            
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ This is an admittedly shonky RC to run DUNE-DAQ applications. ┃
-│ Use it wisely!                                                │
-└───────────────────────────────────────────────────────────────┘
-```
+In the `nanorc-demo` directory:
 
-You have entered an interactive CLI. You can exit using CTRL-C.
+```
+./nanorc/nanorc.py mdapp_fake
+
+                            Shonky NanoRC                             
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ This is an admittedly shonky tiny RC to run DUNE-DAQ applications. ┃
+│   Give it a command and it will do your biddings,                  │
+│   but trust it and it will betray you!                             │
+│ Handle wiht care!                                                  │
+└────────────────────────────────────────────────────────────────────┘
+shonky rc> 
+```
+To see the comments available use `help`.
+
 ```
 shonky rc> help
 
@@ -51,56 +68,67 @@ boot  conf  init  pause  resume  scrap  start  status  stop  terminate  wait
 Undocumented commands:
 ======================
 exit  help  quit
-
-shonky rc>
 ```
 
-`boot` will start your applications
+`boot` will start your applications. In the case of the example, a trigger emulator application to supply triggers and a readout and dataflow application which receives the triggers.
 ```
 shonky rc> boot
-{
-    'env': {'DBT_ROOT': 'env', 'DBT_AREA_ROOT': 'env'},
-    'hosts': {'ru_pc': 'lxplus7107', 'trg_pc': 'lxplus7107'},
-    'apps': {'ruemu': {'exec': 'daq_application', 'host': 'ru_pc', 'port': 3333}, 'trgemu': {'exec': 'daq_application', 'host': 'trg_pc', 'port': 3334}}
-}
-⠇ # apps started ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   0% -:--:-- 0:00:05
-⠇ ruemu          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   0% -:--:-- 0:00:05
-⠇ trgemu         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   0% -:--:-- 0:00:05
-                             Apps                              
-┏━━━━━━━━┳━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━┓
-┃ name   ┃ host ┃ alive ┃ pings      ┃ last cmd ┃ last cmd ok ┃
-┡━━━━━━━━╇━━━━━━╇━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━┩
-│ ruemu  │ True │ True  │ lxplus7107 │          │             │
-│ trgemu │ True │ True  │ lxplus7107 │          │             │
-└────────┴──────┴───────┴────────────┴──────────┴─────────────┘
+          {                                                                                                                                                 
+               'apps': {                                                                                                                                               
+                   'ruemu_df': {'exec': 'daq_application', 'host': 'host_rudf', 'port': 3334},                                                                      
+                   'trgemu': {'exec': 'daq_application', 'host': 'host_trg', 'port': 3333}                                                                         
+               },                                                                                                                                                 
+               'env': {'DBT_AREA_ROOT': 'env', 'DBT_ROOT': 'env'},                                                                                                    
+               'hosts': {'host_rudf': 'lxplus7102.cern.ch', 'host_trg': 'lxplus7102.cern.ch'}                                                              
+           }                                                                                                                                                           
+⠹ # apps started ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   0% -:--:-- 0:00:16
+⠹ ruemu_df       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   0% -:--:-- 0:00:16
+⠹ trgemu         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   0% -:--:-- 0:00:16
+                                    Apps                                     
+┏━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ name     ┃ host               ┃ alive ┃ pings ┃ last cmd ┃ last succ. cmd ┃
+┡━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ ruemu_df │ lxplus7102.cern.ch │ True  │ True  │ None     │ None           │
+│ trgemu   │ lxplus7102.cern.ch │ True  │ True  │ None     │ None           │
+└──────────┴────────────────────┴───────┴───────┴──────────┴────────────────┘
 ```
 
-You can then send the `init`, `conf`, `start`, and `resume` command.
-Note that `start` requires a run number as argument.
+You can then send the `init`, `conf`, `start`, and `resume` commands to get things going. Note that `start` requires a run number as argument. The commands produce quite verbose output so that you can see what was sent directly to the applications without digging in the logfiles.
+
+Triggers will not be generated until after a resume command is issued, and then trigger records with 2 links each at 1 Hz will be generated.
+
+Use 'status' to see what's going on:
+
 ```
-shonky rc> resume
-Sending resume to ruemu
-{'id': 'resume', 'data': {}, 'entry_state': 'RUNNING', 'exit_state': 'RUNNING'}
-Received reply from ruemu to resume
-{'data': {'ans-host': '188.185.91.197', 'ans-port': '13333', 'cmdid': 'resume'}, 'result': 'OK', 'success': True}
-Sending resume to trgemu
-{'id': 'resume', 'data': {}, 'entry_state': 'RUNNING', 'exit_state': 'RUNNING'}
-Received reply from trgemu to resume
-{'data': {'ans-host': '188.185.91.197', 'ans-port': '13334', 'cmdid': 'resume'}, 'result': 'OK', 'success': True}
-                             Apps                              
-┏━━━━━━━━┳━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━┓
-┃ name   ┃ host ┃ alive ┃ pings      ┃ last cmd ┃ last cmd ok ┃
-┡━━━━━━━━╇━━━━━━╇━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━┩
-│ ruemu  │ True │ True  │ lxplus7107 │ resume   │ resume      │
-│ trgemu │ True │ True  │ lxplus7107 │ resume   │ resume      │
-└────────┴──────┴───────┴────────────┴──────────┴─────────────┘
-shonky rc>
+shonky rc> status
+                                    Apps                                     
+┏━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ name     ┃ host               ┃ alive ┃ pings ┃ last cmd ┃ last succ. cmd ┃
+┡━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ ruemu_df │ lxplus7102.cern.ch │ True  │ True  │ start    │ start          │
+│ trgemu   │ lxplus7102.cern.ch │ True  │ True  │ resume   │ resume         │
+└──────────┴────────────────────┴───────┴───────┴──────────┴────────────────┘
 ```
 
-In case you experience timeout problems booting applications or sending commands, consider changing the `hosts` values
-from `localhost` to the hostname of your machine. This has to do with SSH authentication.
+When you've seen enough use `stop`, `scrap` and `terminate` commands. In case you experience timeout problems booting applications or sending commands, consider changing the `hosts` values from `localhost` to the hostname of your machine. This has to do with SSH authentication.
 
-### Viewing logs
+### Viewing logs and output
 
-Logs are kept in the working directory at the time you started the NanoRC cli.  
-They are named `log_<name>_<port>.txt`.
+Logs are kept in the working directory at the time you started nanorc, named `log_<name>_<port>.txt`.
+
+You can peak in the output hdf5 file using:
+
+```bash
+h5dump -H swtest_run000666_0000_tapper_20210513T133527.hdf5
+```
+(your file will be named something else of course).
+
+For TriggerRecordHeaders:
+
+```bash
+python3 $DFMODULES_FQ_DIR/dfmodules/bin/hdf5dump/hdf5_dump.py -TRH -f swtest_run000666_0000_tapper_20210513T133527.hdf5
+```
+For FragmentHeaders:
+```bash
+python3 $DFMODULES_FQ_DIR/dfmodules/bin/hdf5dump/hdf5_dump.py -H -f swtest_run000666_0000_tapper_20210513T133527.hdf5
+```
