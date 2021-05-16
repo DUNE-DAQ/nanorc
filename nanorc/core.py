@@ -76,10 +76,14 @@ class NanoRC:
         :type       raise_on_fail:  bool
         """
 
-        # Loop over data keys if no sequence is specified or all apps, if data is emoty
+        ok, failed = {}, {}
+        if not self.apps:
+            self.log.warning(f"No applications defined to send '{cmd}' to. Has 'boot' been executed?")
+            return ok, failed
+
+        # Loop over data keys if no sequence is specified or all apps, if data is empty
         if not sequence:
             sequence = data.keys() if data else self.apps.keys()
-        ok, failed = {}, {}
         for n in sequence:
             r = self.apps[n].send_command(cmd, data[n] if data else {}, state_entry, state_exit)
             (ok if r['success'] else failed)[n] = r

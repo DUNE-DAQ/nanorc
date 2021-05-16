@@ -169,33 +169,6 @@ class InfoThread(threading.Thread):
         print("Farewell!")
 
 
-# def old():
-#     fname = "info_ruemu_df_3334.json"
-#     # fname = "info_trgemu_3333.json"
-#     with open(fname, 'rb') as f:
-#         f.seek(-2, os.SEEK_END)
-#         while f.read(1) != b'\n':
-#             f.seek(-2, os.SEEK_CUR)
-#         last_line = f.readline().decode()
-#         j = json.loads(last_line[:-1])
-
-#         t = info_to_table(j, 'ruemu_df')
-#         console.log(t)
-
-#         layout = make_layout()
-#         layout['body'].update(t)
-#         # console.print(layout)
-
-#         # with Live(layout, refresh_per_second=2, screen=True):
-#         while True:
-#             time.sleep(1)
-#             l = f.readline().decode()
-#             if l:
-#                 j = json.loads(l[:-1])
-#                 t = info_to_table(j, 'ruemu_df')
-#                 console.log(t)
-
-
 
 def main():
 
