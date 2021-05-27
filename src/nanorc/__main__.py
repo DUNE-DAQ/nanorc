@@ -27,7 +27,12 @@ from nanorc.core import NanoRC
 
 class NanoContext:
     """docstring for NanoContext"""
-    def __init__(self, console):
+    def __init__(self, console: Console):
+        """Nanorc Context for click use.
+        
+        Args:
+            console (Console): rich console for messages and logging
+        """
         super(NanoContext, self).__init__()
         self.console = console
         self.print_traceback = False
@@ -93,7 +98,7 @@ def cli(ctx, obj, traceback, loglevel, cfg_dir):
 
 @cli.command('status')
 @click.pass_obj
-def status(obj):
+def status(obj: NanoContext):
     obj.rc.status()
 
 @cli.command('boot')
@@ -117,14 +122,16 @@ def conf(obj):
 @cli.command('start')
 @click.argument('run', type=int)
 @click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')
-# @click.option('--trigger-interval-ticks', type=int, default=50000000, help='Trigger separation in ticks')
 @click.pass_obj
-def start(obj, run, disable_data_storage):
+def start(obj:NanoContext, run:int, disable_data_storage:bool):
     """
-    Starts the run
-
-    RUN: run number
-
+    Start Command
+    
+    Args:
+        obj (NanoContext): Context object
+        run (int): Run number
+        disable_data_storage (bool): Flag to disable data writing to storage
+    
     """
     obj.rc.start(run, disable_data_storage, None) # FIXME: how?
     obj.rc.status()
@@ -144,7 +151,13 @@ def pause(obj):
 @cli.command('resume')
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.pass_obj
-def resume(obj, trigger_interval_ticks):
+def resume(obj:NanoContext, trigger_interval_ticks:int):
+    """Resume Command
+    
+    Args:
+        obj (NanoContext): Context object
+        trigger_interval_ticks (int): Trigger separation in ticks
+    """
     obj.rc.resume(trigger_interval_ticks)
     obj.rc.status()
 
@@ -182,8 +195,7 @@ def wait(obj, seconds):
 
             time.sleep(1)
 
-if __name__ == '__main__':
-
+def main():
     from rich.logging import RichHandler
 
     logging.basicConfig(
@@ -205,8 +217,6 @@ if __name__ == '__main__':
         else:
             console.print_exception()
 
-
-
-
-
+if __name__ == '__main__':
+    main()
 
