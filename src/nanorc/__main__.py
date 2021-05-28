@@ -54,10 +54,27 @@ loglevels = {
     'NOTSET': logging.NOTSET,
 }
 
+def updateLogLevel(loglevel):
+        level = loglevels[loglevel]
+
+        # Update log level for root logger
+        logger = logging.getLogger()
+        logger.setLevel(level)
+        for handler in logger.handlers:
+            handler.setLevel(level)
+        # And then manually tweak 'sh.command' logger. Sigh.
+        sh_command_level = level if level > logging.INFO else (level+10)
+        sh_command_logger = logging.getLogger(sh.__name__)
+        # sh_command_logger.propagate = False
+        sh_command_logger.setLevel(sh_command_level)
+        for handler in sh_command_logger.handlers:
+            handler.setLevel(sh_command_level)
+
+
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
-@click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default=None, help='Set the log level')
+@click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
@@ -72,24 +89,20 @@ def cli(ctx, obj, traceback, loglevel, cfg_dir):
     grid.add_row("  but trust it and it will betray you!")
     grid.add_row("Use it with care!")
 
-    console.print(Panel.fit(grid))
+    obj.console.print(Panel.fit(grid))
 
 
     if loglevel:
-        level = loglevels[loglevel]
-        logger = logging.getLogger()
-        logger.setLevel(level)
-        for handler in logger.handlers:
-            handler.setLevel(level)
+        updateLogLevel(loglevel)
 
     try:
-        rc = NanoRC(console, cfg_dir)
+        rc = NanoRC(obj.console, cfg_dir)
     except Exception as e:
-        logging.getLogger("rich").exception("Failed to build NanoRC")
+        logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()
         
     def cleanup_rc():
-        print("NanoRC context cleanup: Terminating RC before exiting")
+        logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
         rc.terminate()
 
     ctx.call_on_close(cleanup_rc)    

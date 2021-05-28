@@ -8,6 +8,7 @@
 #         f.readlines()
 
 import os
+import re
 import time
 import json
 import threading
@@ -23,8 +24,6 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.align import Align
 from multiprocessing import Queue
-
-
 
 console = Console()
 
@@ -173,6 +172,10 @@ class InfoThread(threading.Thread):
 @click.command()
 @click.argument('info_jsons', type=click.Path(), nargs=-1)
 def cli(info_jsons):
+
+    info_re = re.compile('^info_.*\.json$')
+    if not info_jsons:
+        info_jsons = tuple(f for f in os.listdir() if info_re.match(f))
 
     info_threads = {j: InfoThread(j, 1) for j in info_jsons}
     for a, t in info_threads.items(): 
