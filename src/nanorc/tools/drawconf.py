@@ -119,11 +119,13 @@ def cli(output_file, json_dir):
         dotfile.write(conf.source)
 
 
-if __name__ == '__main__':
+
+def main():
     print("Starting cli")
     cli()
 
-
+if __name__ == '__main__':
+    main()
 
 
 

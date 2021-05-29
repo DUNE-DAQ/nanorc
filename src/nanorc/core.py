@@ -100,7 +100,7 @@ class NanoRC:
         Boots applications
         """
         
-        self.log.info(str(self.cfg.boot))
+        self.log.debug(str(self.cfg.boot))
 
         try:
             self.pm.boot(self.cfg.boot)
@@ -121,6 +121,7 @@ class NanoRC:
         if self.listener:
             self.listener.terminate()
 
+        self.log.warning("Terminating")
         self.pm.terminate()
     
 

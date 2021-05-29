@@ -27,14 +27,14 @@ class ResponseDispatcher(threading.Thread):
     def run(self):
 
         while True:
-            r = self.listener.reponse_queue.get()
+            r = self.listener.response_queue.get()
             if r == self.STOP:
                 break
 
             self.listener.notify(r)
 
     def stop(self):
-        self.listener.reponse_queue.put_nowait(self.STOP)
+        self.listener.response_queue.put_nowait(self.STOP)
         self.join()
 
 class ResponseListener:
@@ -44,7 +44,7 @@ class ResponseListener:
     def __init__(self, port : int ):
         self.log = logging.getLogger("ResponseListener")
         self.port = port
-        self.reponse_queue = Queue()
+        self.response_queue = Queue()
         self.handlers = {}
         self.flask = self._create()
         self.dispatcher = ResponseDispatcher(self)
@@ -60,7 +60,7 @@ class ResponseListener:
         def index():
             json = request.get_json(force=True)
             # enqueue command reply
-            self.reponse_queue.put(json)
+            self.response_queue.put(json)
             return "Response received"
 
         app.add_url_rule("/response", "index", index, methods=["POST"])
@@ -138,14 +138,14 @@ class AppCommander:
         self.app_port = port
         self.app_url = f"http://{self.app_host}:{str(self.app_port)}/command"
         self.listener_port = response_port
-        self.reponse_queue = Queue()
+        self.response_queue = Queue()
         # self.listener = self._create_listener(response_port)
 
     def __del__(self):
         pass
 
     def notify(self, response):
-        self.reponse_queue.put(response)
+        self.response_queue.put(response)
 
     def ping(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -172,7 +172,7 @@ class AppCommander:
             "exit_state": exit_state,
         }
         self.log.info(f"Sending {cmd_id} to {self.app} ({self.app_url})")
-        self.log.info(json.dumps(cmd, sort_keys=True, indent=2))
+        self.log.debug(json.dumps(cmd, sort_keys=True, indent=2))
 
         headers = {
             "content-type": "application/json",
@@ -181,9 +181,9 @@ class AppCommander:
         response = requests.post(self.app_url, data=json.dumps(cmd), headers=headers)
         self.log.info(f"Response: {response}")
         try:
-            r = self.reponse_queue.get(timeout=timeout)
+            r = self.response_queue.get(timeout=timeout)
             self.log.info(f"Received reply from {self.app} to {cmd_id}")
-            self.log.info(json.dumps(r, sort_keys=True, indent=2))
+            self.log.debug(json.dumps(r, sort_keys=True, indent=2))
 
         except queue.Empty as e:
             # Proper error handling, please

@@ -27,7 +27,12 @@ from nanorc.core import NanoRC
 
 class NanoContext:
     """docstring for NanoContext"""
-    def __init__(self, console):
+    def __init__(self, console: Console):
+        """Nanorc Context for click use.
+        
+        Args:
+            console (Console): rich console for messages and logging
+        """
         super(NanoContext, self).__init__()
         self.console = console
         self.print_traceback = False
@@ -49,10 +54,27 @@ loglevels = {
     'NOTSET': logging.NOTSET,
 }
 
+def updateLogLevel(loglevel):
+        level = loglevels[loglevel]
+
+        # Update log level for root logger
+        logger = logging.getLogger()
+        logger.setLevel(level)
+        for handler in logger.handlers:
+            handler.setLevel(level)
+        # And then manually tweak 'sh.command' logger. Sigh.
+        sh_command_level = level if level > logging.INFO else (level+10)
+        sh_command_logger = logging.getLogger(sh.__name__)
+        # sh_command_logger.propagate = False
+        sh_command_logger.setLevel(sh_command_level)
+        for handler in sh_command_logger.handlers:
+            handler.setLevel(sh_command_level)
+
+
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
-@click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default=None, help='Set the log level')
+@click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
@@ -67,24 +89,20 @@ def cli(ctx, obj, traceback, loglevel, cfg_dir):
     grid.add_row("  but trust it and it will betray you!")
     grid.add_row("Use it with care!")
 
-    console.print(Panel.fit(grid))
+    obj.console.print(Panel.fit(grid))
 
 
     if loglevel:
-        level = loglevels[loglevel]
-        logger = logging.getLogger()
-        logger.setLevel(level)
-        for handler in logger.handlers:
-            handler.setLevel(level)
+        updateLogLevel(loglevel)
 
     try:
-        rc = NanoRC(console, cfg_dir)
+        rc = NanoRC(obj.console, cfg_dir)
     except Exception as e:
-        logging.getLogger("rich").exception("Failed to build NanoRC")
+        logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()
         
     def cleanup_rc():
-        print("NanoRC context cleanup: Terminating RC before exiting")
+        logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
         rc.terminate()
 
     ctx.call_on_close(cleanup_rc)    
@@ -93,7 +111,7 @@ def cli(ctx, obj, traceback, loglevel, cfg_dir):
 
 @cli.command('status')
 @click.pass_obj
-def status(obj):
+def status(obj: NanoContext):
     obj.rc.status()
 
 @cli.command('boot')
@@ -117,14 +135,16 @@ def conf(obj):
 @cli.command('start')
 @click.argument('run', type=int)
 @click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')
-# @click.option('--trigger-interval-ticks', type=int, default=50000000, help='Trigger separation in ticks')
 @click.pass_obj
-def start(obj, run, disable_data_storage):
+def start(obj:NanoContext, run:int, disable_data_storage:bool):
     """
-    Starts the run
-
-    RUN: run number
-
+    Start Command
+    
+    Args:
+        obj (NanoContext): Context object
+        run (int): Run number
+        disable_data_storage (bool): Flag to disable data writing to storage
+    
     """
     obj.rc.start(run, disable_data_storage, None) # FIXME: how?
     obj.rc.status()
@@ -144,7 +164,13 @@ def pause(obj):
 @cli.command('resume')
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.pass_obj
-def resume(obj, trigger_interval_ticks):
+def resume(obj:NanoContext, trigger_interval_ticks:int):
+    """Resume Command
+    
+    Args:
+        obj (NanoContext): Context object
+        trigger_interval_ticks (int): Trigger separation in ticks
+    """
     obj.rc.resume(trigger_interval_ticks)
     obj.rc.status()
 
@@ -182,8 +208,7 @@ def wait(obj, seconds):
 
             time.sleep(1)
 
-if __name__ == '__main__':
-
+def main():
     from rich.logging import RichHandler
 
     logging.basicConfig(
@@ -205,8 +230,6 @@ if __name__ == '__main__':
         else:
             console.print_exception()
 
-
-
-
-
+if __name__ == '__main__':
+    main()
 
