@@ -173,7 +173,8 @@ It can be instructive to take a closer look at how we can tell nanorc to `boot` 
                 "CET_PLUGIN_PATH": "getenv",
                 "DUNEDAQ_SHARE_PATH": "getenv",
                 "LD_LIBRARY_PATH": "getenv",
-                "PATH": "getenv"
+                "PATH": "getenv",
+                "TRACE_FILE": "getenv:/tmp/trace_buffer_${HOSTNAME}_${USER}"
             },
             "cmd": [
                 "CMD_FAC=rest://localhost:${APP_PORT}",
@@ -194,5 +195,6 @@ It can be instructive to take a closer look at how we can tell nanorc to `boot` 
 
 It should be pointed out that some substitutions are made when nanorc uses a file such as this to boot the processes. Specifically:
 
-* `"getenv"` is replaced with the actual value of the environment variable
+* `"getenv"` is replaced with the actual value of the environment variable, throwing a Python exception if it is unset
+* `"getenv:<default value>"` is replaced with the actual value of the environment variable if it is set, with `<default value>` used if it is unset
 * If a host is provided as `localhost` or `127.0.0.1`, the result of the Python call `socket.gethostname` is used in its place
