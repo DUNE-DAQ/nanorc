@@ -164,7 +164,7 @@ class SSHProcessManager(object):
                 "APP_PORT": app_conf["port"],
                 "APP_WD": os.getcwd()
                 })
-            cmd=';'.join([ f"export {n}={v}" for n,v in app_vars.items()] + boot_info['exec'][app_conf['exec']]['cmd'])
+            cmd=';'.join([ f"export {n}=\"{v}\"" for n,v in app_vars.items()] + boot_info['exec'][app_conf['exec']]['cmd'])
 
             log_file = f'log_{app_name}_{app_conf["port"]}.txt'
 

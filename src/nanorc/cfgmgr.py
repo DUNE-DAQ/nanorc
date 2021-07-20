@@ -85,20 +85,29 @@ class ConfigManager:
             for n, h in self.boot["hosts"].items()
         }
 
-        self.boot["env"] = {
-            k: (os.environ[k] if v == "getenv" else v) for k, v in self.boot["env"].items()
-        }
-
+        for k, v in self.boot["env"].items():
+            if str(v).find("getenv") == 0:
+                if k in os.environ.keys():
+                    self.boot["env"][k] = os.environ[k]
+                elif str(v).find(":") > 0:
+                    self.boot["env"][k] = v[v.find(":") + 1:]
+                else:
+                    raise ValueError("Key " + k + " is not in environment and no default specified!")
+               
         for exec_spec in self.boot["exec"].values():
-            exec_spec["env"] = {
-                k: (os.environ[k] if v == "getenv" else v) for k, v in exec_spec["env"].items()
-            }
+            for k, v in exec_spec["env"].items():
+                if str(v).find("getenv") == 0:
+                    if k in os.environ.keys():
+                        exec_spec["env"][k] = os.environ[k]
+                    elif str(v).find(":") > 0:
+                        exec_spec["env"][k] = v[v.find(":") + 1:]
+                    else:
+                        raise ValueError("Key " + k + " is not in environment and no default specified!")
+            
         # Conf:
         ips = {n: socket.gethostbyname(h) for n, h in self.boot["hosts"].items()}
         # Set sender and receiver address to ips
-        for c in json_extract(self.conf, "sender_config") + json_extract(
-            self.conf, "receiver_config"
-        ):
+        for c in json_extract(self.conf, "sender_config") + json_extract(self.conf, "receiver_config"):
             c["address"] = c["address"].format(**ips)
 
     def runtime_start(self, data: dict) -> dict:
