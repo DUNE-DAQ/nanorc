@@ -130,13 +130,15 @@ class NanoRC:
         """
         Initializes the applications.
         """
-        ok, failed = self.send_many('init', self.cfg.init, 'NONE', 'INITIAL', raise_on_fail=True)
+        app_seq = getattr(self.cfg, 'init_order', None)
+        ok, failed = self.send_many('init', self.cfg.init, 'NONE', 'INITIAL', sequence=app_seq, raise_on_fail=True)
 
     def conf(self) -> NoReturn:
         """
         Sends configure command to the applications.
         """
-        ok, failed = self.send_many('conf', self.cfg.conf, 'INITIAL', 'CONFIGURED', raise_on_fail=True)
+        app_seq = getattr(self.cfg, 'conf_order', None)
+        ok, failed = self.send_many('conf', self.cfg.conf, 'INITIAL', 'CONFIGURED', sequence=app_seq, raise_on_fail=True)
 
     def start(self, run: int, disable_data_storage: bool, trigger_interval_ticks: Union[int, None]) -> NoReturn:
         """
@@ -201,4 +203,5 @@ class NanoRC:
         """
         Send scrap command
         """
-        ok, failed = self.send_many('scrap', None, 'CONFIGURED', 'INITIAL', raise_on_fail=True)
+        app_seq = getattr(self.cfg, 'scrap_order', None)
+        ok, failed = self.send_many('scrap', None, 'CONFIGURED', 'INITIAL', sequence=app_seq, raise_on_fail=True)
