@@ -130,8 +130,7 @@ class NanoRC:
         """
         Initializes the applications.
         """
-        app_seq = getattr(self.cfg, 'init_order', None)
-        ok, failed = self.send_many('init', self.cfg.init, 'NONE', 'INITIAL', sequence=app_seq, raise_on_fail=True)
+        ok, failed = self.send_many('init', self.cfg.init, 'NONE', 'INITIAL', raise_on_fail=True)
 
     def conf(self) -> NoReturn:
         """
