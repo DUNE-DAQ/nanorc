@@ -178,7 +178,7 @@ class NanoRC:
         Sends pause command
         """
         app_seq = getattr(self.cfg, 'pause_order', None)
-        ok, failed = self.send_many('pause', None, 'RUNNING', 'RUNNING', app_seq, raise_on_fail=True)
+        ok, failed = self.send_many('pause', self.cfg.pause, 'RUNNING', 'RUNNING', app_seq, raise_on_fail=True)
 
 
     def resume(self, trigger_interval_ticks: Union[int, None]) -> NoReturn:
@@ -204,4 +204,4 @@ class NanoRC:
         Send scrap command
         """
         app_seq = getattr(self.cfg, 'scrap_order', None)
-        ok, failed = self.send_many('scrap', None, 'CONFIGURED', 'INITIAL', sequence=app_seq, raise_on_fail=True)
+        ok, failed = self.send_many('scrap', self.cfg.scrap, 'CONFIGURED', 'INITIAL', sequence=app_seq, raise_on_fail=True)
