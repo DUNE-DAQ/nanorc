@@ -157,10 +157,10 @@ def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_
 @cli.command('stop')
 @click.option('--stop-wait', type=int, default=0, help='Seconds to wait between Pause and Stop commands')
 @click.pass_obj
-def stop(obj, resume_wait:int):
+def stop(obj, stop_wait:int):
     obj.rc.pause()
     obj.rc.status()
-    time.sleep(resume_wait)
+    time.sleep(stop_wait)
     obj.rc.stop()
     obj.rc.status()
 
