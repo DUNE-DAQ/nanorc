@@ -139,7 +139,7 @@ class NanoRC:
         app_seq = getattr(self.cfg, 'conf_order', None)
         ok, failed = self.send_many('conf', self.cfg.conf, 'INITIAL', 'CONFIGURED', sequence=app_seq, raise_on_fail=True)
 
-    def start(self, run: int, disable_data_storage: bool, trigger_interval_ticks: Union[int, None]) -> NoReturn:
+    def start(self, run: int, disable_data_storage: bool) -> NoReturn:
         """
         Sends start command to the applications
         
@@ -155,8 +155,9 @@ class NanoRC:
                 "run": run,
             }
 
-        if not trigger_interval_ticks is None:
-            runtime_start_data["trigger_interval_ticks"] = trigger_interval_ticks
+        # TODO: delete 
+        # if not trigger_interval_ticks is None:
+        #     runtime_start_data["trigger_interval_ticks"] = trigger_interval_ticks
 
         start_data = self.cfg.runtime_start(runtime_start_data)
         app_seq = getattr(self.cfg, 'start_order', None)
@@ -177,7 +178,7 @@ class NanoRC:
         Sends pause command
         """
         app_seq = getattr(self.cfg, 'pause_order', None)
-        ok, failed = self.send_many('pause', None, 'RUNNING', 'RUNNING', app_seq, raise_on_fail=True)
+        ok, failed = self.send_many('pause', self.cfg.pause, 'RUNNING', 'RUNNING', app_seq, raise_on_fail=True)
 
 
     def resume(self, trigger_interval_ticks: Union[int, None]) -> NoReturn:
@@ -203,4 +204,4 @@ class NanoRC:
         Send scrap command
         """
         app_seq = getattr(self.cfg, 'scrap_order', None)
-        ok, failed = self.send_many('scrap', None, 'CONFIGURED', 'INITIAL', sequence=app_seq, raise_on_fail=True)
+        ok, failed = self.send_many('scrap', self.cfg.scrap, 'CONFIGURED', 'INITIAL', sequence=app_seq, raise_on_fail=True)
