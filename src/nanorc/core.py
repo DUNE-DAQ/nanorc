@@ -14,11 +14,12 @@ from typing import Union, NoReturn
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
-    def __init__(self, console: Console, cfg_dir: str):
+    def __init__(self, console: Console, cfg_dir: str, timeout:int):
         super(NanoRC, self).__init__()     
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
         self.cfg = ConfigManager(cfg_dir)
+        self.timeout = timeout
 
         self.pm = SSHProcessManager(console)
         self.apps = None
@@ -85,7 +86,7 @@ class NanoRC:
         if not sequence:
             sequence = data.keys() if data else self.apps.keys()
         for n in sequence:
-            r = self.apps[n].send_command(cmd, data[n] if data else {}, state_entry, state_exit)
+            r = self.apps[n].send_command(cmd, data[n] if data else {}, state_entry, state_exit, self.timeout)
             (ok if r['success'] else failed)[n] = r
         if raise_on_fail and failed:
             self.log.error(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
