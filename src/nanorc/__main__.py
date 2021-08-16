@@ -75,10 +75,12 @@ def updateLogLevel(loglevel):
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
+@click.option('--timeout', type=int, default=60, help='Application commands timeout')
+
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, cfg_dir):
+def cli(ctx, obj, traceback, loglevel, timeout, cfg_dir):
 
     obj.print_traceback = traceback
 
@@ -96,7 +98,7 @@ def cli(ctx, obj, traceback, loglevel, cfg_dir):
         updateLogLevel(loglevel)
 
     try:
-        rc = NanoRC(obj.console, cfg_dir)
+        rc = NanoRC(obj.console, cfg_dir, timeout)
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()
