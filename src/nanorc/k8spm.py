@@ -6,8 +6,10 @@ import rich
 
 class K8SProcessManager(object):
     """docstring for K8SProcessManager"""
-    def __init__(self):
+    def __init__(self, console):
         super(K8SProcessManager, self).__init__()
+
+        self.console = console
 
         config.load_kube_config()
 
@@ -17,10 +19,16 @@ class K8SProcessManager(object):
 
 
     def list_pods(self):
-        print("Listing pods with their IPs:")
+        self.console.print("Listing pods with their IPs:")
         ret = self._core_v1_api.list_pod_for_all_namespaces(watch=False)
         for i in ret.items:
-            print("%s\t%s\t%s" % (i.status.pod_ip, i.metadata.namespace, i.metadata.name))
+            self.console.print("%s\t%s\t%s" % (i.status.pod_ip, i.metadata.namespace, i.metadata.name))
+
+    def list_endpoints(self):
+        self.console.print("Listing endpoints:")
+        ret = self._core_v1_api.list_endpoints_for_all_namespaces(watch=False)
+        for i in ret.items:
+            self.console.print("%s\t%s" % (i.metadata.namespace, i.metadata.name))
 
     # ----
     def create_namespace(self, namespace : str):
@@ -33,8 +41,8 @@ class K8SProcessManager(object):
                 body=ns
             )
         except Exception as e:
-            rich.print("[red]Error[/red]")
-            rich.print(e)
+            self.console.print("[red]Error[/red]")
+            self.console.print(e)
             return
 
     # ----
@@ -45,8 +53,8 @@ class K8SProcessManager(object):
                 body=ns
             )
         except Exception as e:
-            rich.print("[red]Error[/red]")
-            rich.print(e)
+            self.console.print("[red]Error[/red]")
+            self.console.print(e)
             return
 
     # ----
@@ -78,7 +86,7 @@ class K8SProcessManager(object):
             metadata=client.V1ObjectMeta(name=name),
             spec=spec)
 
-        rich.print(deployment)
+        self.console.print(deployment)
         # return
         # Creation of the Deployment in specified namespace
         # (Can replace "default" with a namespace you may have created)
@@ -88,10 +96,10 @@ class K8SProcessManager(object):
                 namespace=namespace, body=deployment
             )
         except Exception as e:
-            rich.print("[red]Error[/red]")
-            rich.print(e)
+            self.console.print("[red]Error[/red]")
+            self.console.print(e)
             return
-        rich.print(resp)
+        self.console.print(resp)
 
 
     # # ----
@@ -114,49 +122,47 @@ class K8SProcessManager(object):
             )
 
         service = client.V1Service(metadata=metadata, spec=spec)  # V1Service
-        rich.print(service)
+        self.console.print(service)
 
         try:
             resp = self._core_v1_api.create_namespaced_service(namespace, service)
         except Exception as e:
-            rich.print("[red]Error[/red]")
-            rich.print(e)
+            self.console.print("[red]Error[/red]")
+            self.console.print(e)
             return
 
-        rich.print(resp)
+        self.console.print(resp)
 
 
     # ----
     def create_nanorc_responder(self, name: str, app_label: str, namespace: str, ip: str, port: int):
-        # # Creating Meta Data
-        # metadata = client.V1ObjectMeta(name=name)
+        # Creating Meta Data
+        metadata = client.V1ObjectMeta(name=name)
 
-        # rich.print("[blue]Creating nanorc responder service[/blue]")
-        # # Creating Port object
-        # port = client.V1ServicePort(
-        #     protocol = 'TCP',
-        #     target_port = port,
-        #     port = port,
-        #     node_port = 0
-        # )
+        self.console.print("[blue]Creating nanorc responder service[/blue]")
+        # Creating Port object
+        svc_port = client.V1ServicePort(
+            protocol = 'TCP',
+            target_port = port,
+            port = port,
+        )
 
-        # # Creating spec 
-        # spec = client.V1ServiceSpec(
-        #         ports=[port],
-        #         selector = {"app": app_label}
-        #     )
+        # Creating spec 
+        spec = client.V1ServiceSpec(
+                ports=[svc_port],
+            )
 
-        # # Creating Service object
-        # service = client.V1Service(metadata=metadata, spec=spec)  # V1Service
-        # rich.print(service)
-        # try:
-        #     resp = self._core_v1_api.create_namespaced_service(namespace, service)
-        # except Exception as e:
-        #     rich.print("[red]Error[/red]")
-        #     rich.print(e)
-        #     return
+        # Creating Service object
+        service = client.V1Service(metadata=metadata, spec=spec)  # V1Service
+        self.console.print(service)
+        try:
+            resp = self._core_v1_api.create_namespaced_service(namespace, service)
+        except Exception as e:
+            self.console.print("[red]Error[/red]")
+            self.console.print(e)
+            return
 
-        rich.print("[blue]Creating nanorc responder endpoint[/blue]")
+        self.console.print("[blue]Creating nanorc responder endpoint[/blue]")
 
         # Creating Meta Data
         metadata = client.V1ObjectMeta(name=name)
@@ -167,20 +173,22 @@ class K8SProcessManager(object):
 
         ep_port = client.V1EndpointPort(
                 port=port,
-                name=name
             )
 
         # Creating endpoints subsets
         subset = client.V1EndpointSubset(addresses=[responder_address], ports=[ep_port])
         # Create Endpoints Objects
         endpoints = client.V1Endpoints(metadata=metadata, subsets=[subset])
+        self.console.print(endpoints)
 
         try:
             self._core_v1_api.create_namespaced_endpoints(namespace, endpoints)
         except Exception as e:
-            rich.print("[red]Error[/red]")
-            rich.print(e)
+            self.console.print("[red]Error[/red]")
+            self.console.print(e)
             return
+
+
 # ---
 def main():
     # config.load_kube_config()
@@ -192,12 +200,16 @@ def main():
     # create_daqapp_deployment(apps_v1, 'trigger', 'trg', 'dunedaq')
     # create_daqapp_service(core_v1, 'trigger', 'trg', 'dunedaq')
     # create_nanorc_responder(core_v1, 'nanorc', 'nanorc', 'dunedaq', '192.168.200.12', 56789)
-    # 
-    partition = 'daq-p0'
-    pm = K8SProcessManager()
+    
+    from rich.console import Console
+
+    console = Console()
+    partition = 'dunedaq-0'
+    pm = K8SProcessManager(console)
     pm.list_pods()
+    pm.list_endpoints()
     pm.create_namespace(partition)
-    pm.create_daqapp_deployment('trigger', 'trg', partition)
+    # pm.create_daqapp_deployment('trigger', 'trg', partition)
     pm.create_nanorc_responder('nanorc', 'nanorc', partition, '192.168.200.12', 56789)
     pm.list_pods()
 
