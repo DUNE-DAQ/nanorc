@@ -5,6 +5,7 @@ from rich.pretty import Pretty
 from rich.table import Table
 from rich.text import Text
 from .sshpm import SSHProcessManager
+from .k8spm import K8SProcessManager
 from .cfgmgr import ConfigManager
 from .appctrl import AppSupervisor, ResponseListener
 from rich.traceback import Traceback
@@ -22,6 +23,7 @@ class NanoRC:
         self.timeout = timeout
 
         self.pm = SSHProcessManager(console)
+        self.k8spm = K8SProcessManager(console)
         self.apps = None
         self.listener = None
 
@@ -104,7 +106,7 @@ class NanoRC:
         self.log.debug(str(self.cfg.boot))
 
         try:
-            self.pm.boot(self.cfg.boot)
+            self.k8spm.boot(self.cfg.boot)
         except Exception as e:
             self.console.print_exception()
             return

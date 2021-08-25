@@ -1,15 +1,17 @@
 #!/usr/bin/env python
 
-from kubernetes import client, config
+import logging
 import rich
+import socket
+from kubernetes import client, config
 
 
 class K8SProcessManager(object):
     """docstring for K8SProcessManager"""
-    def __init__(self, console):
+    def __init__(self):
         super(K8SProcessManager, self).__init__()
 
-        self.console = console
+        self.log = logging.getLogger(__name__)
 
         config.load_kube_config()
 
@@ -19,19 +21,21 @@ class K8SProcessManager(object):
 
 
     def list_pods(self):
-        self.console.print("Listing pods with their IPs:")
+        self.log.info("Listing pods with their IPs:")
         ret = self._core_v1_api.list_pod_for_all_namespaces(watch=False)
         for i in ret.items:
-            self.console.print("%s\t%s\t%s" % (i.status.pod_ip, i.metadata.namespace, i.metadata.name))
+            self.log.info("%s\t%s\t%s" % (i.status.pod_ip, i.metadata.namespace, i.metadata.name))
 
     def list_endpoints(self):
-        self.console.print("Listing endpoints:")
+        self.log.info("Listing endpoints:")
         ret = self._core_v1_api.list_endpoints_for_all_namespaces(watch=False)
         for i in ret.items:
-            self.console.print("%s\t%s" % (i.metadata.namespace, i.metadata.name))
+            self.log.info("%s\t%s" % (i.metadata.namespace, i.metadata.name))
 
     # ----
     def create_namespace(self, namespace : str):
+        self.log.info(f"Creating {namespace} namespace")
+
         ns = client.V1Namespace(
             metadata=client.V1ObjectMeta(name=namespace)
         )
@@ -41,37 +45,56 @@ class K8SProcessManager(object):
                 body=ns
             )
         except Exception as e:
-            self.console.print("[red]Error[/red]")
-            self.console.print(e)
-            return
+            self.log.error(e)
+            raise RuntimeError(f"Failed to create namespace {namespace}") from e
 
     # ----
     def delete_namespace(self, namespace: str):
+        self.log.info(f"Deleting {namespace} namespace")
         try:
             # 
             resp = self._core_v1_api.delete_namespace(
                 body=ns
             )
         except Exception as e:
-            self.console.print("[red]Error[/red]")
-            self.console.print(e)
-            return
+            self.log.error(e)
+            raise RuntimeError(f"Failed to delete namespace {namespace}") from e
 
     # ----
-    def create_daqapp_deployment(self, name: str, app_label: str, namespace: str):
+    def create_daqapp_deployment(self, name: str, app_label: str, namespace: str, mount_cvmfs: bool):
+        self.log.info(f"Creating {namespace}:{name} daq application")
+
+        volume_mount = client.V1VolumeMount(
+                mount_path="/cvmfs/dunedaq.opensciencegrid.org",
+                name="dunedaq"
+            )
+
         container = client.V1Container(
             name="deployment",
-            image="pocket-daq:0.1.2",
+            image="pocket-daq-cvmfs:v0.1.0",
             args=["--name", "theapp", "-c", "rest://localhost:3333"],
             ports=[
                 client.V1ContainerPort(container_port=3333)
-            ]
+            ],
             # image_pull_policy="Never",
+            volume_mounts=[volume_mount] if mount_cvmfs else None
         )
+
+        volume = client.V1Volume(
+            name="dunedaq",
+            persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
+                claim_name="dunedaq.opensciencegrid.org",
+                read_only=True
+                )
+            )
+
         # Template
         template = client.V1PodTemplateSpec(
             metadata=client.V1ObjectMeta(labels={"app": app_label}),
-            spec=client.V1PodSpec(containers=[container]))
+            spec=client.V1PodSpec(
+                containers=[container],
+                volumes=[volume] if mount_cvmfs else None
+            ))
 
         selector = client.V1LabelSelector(match_labels={"app": app_label})
         # Spec
@@ -86,7 +109,7 @@ class K8SProcessManager(object):
             metadata=client.V1ObjectMeta(name=name),
             spec=spec)
 
-        self.console.print(deployment)
+        self.log.debug(deployment)
         # return
         # Creation of the Deployment in specified namespace
         # (Can replace "default" with a namespace you may have created)
@@ -96,14 +119,10 @@ class K8SProcessManager(object):
                 namespace=namespace, body=deployment
             )
         except Exception as e:
-            self.console.print("[red]Error[/red]")
-            self.console.print(e)
-            return
-        self.console.print(resp)
+            self.log.error(e)
+            raise RuntimeError(f"Failed to create daqapp deployment {namespace}:{name}") from e
 
 
-    # # ----
-    # def create_daqapp_service(self, name, app_label, namespace):
 
         # Creating Meta Data
         metadata = client.V1ObjectMeta(name=name)
@@ -122,24 +141,22 @@ class K8SProcessManager(object):
             )
 
         service = client.V1Service(metadata=metadata, spec=spec)  # V1Service
-        self.console.print(service)
+        self.log.debug(service)
 
         try:
             resp = self._core_v1_api.create_namespaced_service(namespace, service)
         except Exception as e:
-            self.console.print("[red]Error[/red]")
-            self.console.print(e)
-            return
-
-        self.console.print(resp)
-
+            self.log.error(e)
+            raise RuntimeError(f"Failed to create daqapp service {namespace}:{name}") from e
 
     # ----
     def create_nanorc_responder(self, name: str, app_label: str, namespace: str, ip: str, port: int):
+
+        self.log.info("Creating nanorc responder service {namespace}:{name}")
+
         # Creating Meta Data
         metadata = client.V1ObjectMeta(name=name)
 
-        self.console.print("[blue]Creating nanorc responder service[/blue]")
         # Creating Port object
         svc_port = client.V1ServicePort(
             protocol = 'TCP',
@@ -154,15 +171,14 @@ class K8SProcessManager(object):
 
         # Creating Service object
         service = client.V1Service(metadata=metadata, spec=spec)  # V1Service
-        self.console.print(service)
+        self.log.debug(service)
         try:
             resp = self._core_v1_api.create_namespaced_service(namespace, service)
         except Exception as e:
-            self.console.print("[red]Error[/red]")
-            self.console.print(e)
-            return
+            self.log.error(e)
+            raise RuntimeError(f"Failed to create nanorc responder service {namespace}:{name}") from e
 
-        self.console.print("[blue]Creating nanorc responder endpoint[/blue]")
+        self.log.info("Creating nanorc responder endpoint")
 
         # Creating Meta Data
         metadata = client.V1ObjectMeta(name=name)
@@ -179,18 +195,83 @@ class K8SProcessManager(object):
         subset = client.V1EndpointSubset(addresses=[responder_address], ports=[ep_port])
         # Create Endpoints Objects
         endpoints = client.V1Endpoints(metadata=metadata, subsets=[subset])
-        self.console.print(endpoints)
+        self.log.info(endpoints)
 
         try:
             self._core_v1_api.create_namespaced_endpoints(namespace, endpoints)
         except Exception as e:
-            self.console.print("[red]Error[/red]")
-            self.console.print(e)
-            return
+            self.log.error(e)
+            raise RuntimeError(f"Failed to create nanorc responder endpoint {namespace}:{name}") from e
+
+    """
+    ---
+    # Source: cvmfs-csi/templates/persistentvolumeclaim.yaml
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: dunedaq.opensciencegrid.org
+    spec:
+      accessModes:
+      - ReadOnlyMany
+      resources:
+        requests:
+          storage: 1Gi
+      storageClassName: dunedaq.opensciencegrid.org
+    """
+    def create_cvmfs_pvc(self, name: str, namespace: str):
+
+        # Creating Meta Data
+        metadata = client.V1ObjectMeta(name=name, namespace=namespace)
+
+        # Creating spec
+        spec=client.V1PersistentVolumeClaimSpec(
+            access_modes=['ReadOnlyMany'],
+            resources=client.V1ResourceRequirements(
+                    requests={'storage': '1Gi'}
+                ),
+            storage_class_name=name
+            )
+
+        # Create claim 
+        claim = client.V1PersistentVolumeClaim(
+            metadata=metadata,
+            spec=spec
+            )
+
+        try:
+            self._core_v1_api.create_namespaced_persistent_volume_claim(namespace, claim)
+        except Exception as e:
+            self.log.error(e)
+            raise RuntimeError(f"Failed to create persistent volume claim {namespace}:{name}") from e
+    # def boot(self, boot_info):
+
+    #     if self.apps:
+    #         raise RuntimeError(
+    #             f"ERROR: apps have already been booted {' '.join(self.apps.keys())}. Terminate them all before booting a new set."
+    #         )
+
+    #     apps = boot_info["apps"]
+    #     hosts = boot_info["hosts"]
+    #     env_vars = boot_info["env"]
+    #     partition = 'dunedaq-0'
+
+    #     for app_name, app_conf in apps.items():
+    #         self.create_daqapp_deployment(app_name, app_name, partition)
+    #     self.create_nanorc_responder('nanorc', 'nanorc', partition, socket.gethostname(), 56789)
 
 
 # ---
 def main():
+
+    from rich.logging import RichHandler
+
+    logging.basicConfig(
+        level="INFO",
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[RichHandler(rich_tracebacks=True)]
+    )
+
     # config.load_kube_config()
 
     # core_v1 = client.CoreV1Api()
@@ -201,17 +282,15 @@ def main():
     # create_daqapp_service(core_v1, 'trigger', 'trg', 'dunedaq')
     # create_nanorc_responder(core_v1, 'nanorc', 'nanorc', 'dunedaq', '192.168.200.12', 56789)
     
-    from rich.console import Console
-
-    console = Console()
     partition = 'dunedaq-0'
-    pm = K8SProcessManager(console)
-    pm.list_pods()
-    pm.list_endpoints()
+    pm = K8SProcessManager()
+    # pm.list_pods()
+    # pm.list_endpoints()
     pm.create_namespace(partition)
-    # pm.create_daqapp_deployment('trigger', 'trg', partition)
-    pm.create_nanorc_responder('nanorc', 'nanorc', partition, '192.168.200.12', 56789)
-    pm.list_pods()
+    pm.create_cvmfs_pvc('dunedaq.opensciencegrid.org', partition)
+    pm.create_daqapp_deployment('trigger', 'trg', partition, True)
+    pm.create_nanorc_responder('nanorc', 'nanorc', partition, '128.141.174.0', 56789)
+    # pm.list_pods()
 
 if __name__ == '__main__':
     main()
