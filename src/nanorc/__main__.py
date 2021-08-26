@@ -106,6 +106,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dir):
     def cleanup_rc():
         logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
         rc.terminate()
+        ctx.exit(rc.return_code)
 
     ctx.call_on_close(cleanup_rc)    
     obj.rc = rc

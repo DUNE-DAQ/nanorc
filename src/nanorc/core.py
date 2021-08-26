@@ -20,6 +20,7 @@ class NanoRC:
         self.console = console
         self.cfg = ConfigManager(cfg_dir)
         self.timeout = timeout
+        self.return_code = 0
 
         self.pm = SSHProcessManager(console)
         self.apps = None
@@ -80,6 +81,7 @@ class NanoRC:
         ok, failed = {}, {}
         if not self.apps:
             self.log.warning(f"No applications defined to send '{cmd}' to. Has 'boot' been executed?")
+            self.return_code = 10
             return ok, failed
 
         # Loop over data keys if no sequence is specified or all apps, if data is empty
@@ -90,9 +92,11 @@ class NanoRC:
             (ok if r['success'] else failed)[n] = r
         if raise_on_fail and failed:
             self.log.error(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
+            self.return_code = 13
             for a,r in failed.items():
                 self.log.error(f"{a}: {r}")
             raise RuntimeError(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
+        self.return_code = 0
         return ok, failed
 
 
@@ -107,6 +111,7 @@ class NanoRC:
             self.pm.boot(self.cfg.boot)
         except Exception as e:
             self.console.print_exception()
+            self.return_code = 11
             return
 
         self.listener = ResponseListener(self.cfg.boot["response_listener"]["port"])
