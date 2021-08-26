@@ -77,7 +77,7 @@ shonky rc> boot
 
 ```
 
-You can then send the `init`, `conf`, `start`, and `resume` commands to get things going. `start` requires a run number as argument. It also optionally takes booleans to toggle data storage (`--disable-data-storage` and `--enable-data-storage`), an integer to control trigger separation in ticks (`--trigger-interval-ticks <num ticks>`) and an integer to control the wait between `start` and `resume` in seconds (`--resume-wait <num seconds>`)
+You can then send the `init`, `conf`, `start`, and `resume` commands to get things going. `start` requires a run number as argument. It also optionally takes booleans to toggle data storage (`--disable-data-storage` and `--enable-data-storage`) and an integer to control trigger separation in ticks (`--trigger-interval-ticks <num ticks>`).
 
 The commands produce quite verbose output so that you can see what was sent directly to the applications without digging in the logfiles.
 
@@ -100,11 +100,12 @@ shonky rc> status
 
 When you've seen enough use `stop`, `scrap` and `terminate` commands. In case you experience timeout problems booting applications or sending commands, consider changing the `hosts` values from `localhost` to the hostname of your machine. This has to do with SSH authentication.
 
-Note that you can also control nanorc in "batch mode", e.g.:
+You can also control nanorc in "batch mode", e.g.:
 ```
 run_number=999
 nanorc mdapp_fake boot init conf start --disable-data-storage $run_number wait 2 resume wait 60 pause wait 2 stop scrap terminate
 ```
+Notice the ability to control the time via transitions from the command line via the `wait` argument. 
 
 ### Viewing logs and output
 
