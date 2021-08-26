@@ -28,6 +28,7 @@ Now you're ready to run.
 
 ### Running the NanoRC
 
+To see a list of options you can pass nanorc in order to control things such as the amount of information it prints and the timeouts for transitions, run `nanorc -h`. We'll skip those for now in the following demo:
 ```
 nanorc mdapp_fake
 
@@ -55,7 +56,7 @@ Undocumented commands:
 exit  help  quit
 ```
 
-`boot` will start your applications. In the case of the example, a trigger emulator application to supply triggers and a readout and dataflow application which receives the triggers.
+`boot` will start your applications. In the case of the example, a trigger application to supply triggers, a hardware signal interface (HSI) application, and a readout and dataflow application which receives the triggers.
 ```
 shonky rc> boot
 
@@ -76,9 +77,11 @@ shonky rc> boot
 
 ```
 
-You can then send the `init`, `conf`, `start`, and `resume` commands to get things going. Note that `start` requires a run number as argument. The commands produce quite verbose output so that you can see what was sent directly to the applications without digging in the logfiles.
+You can then send the `init`, `conf`, `start`, and `resume` commands to get things going. `start` requires a run number as argument. It also optionally takes booleans to toggle data storage (`--disable-data-storage` and `--enable-data-storage`), an integer to control trigger separation in ticks (`--trigger-interval-ticks <num ticks>`) and an integer to control the wait between `start` and `resume` in seconds (`--resume-wait <num seconds>`)
 
-Triggers will not be generated until after a resume command is issued, and then trigger records with 2 links each at 1 Hz will be generated.
+The commands produce quite verbose output so that you can see what was sent directly to the applications without digging in the logfiles.
+
+Triggers will not be generated until after a resume command is issued, and then trigger records with 2 links each at a default of 1 Hz will be generated.
 
 Use 'status' to see what's going on:
 
@@ -97,9 +100,15 @@ shonky rc> status
 
 When you've seen enough use `stop`, `scrap` and `terminate` commands. In case you experience timeout problems booting applications or sending commands, consider changing the `hosts` values from `localhost` to the hostname of your machine. This has to do with SSH authentication.
 
+Note that you can also control nanorc in "batch mode", e.g.:
+```
+run_number=999
+nanorc mdapp_fake boot init conf start --disable-data-storage $run_number wait 2 resume wait 60 pause wait 2 stop scrap terminate
+```
+
 ### Viewing logs and output
 
-Logs are kept in the working directory at the time you started nanorc, named `log_<name>_<port>.txt`.
+Logs are kept in the working directory at the time you started nanorc, named `log_<application name>_<port>.txt`.
 
 You can peek at the output hdf5 file using:
 
