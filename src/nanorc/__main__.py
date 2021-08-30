@@ -117,9 +117,16 @@ def status(obj: NanoContext):
     obj.rc.status()
 
 @cli.command('boot')
+@click.option('-p', '--partition', default='dunedaq-0', help="Run Control partition")
 @click.pass_obj
-def boot(obj):
-    obj.rc.boot()
+def boot(obj, partition):
+    """Boot a daq partition
+    
+    Args:
+        obj (TYPE): Description
+        partition (TYPE): Description
+    """
+    obj.rc.boot(partition)
     obj.rc.status()
 
 @cli.command('init')

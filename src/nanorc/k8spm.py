@@ -3,9 +3,10 @@
 import logging
 import rich
 import socket
+import time
 from kubernetes import client, config
 from rich.console import Console
-
+from rich.progress import track
 
 class AppProcessDescriptor(object):
     """docstring for AppProcessDescriptor"""
@@ -285,7 +286,7 @@ class K8SProcessManager(object):
             raise RuntimeError(f"Failed to create persistent volume claim {namespace}:{name}") from e
 
 
-    def boot(self, boot_info):
+    def boot(self, boot_info, partition):
 
         if self.apps:
             raise RuntimeError(
@@ -313,7 +314,8 @@ class K8SProcessManager(object):
     #     hosts = boot_info["hosts"]
         env_vars = boot_info["env"]
 
-        self.partition = env_vars.get('DUNEDAQ_PARTITION', 'dunedaq-p0')
+        # self.partition = env_vars.get('DUNEDAQ_PARTITION', 'dunedaq-p0')
+        self.partition = partition
         cmd_port = 3333
         
         # Create partition
@@ -338,9 +340,24 @@ class K8SProcessManager(object):
     # ---
     def terminate(self):
 
+        timeout = 60
         if self.partition:
             self.delete_namespace(self.partition)
 
+            # TODO: add progressbar here
+            # for _ in range(timeout):
+            for _ in track(range(timeout), description="Terminating namespace..."):
+
+                try:
+                    s = self._core_v1_api.read_namespace_status(self.partition)
+                except client.exceptions.ApiException as exc:
+                    if exc.reason == 'Not Found':
+                        return
+                    else:
+                        break
+                time.sleep(1)
+
+            logging.warning('Timeout expired!')
 
 
 # ---

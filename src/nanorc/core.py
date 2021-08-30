@@ -116,7 +116,7 @@ class NanoRC:
         return ok, failed
 
 
-    def boot(self) -> NoReturn:
+    def boot(self, partition: str) -> NoReturn:
         """
         Boots applications
         """
@@ -124,7 +124,7 @@ class NanoRC:
         self.log.debug(str(self.cfg.boot))
 
         try:
-            self.k8spm.boot(self.cfg.boot)
+            self.k8spm.boot(self.cfg.boot, partition)
         except Exception as e:
             self.console.print_exception()
             return
@@ -136,6 +136,7 @@ class NanoRC:
 
         self.apps = { n:AppSupervisor(self.console, d, self.listener, response_host, proxy) for n,d in self.k8spm.apps.items() }
 
+        # TODO: move (some of) this loop into k8spm?
         timeout = 30
         with Progress(
             SpinnerColumn(),
