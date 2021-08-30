@@ -10,7 +10,8 @@ setup(
         "rich",
         "sh",
         "graphviz",
-
+        "kubernetes",
+        "docker"
     ],
     extras_require={"develop": [
         "ipdb",

@@ -3,6 +3,7 @@ import requests
 import queue
 import json
 import socket
+import socks
 import threading
 
 from flask import Flask, request, cli
@@ -129,7 +130,7 @@ class AppCommander:
     """docstring for DAQAppController"""
 
     def __init__(
-        self, console: Console, app: str, host: str, port: int, response_port: int
+        self, console: Console, app: str, host: str, port: int, response_port: int, response_host: str = None, proxy : tuple = None
     ):
         self.log = logging.getLogger(app)
         self.console = console
@@ -138,6 +139,8 @@ class AppCommander:
         self.app_port = port
         self.app_url = f"http://{self.app_host}:{str(self.app_port)}/command"
         self.listener_port = response_port
+        self.listener_host = response_host
+        self.proxy = proxy
         self.response_queue = Queue()
         # self.listener = self._create_listener(response_port)
 
@@ -148,7 +151,12 @@ class AppCommander:
         self.response_queue.put(response)
 
     def ping(self):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        if not self.proxy:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        else:
+            s = socks.socksocket(socket.AF_INET, socket.SOCK_STREAM)
+            s.set_proxy(socks.SOCKS5, self.proxy[0], self.proxy[1])
         try:
             s.connect((self.app_host, self.app_port))
             s.shutdown(2)
@@ -178,7 +186,21 @@ class AppCommander:
             "content-type": "application/json",
             "X-Answer-Port": str(self.listener_port),
         }
-        response = requests.post(self.app_url, data=json.dumps(cmd), headers=headers)
+        if not self.listener_host is None:
+            headers['X-Answer-Host'] = self.listener_host
+
+
+        response = requests.post(
+            self.app_url,
+            data=json.dumps(cmd),
+            headers=headers,
+            proxies={
+                'http': f'socks5h://{self.proxy[0]}:{self.proxy[1]}',
+                'https': f'socks5h://{self.proxy[0]}:{self.proxy[1]}'
+            } if self.proxy else None
+        )
+
+
         self.log.info(f"Response: {response}")
         try:
             r = self.response_queue.get(timeout=timeout)
@@ -197,11 +219,11 @@ class AppCommander:
 class AppSupervisor:
     """Lightweight application supervisor"""
 
-    def __init__(self, console: Console, desc: AppProcessDescriptor, listener: ResponseListener):
+    def __init__(self, console: Console, desc: AppProcessDescriptor, listener: ResponseListener, response_host: str = None, proxy: tuple = None):
         self.console = console
         self.desc = desc
         self.commander = AppCommander(
-            console, desc.name, desc.host, desc.port, listener.port
+            console, desc.name, desc.host, desc.port, listener.port, response_host, proxy
         )
         self.last_sent_command = None
         self.last_ok_command = None

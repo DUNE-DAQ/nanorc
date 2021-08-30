@@ -23,7 +23,7 @@ class NanoRC:
         self.timeout = timeout
 
         self.pm = SSHProcessManager(console)
-        self.k8spm = K8SProcessManager(console)
+        self.k8spm = K8SProcessManager()
         self.apps = None
         self.listener = None
 
@@ -112,7 +112,11 @@ class NanoRC:
             return
 
         self.listener = ResponseListener(self.cfg.boot["response_listener"]["port"])
-        self.apps = { n:AppSupervisor(self.console, d, self.listener) for n,d in self.pm.apps.items() }
+
+        response_host = f'nanorc.{self.k8spm.partition}'
+        proxy = ('127.0.0.1', 31000)
+
+        self.apps = { n:AppSupervisor(self.console, d, self.listener, response_host, proxy) for n,d in self.k8spm.apps.items() }
 
     def terminate(self) -> NoReturn:
         if self.apps:
@@ -125,7 +129,7 @@ class NanoRC:
             self.listener.terminate()
 
         self.log.warning("Terminating")
-        self.pm.terminate()
+        self.k8spm.terminate()
     
 
 
