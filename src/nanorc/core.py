@@ -1,4 +1,5 @@
 import logging
+import time
 from rich.console import Console
 from rich.style import Style
 from rich.pretty import Pretty
@@ -9,6 +10,8 @@ from .k8spm import K8SProcessManager
 from .cfgmgr import ConfigManager
 from .appctrl import AppSupervisor, ResponseListener
 from rich.traceback import Traceback
+from rich.progress import *
+from rich.table import Table
 
 from typing import Union, NoReturn
 
@@ -22,17 +25,18 @@ class NanoRC:
         self.cfg = ConfigManager(cfg_dir)
         self.timeout = timeout
 
-        self.pm = SSHProcessManager(console)
-        self.k8spm = K8SProcessManager()
+        # self.pm = SSHProcessManager(console)
+        self.k8spm = K8SProcessManager(console)
         self.apps = None
         self.listener = None
 
     def status(self) -> NoReturn:
         """
         Displays the status of the applications
-        
-        :returns:   Nothing
-        :rtype:     None
+    
+
+        Returns:
+            NoReturn: nothing
         """
 
         if not self.apps:
@@ -77,6 +81,20 @@ class NanoRC:
         :type       sequence:       list
         :param      raise_on_fail:  Raise an exception if any application fails
         :type       raise_on_fail:  bool
+        
+        Args:
+            cmd (str): Command name
+            data (dict): Command data
+            state_entry (str): Initial state before the command
+            state_exit (str): Sinal state after the command
+            sequence (list, optional): Order with which commands are sent
+            raise_on_fail (bool, optional): Raise an exception if sending fails
+        
+        Returns:
+            TYPE: Description
+        
+        Raises:
+            RuntimeError: Description
         """
 
         ok, failed = {}, {}
@@ -118,6 +136,51 @@ class NanoRC:
 
         self.apps = { n:AppSupervisor(self.console, d, self.listener, response_host, proxy) for n,d in self.k8spm.apps.items() }
 
+        timeout = 30
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeRemainingColumn(),
+            TimeElapsedColumn(),
+            console=self.console,
+        ) as progress:
+            total = progress.add_task("[yellow]# apps started", total=len(self.apps))
+            apps_tasks = {
+                a: progress.add_task(f"[blue]{a}", total=1) for a in self.apps
+            }
+            waiting = progress.add_task("[yellow]timeout", total=timeout)
+
+            for _ in range(timeout):
+                progress.update(waiting, advance=1)
+
+                alive, resp = self.check_apps()
+                # progress.log(alive, resp)
+                for a, t in apps_tasks.items():
+                    if a in resp:
+                        progress.update(t, completed=1)
+                progress.update(total, completed=len(resp))
+                if resp == list(self.apps.keys()):
+                    progress.update(waiting, visible=False)
+                    break
+                time.sleep(1)
+
+    # ---
+    def check_apps(self):
+        responding = []
+        alive = []
+        for name, sup in self.apps.items():
+
+            desc = sup.desc
+
+            if desc.proc is not None and desc.proc.is_alive():
+                alive += [name]
+            if desc.proc is not None and sup.commander.ping():
+                responding += [name]
+        return alive, responding
+
+
     def terminate(self) -> NoReturn:
         if self.apps:
             for n,s in self.apps.items():
@@ -150,12 +213,9 @@ class NanoRC:
         """
         Sends start command to the applications
         
-        :param      run:                     The run
-        :type       run:                     int
-        :param      disable_data_storage:    The disable data storage
-        :type       disable_data_storage:    bool
-        :param      trigger_interval_ticks:  The trigger interval ticks
-        :type       trigger_interval_ticks:  int
+        Args:
+            run (int): Run number
+            disable_data_storage (bool): disable storage of data
         """
         runtime_start_data = {
                 "disable_data_storage": disable_data_storage,

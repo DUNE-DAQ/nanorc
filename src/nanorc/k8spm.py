@@ -4,6 +4,7 @@ import logging
 import rich
 import socket
 from kubernetes import client, config
+from rich.console import Console
 
 
 class AppProcessDescriptor(object):
@@ -15,6 +16,7 @@ class AppProcessDescriptor(object):
         self.host = None
         self.conf = None
         self.port = None
+        self.proc = None
 
 
     def __str__(self):
@@ -27,17 +29,23 @@ class K8sProcess(object):
         self.name = name
         self.namespace = namespace
 
-    # def status(self):
-        # self.pm.__apps_v1_api.list_namespaced_deployment()
     def is_alive(self):
-        return True
+        s = self.pm._apps_v1_api.read_namespaced_deployment_status(self.name, self.namespace)
+        return s.status.updated_replicas == s.spec.replicas
+
 
 class K8SProcessManager(object):
     """docstring for K8SProcessManager"""
-    def __init__(self):
+    def __init__(self, console: Console):
+        """A Kubernetes Process Manager
+        
+        Args:
+            console (Console): Description
+        """
         super(K8SProcessManager, self).__init__()
 
         self.log = logging.getLogger(__name__)
+        self.console = console
         self.apps = {}
         self.partition = None
 
@@ -92,52 +100,9 @@ class K8SProcessManager(object):
     def create_daqapp_deployment(self, name: str, app_label: str, namespace: str, cmd_port: int = 3333, mount_cvmfs: bool = False, env_vars: dict = None):
         self.log.info(f"Creating {namespace}:{name} daq application (port: {cmd_port})")
 
-        # volume_mount = client.V1VolumeMount(
-        #         mount_path="/cvmfs/dunedaq.opensciencegrid.org",
-        #         name="dunedaq"
-        #     )
-
-        # container = client.V1Container(
-        #     name="deployment",
-        #     image="pocket-daq-cvmfs:v0.1.0",
-        #     args=["--name", "theapp", "-c", "rest://localhost:3333"],
-        #     ports=[
-        #         client.V1ContainerPort(
-        #             container_port=3333,
-        #             name="command",
-        #             protocol="TCP"
-        #             )
-        #     ],
-        #     # image_pull_policy="Never",
-        #     volume_mounts=[volume_mount] if mount_cvmfs else None
-        # )
-
-        # volume = client.V1Volume(
-        #     name="dunedaq",
-        #     persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
-        #         claim_name="dunedaq.opensciencegrid.org",
-        #         read_only=True
-        #         )
-        #     )
-
-        # Template
-        # template = client.V1PodTemplateSpec(
-        #     metadata=client.V1ObjectMeta(labels={"app": app_label}),
-        #     spec=client.V1PodSpec(
-        #         containers=[container],
-        #         volumes=[volume] if mount_cvmfs else None
-        #     ))
-
-        # selector = client.V1LabelSelector(match_labels={"app": app_label})
-        # Spec
-        # spec = client.V1DeploymentSpec(
-        #     selector=selector,
-        #     replicas=1,
-        #     template=template)
-
         # Deployment
         deployment = client.V1Deployment(
-            api_version="apps/v1",
+            # api_version="apps/v1",
             kind="Deployment",
             metadata=client.V1ObjectMeta(name=name),
             spec=client.V1DeploymentSpec(
@@ -206,24 +171,6 @@ class K8SProcessManager(object):
             self.log.error(e)
             raise RuntimeError(f"Failed to create daqapp deployment {namespace}:{name}") from e
 
-
-
-        # Creating Meta Data
-        # metadata = client.V1ObjectMeta(name=name)
-
-        # Creating Port object
-        # port = client.V1ServicePort(
-        #     protocol = "TCP",
-        #     target_port = "command",
-        #     port = 3333,
-        # )
-
-        # Creating spec 
-        # spec = client.V1ServiceSpec(
-        #         ports=[port],
-        #         selector = {"app": app_label}
-        #     )
-
         service = client.V1Service(
             metadata=client.V1ObjectMeta(name=name),
             spec=client.V1ServiceSpec(
@@ -250,21 +197,6 @@ class K8SProcessManager(object):
 
         self.log.info(f"Creating nanorc responder service {namespace}:{name} for {ip}:{port}")
 
-        # Creating Meta Data
-        # metadata = client.V1ObjectMeta(name=name)
-
-        # Creating Port object
-        # svc_port = client.V1ServicePort(
-        #     protocol = 'TCP',
-        #     target_port = port,
-        #     port = port,
-        # )
-
-        # Creating spec 
-        # spec = client.V1ServiceSpec(
-        #         ports=[svc_port],
-        #     )
-
         # Creating Service object
         service = client.V1Service(
             metadata=client.V1ObjectMeta(name=name),
@@ -288,19 +220,6 @@ class K8SProcessManager(object):
 
         self.log.info("Creating nanorc responder endpoint")
 
-        # Creating Meta Data
-        # metadata = client.V1ObjectMeta(name=name)
-
-        # responder_address = client.V1EndpointAddress(
-        #         ip=ip
-        #     )
-
-        # ep_port = client.V1EndpointPort(
-        #         port=port,
-        #     )
-
-        # Creating endpoints subsets
-        # subset = client.V1EndpointSubset(addresses=[responder_address], ports=[ep_port])
         # Create Endpoints Objects
         endpoints = client.V1Endpoints(
             metadata=client.V1ObjectMeta(
@@ -341,25 +260,6 @@ class K8SProcessManager(object):
       storageClassName: dunedaq.opensciencegrid.org
     """
     def create_cvmfs_pvc(self, name: str, namespace: str):
-
-        # # Creating Meta Data
-        # metadata = client.V1ObjectMeta(name=name, namespace=namespace)
-
-        # # Creating spec
-        # spec=client.V1PersistentVolumeClaimSpec(
-        #     access_modes=['ReadOnlyMany'],
-        #     resources=client.V1ResourceRequirements(
-        #             requests={'storage': '1Gi'}
-        #         ),
-        #     storage_class_name=name
-        #     )
-
-        # # Create claim 
-        # claim = client.V1PersistentVolumeClaim(
-        #     metadata=metadata,
-        #     spec=spec
-        #     )
-
 
         # Create claim 
         claim = client.V1PersistentVolumeClaim(
@@ -435,7 +335,7 @@ class K8SProcessManager(object):
 
         self.create_nanorc_responder('nanorc', 'nanorc', self.partition, kind_gateway, boot_info["response_listener"]["port"])   
 
-
+    # ---
     def terminate(self):
 
         if self.partition:
