@@ -131,7 +131,7 @@ class K8SProcessManager(object):
                                 ports=[
                                     client.V1ContainerPort(
                                         container_port=3333,
-                                        name="command",
+                                        name="restcmd",
                                         protocol="TCP"
                                         )
                                 ],
@@ -177,8 +177,9 @@ class K8SProcessManager(object):
             spec=client.V1ServiceSpec(
                 ports=[
                     client.V1ServicePort(
+                        name = "restcmd",
                         protocol = "TCP",
-                        target_port = "command",
+                        target_port = "restcmd",
                         port = 3333,
                     )
                 ],
