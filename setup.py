@@ -11,7 +11,8 @@ setup(
         "sh",
         "graphviz",
         "kubernetes",
-        "docker"
+        "docker",
+        "PySocks"
     ],
     extras_require={"develop": [
         "ipdb",
