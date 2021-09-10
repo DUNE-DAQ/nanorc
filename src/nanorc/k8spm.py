@@ -311,11 +311,11 @@ class K8SProcessManager(object):
             raise RuntimeError("Identify the kind gateway address'") from exc
         logging.info(f"kind network gateway: {kind_gateway}")
 
-        apps = boot_info["apps"]
-    #     hosts = boot_info["hosts"]
-        env_vars = boot_info["env"]
+        apps = boot_info["apps"].copy()
+        env_vars = boot_info["env"].copy()
+        # TODO: move into the rc boot method. The PM should not know about DUNEDAQ_PARTITION
+        env_vars['DUNEDAQ_PARTITION'] = partition
 
-        # self.partition = env_vars.get('DUNEDAQ_PARTITION', 'dunedaq-p0')
         self.partition = partition
         cmd_port = 3333
         
