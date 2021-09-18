@@ -136,15 +136,21 @@ class K8SProcessManager(object):
                                         )
                                 ],
                                 # image_pull_policy="Never",
-                                volume_mounts=[
+                                volume_mounts=([
                                     client.V1VolumeMount(
                                         mount_path="/cvmfs/dunedaq.opensciencegrid.org",
                                         name="dunedaq"
                                     )
-                                ] if mount_cvmfs else None
+                                ] if mount_cvmfs else []) +
+                                [
+                                    client.V1VolumeMount(
+                                        mount_path="/dunedaq/pocket",
+                                        name="pocket"
+                                    )
+                                ]
                             )
                         ],
-                        volumes=[
+                        volumes=([
                             client.V1Volume(
                                 name="dunedaq",
                                 persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
@@ -152,7 +158,15 @@ class K8SProcessManager(object):
                                     read_only=True
                                     )
                             )
-                        ] if mount_cvmfs else None
+                        ] if mount_cvmfs else []) +
+                        [
+                            client.V1Volume(
+                                name="pocket",
+                                host_path=client.V1HostPathVolumeSource(
+                                    path='/pocket',
+                                )
+                            )
+                        ]
                     ))
             )
 
