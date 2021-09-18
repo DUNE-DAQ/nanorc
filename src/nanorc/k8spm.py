@@ -119,7 +119,7 @@ class K8SProcessManager(object):
                                 env = [
                                     client.V1EnvVar(
                                         name=k,
-                                        value=v
+                                        value=str(v)
                                         )
                                     for k,v in env_vars.items()
                                 ] if env_vars else None,
@@ -274,7 +274,7 @@ class K8SProcessManager(object):
             spec=client.V1PersistentVolumeClaimSpec(
                 access_modes=['ReadOnlyMany'],
                 resources=client.V1ResourceRequirements(
-                        requests={'storage': '1Gi'}
+                        requests={'storage': '2Gi'}
                     ),
                 storage_class_name=name
                 )
@@ -286,7 +286,7 @@ class K8SProcessManager(object):
             self.log.error(e)
             raise RuntimeError(f"Failed to create persistent volume claim {namespace}:{name}") from e
 
-
+    #---
     def boot(self, boot_info, partition):
 
         if self.apps:
@@ -338,6 +338,7 @@ class K8SProcessManager(object):
 
         self.create_nanorc_responder('nanorc', 'nanorc', self.partition, kind_gateway, boot_info["response_listener"]["port"])   
 
+
     # ---
     def terminate(self):
 
@@ -373,16 +374,6 @@ def main():
         handlers=[RichHandler(rich_tracebacks=True)]
     )
 
-    # config.load_kube_config()
-
-    # core_v1 = client.CoreV1Api()
-    # apps_v1 = client.AppsV1Api()
-
-    # list_pods(core_v1)
-    # create_daqapp_deployment(apps_v1, 'trigger', 'trg', 'dunedaq')
-    # create_daqapp_service(core_v1, 'trigger', 'trg', 'dunedaq')
-    # create_nanorc_responder(core_v1, 'nanorc', 'nanorc', 'dunedaq', '192.168.200.12', 56789)
-    
     partition = 'dunedaq-0'
     pm = K8SProcessManager()
     # pm.list_pods()
