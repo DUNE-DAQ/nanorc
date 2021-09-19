@@ -4,6 +4,7 @@ import logging
 import rich
 import socket
 import time
+import os
 from kubernetes import client, config
 from rich.console import Console
 from rich.progress import track
@@ -98,7 +99,7 @@ class K8SProcessManager(object):
             raise RuntimeError(f"Failed to delete namespace {namespace}") from e
 
     # ----
-    def create_daqapp_deployment(self, name: str, app_label: str, namespace: str, cmd_port: int = 3333, mount_cvmfs: bool = False, env_vars: dict = None):
+    def create_daqapp_deployment(self, name: str, app_label: str, namespace: str, cmd_port: int = 3333, mount_cvmfs: bool = False, env_vars: dict = None, run_as: dict = None):
         self.log.info(f"Creating {namespace}:{name} daq application (port: {cmd_port})")
 
         # Deployment
@@ -111,11 +112,21 @@ class K8SProcessManager(object):
                 replicas=1,
                 template=client.V1PodTemplateSpec(
                     metadata=client.V1ObjectMeta(labels={"app": app_label}),
+                    # Pod specifications start here
                     spec=client.V1PodSpec(
+                        # Run the pod wuth same user id and group id as the current user
+                        # Required in kind environment to create non-root files in shared folders
+                        security_context=client.V1PodSecurityContext(
+                            run_as_user=run_as['uid'],
+                            run_as_group=run_as['gid'],                            
+                        ) if run_as else None,
+                        # List of processes
                         containers=[
+                            # Daq application container
                             client.V1Container(
-                                name="deployment",
+                                name="daq-application",
                                 image="pocket-daq-cvmfs:v0.1.0",
+                                # Environment variables
                                 env = [
                                     client.V1EnvVar(
                                         name=k,
@@ -310,15 +321,16 @@ class K8SProcessManager(object):
 
         logging.info('Resolving the kind gateway')
         import docker, ipaddress
+        # Detect docker environment
         docker_client = docker.from_env()
-        # for n in docker_client.networks.list():
-            # print(n.name)
 
+        # Find the docker network called Kind
         try:
             kind_network = next(iter(n for n in docker_client.networks.list() if n.name == 'kind'))
         except Exception as exc:
             raise RuntimeError("Failed to identfy docker network 'kind'") from exc
 
+        # And extract the gateway ip, which corresponds to the host
         try:
             kind_gateway = next(iter(s['Gateway'] for s in kind_network.attrs['IPAM']['Config'] if isinstance(ipaddress.ip_address(s['Gateway']), ipaddress.IPv4Address)), None)
         except Exception as exc:
@@ -338,6 +350,11 @@ class K8SProcessManager(object):
         # Create the persistent volume claim
         self.create_cvmfs_pvc('dunedaq.opensciencegrid.org', self.partition)
 
+        run_as = {
+            'uid': os.getuid(),
+            'gid': os.getgid(),
+        }
+        
         for app_name, app_conf in apps.items():
 
             app_desc = AppProcessDescriptor(app_name)
@@ -347,7 +364,7 @@ class K8SProcessManager(object):
             app_desc.port = cmd_port
             app_desc.proc = K8sProcess(self, app_name, self.partition)
 
-            self.create_daqapp_deployment(app_name, app_name, self.partition, cmd_port, mount_cvmfs=True, env_vars=env_vars)
+            self.create_daqapp_deployment(app_name, app_name, self.partition, cmd_port, mount_cvmfs=True, env_vars=env_vars, run_as=run_as)
             self.apps[app_name] = app_desc
 
         self.create_nanorc_responder('nanorc', 'nanorc', self.partition, kind_gateway, boot_info["response_listener"]["port"])   
