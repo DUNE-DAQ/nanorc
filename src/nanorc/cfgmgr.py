@@ -105,7 +105,7 @@ class ConfigManager:
                         raise ValueError("Key " + k + " is not in environment and no default specified!")
             
         # Conf:
-        ips = {n: socket.gethostbyname(h) for n, h in self.boot["hosts"].items()}
+        ips = {n: '0.0.0.0' for n, h in self.boot["hosts"].items()}
         # Set sender and receiver address to ips
         for c in json_extract(self.conf, "sender_config") + json_extract(self.conf, "receiver_config"):
             c["address"] = c["address"].format(**ips)

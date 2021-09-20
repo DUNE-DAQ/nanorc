@@ -144,7 +144,42 @@ class K8SProcessManager(object):
                                         container_port=3333,
                                         name="restcmd",
                                         protocol="TCP"
-                                        )
+                                        ),
+                                    client.V1ContainerPort(
+                                        name = "hsi-messages",
+                                        protocol = "TCP",
+                                        container_port = 12344,
+                                    ),
+                                    client.V1ContainerPort(
+                                        name = "trg-dec",
+                                        protocol = "TCP",
+                                        container_port = 12345,
+                                    ),
+                                    client.V1ContainerPort(
+                                        name = "timesyncs",
+                                        protocol = "TCP",
+                                        container_port = 12350,
+                                    ),
+                                    client.V1ContainerPort(
+                                        name = "fragments",
+                                        protocol = "TCP",
+                                        container_port = 12351,
+                                    ),
+                                    client.V1ContainerPort(
+                                        name = "trg-dec-tk",
+                                        protocol = "TCP",
+                                        container_port = 12346,
+                                    ),
+                                    client.V1ContainerPort(
+                                        name = "dr-dh0",
+                                        protocol = "TCP",
+                                        container_port = 12348,
+                                    ),
+                                    client.V1ContainerPort(
+                                        name = "dr-dh1",
+                                        protocol = "TCP",
+                                        container_port = 12349,
+                                    ),
                                 ],
                                 # image_pull_policy="Never",
                                 volume_mounts=([
@@ -206,7 +241,49 @@ class K8SProcessManager(object):
                         protocol = "TCP",
                         target_port = "restcmd",
                         port = 3333,
-                    )
+                    ),
+                    client.V1ServicePort(
+                        name = "hsi-messages",
+                        protocol = "TCP",
+                        target_port = "hsi-messages",
+                        port = 12344,
+                    ),
+                    client.V1ServicePort(
+                        name = "trg-dec",
+                        protocol = "TCP",
+                        target_port = "trg-dec",
+                        port = 12345,
+                    ),
+                    client.V1ServicePort(
+                        name = "timesyncs",
+                        protocol = "TCP",
+                        target_port = "timesyncs",
+                        port = 12350,
+                    ),
+                    client.V1ServicePort(
+                        name = "fragments",
+                        protocol = "TCP",
+                        target_port = "fragments",
+                        port = 12351,
+                    ),
+                    client.V1ServicePort(
+                        name = "trg-dec-tk",
+                        protocol = "TCP",
+                        target_port = "trg-dec-tk",
+                        port = 12346,
+                    ),
+                    client.V1ServicePort(
+                        name = "dr-dh0",
+                        protocol = "TCP",
+                        target_port = "dr-dh0",
+                        port = 12348,
+                    ),
+                    client.V1ServicePort(
+                        name = "dr-dh1",
+                        protocol = "TCP",
+                        target_port = "dr-dh1",
+                        port = 12349,
+                    ),
                 ],
                 selector = {"app": app_label}
             )
