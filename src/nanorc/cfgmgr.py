@@ -107,8 +107,11 @@ class ConfigManager:
         # Conf:
         ips = {n: '0.0.0.0' for n, h in self.boot["hosts"].items()}
         # Set sender and receiver address to ips
-        for c in json_extract(self.conf, "sender_config") + json_extract(self.conf, "receiver_config"):
+        for c in json_extract(self.conf, "sender_config"):
             c["address"] = c["address"].format(**ips)
+            
+        for c in json_extract(self.conf, "receiver_config"):
+            c["address"] = c["address"].format(**self.boot["hosts"])
 
     def runtime_start(self, data: dict) -> dict:
         """

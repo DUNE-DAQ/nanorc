@@ -415,7 +415,7 @@ class K8SProcessManager(object):
         logging.info(f"kind network gateway: {kind_gateway}")
 
         apps = boot_info["apps"].copy()
-        env_vars = boot_info["env"].copy()
+        env_vars = boot_info["env"]
         # TODO: move into the rc boot method. The PM should not know about DUNEDAQ_PARTITION
         env_vars['DUNEDAQ_PARTITION'] = partition
 
@@ -434,6 +434,12 @@ class K8SProcessManager(object):
         
         for app_name, app_conf in apps.items():
 
+            exec_vars = boot_info['exec'][app_conf['exec']]['env']
+
+            app_vars = {}
+            app_vars.update(env_vars)
+            # app_vars.update(exec_vars)
+
             app_desc = AppProcessDescriptor(app_name)
             app_desc.conf = app_conf.copy()
             app_desc.partition = self.partition
@@ -441,7 +447,7 @@ class K8SProcessManager(object):
             app_desc.port = cmd_port
             app_desc.proc = K8sProcess(self, app_name, self.partition)
 
-            self.create_daqapp_deployment(app_name, app_name, self.partition, cmd_port, mount_cvmfs=True, env_vars=env_vars, run_as=run_as)
+            self.create_daqapp_deployment(app_name, app_name, self.partition, cmd_port, mount_cvmfs=True, env_vars=app_vars, run_as=run_as)
             self.apps[app_name] = app_desc
 
         self.create_nanorc_responder('nanorc', 'nanorc', self.partition, kind_gateway, boot_info["response_listener"]["port"])   
