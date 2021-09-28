@@ -30,8 +30,6 @@ class NanoRC:
         self.apps = None
         self.listener = None
 
-        console.print(self.cfg.conf)
-
     def status(self) -> NoReturn:
         """
         Displays the status of the applications
