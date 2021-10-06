@@ -7,6 +7,7 @@ from rich.text import Text
 from .sshpm import SSHProcessManager
 from .cfgmgr import ConfigManager
 from .appctrl import AppSupervisor, ResponseListener
+from .runmgr import RunNumberManager
 from rich.traceback import Traceback
 
 from typing import Union, NoReturn
@@ -19,6 +20,7 @@ class NanoRC:
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
         self.cfg = ConfigManager(cfg_dir)
+        self.rnm = RunNumberManager()
         self.timeout = timeout
         self.return_code = 0
 
@@ -145,17 +147,18 @@ class NanoRC:
         app_seq = getattr(self.cfg, 'conf_order', None)
         ok, failed = self.send_many('conf', self.cfg.conf, 'INITIAL', 'CONFIGURED', sequence=app_seq, raise_on_fail=True)
 
-    def start(self, run: int, disable_data_storage: bool) -> NoReturn:
+    def start(self, disable_data_storage: bool) -> NoReturn:
         """
         Sends start command to the applications
         
-        :param      run:                     The run
-        :type       run:                     int
         :param      disable_data_storage:    The disable data storage
         :type       disable_data_storage:    bool
         :param      trigger_interval_ticks:  The trigger interval ticks
         :type       trigger_interval_ticks:  int
         """
+
+        rnm.increment_run_number()
+        run = rnm.get_run_number()
         runtime_start_data = {
                 "disable_data_storage": disable_data_storage,
                 "run": run,
@@ -170,6 +173,7 @@ class NanoRC:
         ok, failed = self.send_many('start', start_data, 'CONFIGURED', 'RUNNING', sequence=app_seq, raise_on_fail=True)
 
 
+
     def stop(self) -> NoReturn:
         """
         Sends stop command
@@ -177,6 +181,8 @@ class NanoRC:
 
         app_seq = getattr(self.cfg, 'stop_order', None)
         ok, failed = self.send_many('stop', self.cfg.stop, 'RUNNING', 'CONFIGURED', sequence=app_seq, raise_on_fail=True)
+        run = rnm.get_run_number()
+        rnm.update_stop(run)
 
 
     def pause(self) -> NoReturn:
