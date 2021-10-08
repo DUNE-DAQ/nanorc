@@ -165,9 +165,11 @@ class NanoRC:
         # if not trigger_interval_ticks is None:
         #     runtime_start_data["trigger_interval_ticks"] = trigger_interval_ticks
 
-        start_data = self.cfg.runtime_start(runtime_start_data)
+        start_data, outdir = self.cfg.runtime_start(runtime_start_data)
         app_seq = getattr(self.cfg, 'start_order', None)
         ok, failed = self.send_many('start', start_data, 'CONFIGURED', 'RUNNING', sequence=app_seq, raise_on_fail=True)
+        self.console.log(f"[bold magenta]Started run #{run}[/bold magenta]")
+        self.console.log(f"Saving run data in {outdir}")
 
 
     def stop(self) -> NoReturn:
