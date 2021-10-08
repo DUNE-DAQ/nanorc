@@ -157,8 +157,8 @@ class NanoRC:
         :type       trigger_interval_ticks:  int
         """
 
-        rnm.increment_run_number()
-        run = rnm.get_run_number()
+        self.rnm.increment_run_number()
+        run = self.rnm.get_run_number()
         runtime_start_data = {
                 "disable_data_storage": disable_data_storage,
                 "run": run,
@@ -171,6 +171,8 @@ class NanoRC:
         start_data = self.cfg.runtime_start(runtime_start_data)
         app_seq = getattr(self.cfg, 'start_order', None)
         ok, failed = self.send_many('start', start_data, 'CONFIGURED', 'RUNNING', sequence=app_seq, raise_on_fail=True)
+        self.console.log(f"[bold magenta]Started run #{run}[/bold magenta]")
+
 
 
 
@@ -181,8 +183,9 @@ class NanoRC:
 
         app_seq = getattr(self.cfg, 'stop_order', None)
         ok, failed = self.send_many('stop', self.cfg.stop, 'RUNNING', 'CONFIGURED', sequence=app_seq, raise_on_fail=True)
-        run = rnm.get_run_number()
-        rnm.update_stop(run)
+        run = self.rnm.get_run_number()
+        self.rnm.update_stop(run)
+        self.console.log(f"[bold magenta]Stopped run #{run}[/bold magenta]")
 
 
     def pause(self) -> NoReturn:
