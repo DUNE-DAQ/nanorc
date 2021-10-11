@@ -2,11 +2,9 @@ import os.path
 import json
 import copy
 import socket
-from distutils.dir_util import copy_tree
 
 """Extract nested values from a JSON tree."""
 
-CFG_OUTDIR=os.path.expanduser("~/")
 
 def json_extract(obj, key):
     """Recursively fetch values from nested JSON."""
@@ -118,31 +116,15 @@ class ConfigManager:
         :param      data:  The data
         :type       data:  dict
 
-        :returns:   Complete parameter set and path of the saved config
-        :rtype:     tuple(dict, str)
+        :returns:   Complete parameter set.
+        :rtype:     dict
         """
         start = copy.deepcopy(self.start)
 
-        outdir = CFG_OUTDIR+"/RunConf_"+str(data["run"])
-        postfix = ""
-        counter = 1
-        while os.path.exists(outdir+postfix):
-            counter+=1
-            postfix = "_"+str(counter)
-
-        self.outdir = outdir+postfix+"/"
-        os.mkdir(self.outdir)
-        copy_tree(self.cfg_dir, self.outdir)
-
-        config = json_extract(start, "modules")
-        for c in config:
+        for c in json_extract(start, "modules"):
             for m in c:
                 m["data"].update(data)
-
-        f = open(self.outdir+"start_parsed.json", "w")
-        f.write(json.dumps(config, indent=2))
-        f.close()
-        return start,self.outdir
+        return start
 
     def runtime_resume(self, data: dict) -> dict:
         """
@@ -155,26 +137,13 @@ class ConfigManager:
         """
         resume = copy.deepcopy(self.resume)
 
-        postfix = ""
-        counter = 1
-        while os.path.exists(self.outdir+"resume_parsed"+postfix+".json"):
-            counter+=1
-            postfix = "_"+str(counter)
-
-        config = json_extract(resume, "modules")
-        for c in config:
+        for c in json_extract(resume, "modules"):
             for m in c:
                 m["data"].update(data)
-
-        file_name = self.outdir+"resume_parsed"+postfix+".json"
-        f = open(file_name, "w")
-        f.write(json.dumps(config, indent=2))
-        f.close()
         return resume
 
 
 if __name__ == "__main__":
-    import sys
     from os.path import dirname, join
     from rich.console import Console
     from rich.pretty import Pretty
@@ -182,7 +151,7 @@ if __name__ == "__main__":
 
     console = Console()
     try:
-        cfg = ConfigManager(sys.argv[1])
+        cfg = ConfigManager(join(dirname(__file__), "examples", "minidaqapp"))
     except Exception as e:
         console.print(Traceback())
 
@@ -206,10 +175,4 @@ if __name__ == "__main__":
     console.print(Pretty(cfg.stop_order))
 
     console.print("Start data V:runner:")
-    console.print(Pretty(cfg.runtime_start({"trigger_interval_ticks": "bb"}, 1001)))
-
-    console.print("Resume :runner:")
-    console.print(Pretty(cfg.runtime_resume({"trigger_interval_ticks": "bb"})))
-
-    console.print("Resume :runner:")
-    console.print(Pretty(cfg.runtime_resume({"trigger_interval_ticks": "cc"})))
+    console.print(Pretty(cfg.runtime_start({"aa": "bb"})))
