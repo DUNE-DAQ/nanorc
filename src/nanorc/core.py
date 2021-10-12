@@ -20,7 +20,7 @@ class NanoRC:
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
         self.cfg = ConfigManager(cfg_dir)
-        self.cfgsvr = ConfigSaver(cfg_dir, cfg_outdir)
+        self.cfgsvr = ConfigSaver(self.cfg, cfg_outdir)
         self.timeout = timeout
         self.return_code = 0
 

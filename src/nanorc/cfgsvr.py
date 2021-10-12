@@ -1,14 +1,15 @@
 import os.path
 import json
 import copy
+from .cfgmgr import ConfigManager
 from distutils.dir_util import copy_tree
 
 class ConfigSaver:
     """docstring for ConfigManager"""
 
-    def __init__(self, cfg_dir, cfg_outdir):
+    def __init__(self, cfgmgr:ConfigManager, cfg_outdir:str):
         super(ConfigSaver, self).__init__()
-        self.cfg_dir = cfg_dir
+        self.cfgmgr = cfgmgr
         self.outdir = cfg_outdir
 
     def _get_new_out_dir_name(self, run:int) -> str:
@@ -59,9 +60,8 @@ class ConfigSaver:
         :rtype:     str
         """
         self.thisrun_outdir = self._get_new_out_dir_name(run)
-        print(self.thisrun_outdir)
         os.makedirs(self.thisrun_outdir)
-        copy_tree(self.cfg_dir, self.thisrun_outdir)
+        copy_tree(self.cfgmgr.cfg_dir, self.thisrun_outdir)
 
         f = open(self.thisrun_outdir+"start_parsed.json", "w")
         f.write(json.dumps(data, indent=2))
@@ -97,7 +97,8 @@ if __name__ == "__main__":
     @click.argument('cfg_outdir', type=click.Path())
     @click.argument('run', type=int)
     def config_saver_test(cfg_dir, cfg_outdir, run):
-        instance = ConfigSaver(cfg_dir, cfg_outdir)
+        cfgmgr = ConfigManager(join(dirname(__file__), "examples", "minidaqapp"))
+        instance = ConfigSaver(cfgmgr, cfg_outdir)
         print(f"Save start data for run {run}")
         runtime_start_data = {
             "disable_data_storage": True,
