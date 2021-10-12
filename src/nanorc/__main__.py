@@ -136,20 +136,22 @@ def conf(obj):
     obj.rc.status()
 
 @cli.command('start')
+@click.argument('run', type=int)
 @click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.option('--resume-wait', type=int, default=0, help='Seconds to wait between Start and Resume commands')
 @click.pass_obj
-def start(obj:NanoContext, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int):
+def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int):
     """
     Start Command
     
     Args:
         obj (NanoContext): Context object
+        run (int): Run number
         disable_data_storage (bool): Flag to disable data writing to storage
     
     """
-    obj.rc.start(disable_data_storage)
+    obj.rc.start(run, disable_data_storage)
     obj.rc.status()
     time.sleep(resume_wait)
     obj.rc.resume(trigger_interval_ticks)
