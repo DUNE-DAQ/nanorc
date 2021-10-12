@@ -76,11 +76,12 @@ def updateLogLevel(loglevel):
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
+@click.option('--cfg-outdir', type=click.Path(), default="./")
 
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_dir):
+def cli(ctx, obj, traceback, loglevel, timeout, cfg_outdir, cfg_dir):
 
     obj.print_traceback = traceback
 
@@ -98,7 +99,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dir):
         updateLogLevel(loglevel)
 
     try:
-        rc = NanoRC(obj.console, cfg_dir, timeout)
+        rc = NanoRC(obj.console, cfg_dir, cfg_outdir, timeout)
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()

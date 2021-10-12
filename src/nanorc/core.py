@@ -6,6 +6,7 @@ from rich.table import Table
 from rich.text import Text
 from .sshpm import SSHProcessManager
 from .cfgmgr import ConfigManager
+from .cfgsvr import ConfigSaver
 from .appctrl import AppSupervisor, ResponseListener
 from rich.traceback import Traceback
 
@@ -14,11 +15,12 @@ from typing import Union, NoReturn
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
-    def __init__(self, console: Console, cfg_dir: str, timeout:int):
+    def __init__(self, console: Console, cfg_dir: str, cfg_outdir: str, timeout:int):
         super(NanoRC, self).__init__()     
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
         self.cfg = ConfigManager(cfg_dir)
+        self.cfgsvr = ConfigSaver(self.cfg, cfg_outdir)
         self.timeout = timeout
         self.return_code = 0
 
@@ -166,8 +168,12 @@ class NanoRC:
         #     runtime_start_data["trigger_interval_ticks"] = trigger_interval_ticks
 
         start_data = self.cfg.runtime_start(runtime_start_data)
+        cfg_save_dir = self.cfgsvr.save_on_start(start_data, run)
+
         app_seq = getattr(self.cfg, 'start_order', None)
         ok, failed = self.send_many('start', start_data, 'CONFIGURED', 'RUNNING', sequence=app_seq, raise_on_fail=True)
+        self.console.log(f"[bold magenta]Started run #{run}[/bold magenta]")
+        self.console.log(f"Saving run data in {cfg_save_dir}")
 
 
     def stop(self) -> NoReturn:
@@ -200,6 +206,7 @@ class NanoRC:
             runtime_resume_data["trigger_interval_ticks"] = trigger_interval_ticks
 
         resume_data = self.cfg.runtime_resume(runtime_resume_data)
+        self.cfgsvr.save_on_resume(resume_data)
 
         app_seq = getattr(self.cfg, 'resume_order', None)
         ok, failed = self.send_many('resume', resume_data, 'RUNNING', 'RUNNING', sequence=app_seq, raise_on_fail=True)
