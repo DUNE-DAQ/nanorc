@@ -2,6 +2,24 @@ import requests
 import json
 from .credmgr import credentials,Authentication
 
+class SimpleRunNumberManager:
+    def __init__(self):
+        self.run_number = None
+        self.requested_run_number = []
+
+    def get_run_number(self):
+        if self.run_number in self.requested_run_number:
+            raise RuntimeError(f"ERROR: run {self.run_number} has already run")
+        
+        self.requested_run_number.append(self.run_number)
+        return self.run_number
+
+    def increment_run_number(self):
+        self.run_number += 1
+
+    def update_stop(self, run_number):
+        pass
+        
 class RunNumberManager:
     """A class that interacts with the run number db"""
     

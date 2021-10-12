@@ -7,7 +7,7 @@ from rich.text import Text
 from .sshpm import SSHProcessManager
 from .cfgmgr import ConfigManager
 from .appctrl import AppSupervisor, ResponseListener
-from .runmgr import RunNumberManager
+from .runmgr import RunNumberManager, SimpleRunNumberManager
 from rich.traceback import Traceback
 
 from typing import Union, NoReturn
@@ -15,15 +15,17 @@ from typing import Union, NoReturn
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
-    def __init__(self, console: Console, cfg_dir: str, timeout:int, rundb_svr_socket:str=""):
+    def __init__(self, console: Console, cfg_dir: str, timeout:int, dotnanorc_file:str, :str=""):
         super(NanoRC, self).__init__()     
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
         self.cfg = ConfigManager(cfg_dir)
-        if rundb_svr_socket != "":
+        
+        if dotnanorc_file != "":
             self.rnm = RunNumberManager(rundb_svr_socket)
         else:
-            self.rnm = None
+            self.rnm = SimpleRunNumberManager()
+            
         self.timeout = timeout
         self.return_code = 0
 

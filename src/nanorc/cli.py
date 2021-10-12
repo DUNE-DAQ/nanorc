@@ -22,6 +22,7 @@ from rich.traceback import Traceback
 from rich.progress import *
 
 from nanorc.core import NanoRC
+from .runmgr import TrivialRunNumberManager
 
 class NanoContext:
     """docstring for NanoContext"""
@@ -149,6 +150,7 @@ def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_
         disable_data_storage (bool): Flag to disable data writing to storage
     
     """
+    
     obj.rc.start(run, disable_data_storage)
     obj.rc.status()
     time.sleep(resume_wait)
