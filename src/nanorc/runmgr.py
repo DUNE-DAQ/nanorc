@@ -1,37 +1,31 @@
 import requests
 import json
-
-API_HOST="http://10.73.136.62"
-API_PORT="5000"
-API_USER="SOMEUSER"
-API_PSWD="SOMEPASS"
+from .credmgr import credentials,Authentication
 
 class RunNumberManager:
     """A class that interacts with the run number db"""
     
-    def __init__(self):
+    def __init__(self, socket):
         super(RunNumberManager, self).__init__()
         self.run = None
+        self.API_SOCKET=socket
+        auth = credentials.get_login("rundb")
+        self.API_USER=auth.user
+        self.API_PSWD=auth.password
 
     def get_run_number(self):
-        req = requests.get(API_HOST+":"+API_PORT+'/runnumber/get', auth=(API_USER, API_PSWD))
+        req = requests.get(self.API_SOCKET+'/runnumber/get', auth=(self.API_USER, self.API_PSWD))
         self.run = req.json()[0][0][0]
         return self.run
 
     def increment_run_number(self):
-        req = requests.get(API_HOST+":"+API_PORT+'/runnumber/increment', auth=(API_USER, API_PSWD))
+        req = requests.get(self.API_SOCKET+'/runnumber/increment', auth=(self.API_USER, self.API_PSWD))
         self.run = req.json()[0][0][0]
         return self.run
 
     def update_stop(self, run_number):
-        req = requests.get(API_HOST+":"+API_PORT+'/runnumber/updatestop/'+str(run_number), auth=(API_USER, API_PSWD))
+        req = requests.get(self.API_SOCKET+'/runnumber/updatestop/'+str(run_number), auth=(self.API_USER, self.API_PSWD))
         return req.json()[0][0][0]
-
-    def save_next_run_data(self, data):
-        pass
-    
-    def save_end_of_run_data(self, data):
-        pass
     
 
 def test_runmgr():

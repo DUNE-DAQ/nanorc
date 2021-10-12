@@ -15,12 +15,15 @@ from typing import Union, NoReturn
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
-    def __init__(self, console: Console, cfg_dir: str, timeout:int):
+    def __init__(self, console: Console, cfg_dir: str, timeout:int, rundb_svr_socket:str=""):
         super(NanoRC, self).__init__()     
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
         self.cfg = ConfigManager(cfg_dir)
-        self.rnm = RunNumberManager()
+        if rundb_svr_socket != "":
+            self.rnm = RunNumberManager(rundb_svr_socket)
+        else:
+            self.rnm = None
         self.timeout = timeout
         self.return_code = 0
 
@@ -147,18 +150,20 @@ class NanoRC:
         app_seq = getattr(self.cfg, 'conf_order', None)
         ok, failed = self.send_many('conf', self.cfg.conf, 'INITIAL', 'CONFIGURED', sequence=app_seq, raise_on_fail=True)
 
-    def start(self, disable_data_storage: bool) -> NoReturn:
+    def start(self, run:int, disable_data_storage: bool) -> NoReturn:
         """
         Sends start command to the applications
         
+        :param      run:  The run number
+        :type       run:  int
         :param      disable_data_storage:    The disable data storage
         :type       disable_data_storage:    bool
-        :param      trigger_interval_ticks:  The trigger interval ticks
-        :type       trigger_interval_ticks:  int
         """
 
-        self.rnm.increment_run_number()
-        run = self.rnm.get_run_number()
+        if run is None:
+            self.rnm.increment_run_number()
+            run = self.rnm.get_run_number()
+            
         runtime_start_data = {
                 "disable_data_storage": disable_data_storage,
                 "run": run,
@@ -183,9 +188,10 @@ class NanoRC:
 
         app_seq = getattr(self.cfg, 'stop_order', None)
         ok, failed = self.send_many('stop', self.cfg.stop, 'RUNNING', 'CONFIGURED', sequence=app_seq, raise_on_fail=True)
-        run = self.rnm.get_run_number()
-        self.rnm.update_stop(run)
-        self.console.log(f"[bold magenta]Stopped run #{run}[/bold magenta]")
+        if self.rnm is not None:
+            run = self.rnm.get_run_number()
+            self.rnm.update_stop(run)
+            self.console.log(f"[bold magenta]Stopped run #{run}[/bold magenta]")
 
 
     def pause(self) -> NoReturn:

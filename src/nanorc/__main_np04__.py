@@ -24,7 +24,6 @@ from rich.progress import *
 from nanorc.core import NanoRC
 
 
-
 class NanoContext:
     """docstring for NanoContext"""
     def __init__(self, console: Console):
@@ -76,11 +75,12 @@ def updateLogLevel(loglevel):
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
+@click.option('--rundb-svr-socket', type=str, help='run db server ip socket (http://10.73.136.62:5000/ for example)', required=True)
 
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_dir):
+def cli(ctx, obj, traceback, loglevel, timeout, rundb_svr_socket, cfg_dir):
 
     obj.print_traceback = traceback
 
@@ -98,7 +98,8 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dir):
         updateLogLevel(loglevel)
 
     try:
-        rc = NanoRC(obj.console, cfg_dir, timeout)
+        rc = NanoRC(obj.console, cfg_dir, timeout, rundb_svr_socket)
+        
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()
@@ -149,7 +150,7 @@ def start(obj:NanoContext, disable_data_storage:bool, trigger_interval_ticks:int
         disable_data_storage (bool): Flag to disable data writing to storage
     
     """
-    obj.rc.start(disable_data_storage)
+    obj.rc.start(run=None, disable_data_storage=disable_data_storage)
     obj.rc.status()
     time.sleep(resume_wait)
     obj.rc.resume(trigger_interval_ticks)
@@ -230,7 +231,15 @@ def main():
 
     console = Console()
     obj = NanoContext(console)
-
+    
+    try:
+        from .credmgr import credentials
+        credentials.add_login_from_file("rundb", "credentials_rundb")
+        
+    except Exception as e:
+        console.log("[bold red]Cannot read run db credentials, you need to get the credentials_rundb.py file[/bold red]")
+        console.log(e)
+    
     try:
         cli(obj=obj, show_default=True)
     except Exception as e:
