@@ -23,13 +23,10 @@ class ConfigSaver:
         """
         prefix = "/RunConf_"
         outdir = self.outdir+prefix+str(run)
-        postfix = ""
-        counter = 1
-        while os.path.exists(outdir+postfix):
-            counter+=1
-            postfix = "_"+str(counter)
-
-        return outdir+postfix+"/"
+        if os.path.exists(outdir):
+            raise RuntimeError(f"Folder containing the run {run} already exists!")
+            
+        return outdir+"/"
 
     def _get_new_resume_file_name(self) -> str:
         """
