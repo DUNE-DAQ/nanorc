@@ -11,6 +11,8 @@ from rich.console import Console
 from rich.pretty import Pretty
 from .sshpm import AppProcessDescriptor
 
+from typing import Union, NoReturn
+
 
 log = logging.getLogger("werkzeug")
 log.setLevel(logging.ERROR)
@@ -24,8 +26,7 @@ class ResponseDispatcher(threading.Thread):
         threading.Thread.__init__(self)
         self.listener = listener
 
-    def run(self):
-
+    def run(self) -> NoReturn:
         while True:
             r = self.listener.response_queue.get()
             if r == self.STOP:
@@ -33,9 +34,10 @@ class ResponseDispatcher(threading.Thread):
 
             self.listener.notify(r)
 
-    def stop(self):
+    def stop(self) -> NoReturn:
         self.listener.response_queue.put_nowait(self.STOP)
         self.join()
+
 
 class ResponseListener:
     """
@@ -111,7 +113,6 @@ class ResponseListener:
             return RuntimeError(f"No handler registered for app {app}")
         del self.handlers[app]
 
-
     def notify(self, reply: dict):
         if 'appname' not in reply:
             raise RuntimeError("No 'appname' field in reply {reply}")
@@ -124,6 +125,11 @@ class ResponseListener:
 
         self.handlers[app].notify(reply)
 
+
+class ResponseTimeout(Exception):
+    pass
+class NoResponse(Exception):
+    pass
 
 class AppCommander:
     """docstring for DAQAppController"""
@@ -139,7 +145,7 @@ class AppCommander:
         self.app_url = f"http://{self.app_host}:{str(self.app_port)}/command"
         self.listener_port = response_port
         self.response_queue = Queue()
-        # self.listener = self._create_listener(response_port)
+        self.sent_cmd = None
 
     def __del__(self):
         pass
@@ -162,7 +168,6 @@ class AppCommander:
         cmd_data: dict,
         entry_state: str = "ANY",
         exit_state: str = "ANY",
-        timeout: int = 60,
     ):
         # Use moo schema here?
         cmd = {
@@ -178,24 +183,50 @@ class AppCommander:
             "content-type": "application/json",
             "X-Answer-Port": str(self.listener_port),
         }
-        response = requests.post(self.app_url, data=json.dumps(cmd), headers=headers)
-        self.log.info(f"Response: {response}")
-        try:
-            r = self.response_queue.get(timeout=timeout)
-            self.log.info(f"Received reply from {self.app} to {cmd_id}")
-            self.log.debug(json.dumps(r, sort_keys=True, indent=2))
+        ack = requests.post(self.app_url, data=json.dumps(cmd), headers=headers)
+        self.log.info(f"Ack: {ack}")
+        self.sent_cmd = cmd_id
 
-        except queue.Empty as e:
-            # Proper error handling, please
-            self.log.error(f"Timeout while waiting for a reply from {self.app} for command {cmd_id}")
-            raise RuntimeError(
-                f"Timeout while waiting for a reply from {self.app} for command {cmd_id} "
-            )
+        # return await_response(timeout)
+
+    def check_response(self, timeout: int = 0) -> dict:
+        """Check if a response is present in the queue
+        
+        Args:
+            timeout (int, optional): Timeout in seconds
+        
+        Returns:
+            dict: Command response is json
+        
+        Raises:
+            NoResponse: Description
+            ResponseTimeout: Description
+        
+        
+        """
+        try:
+            r = self.response_queue.get(block=(timeout>0), timeout=timeout)
+            self.log.info(f"Received reply from {self.app} to {self.sent_cmd}")
+            self.log.debug(json.dumps(r, sort_keys=True, indent=2))
+            self.sent_cmd = None
+
+        except queue.Empty:
+            if not timeout:
+                raise NoResponse(f"No response available from {self.app} for command {self.sent_cmd}")
+            else:
+                self.log.error(f"Timeout while waiting for a reply from {self.app} for command {self.sent_cmd}")
+                raise ResponseTimeout(
+                    f"Timeout while waiting for a reply from {self.app} for command {self.sent_cmd}"
+                )
+
         return r
 
 
 class AppSupervisor:
-    """Lightweight application supervisor"""
+    """Lightweight application wrapper
+
+    Tracks the last executed and successful commands
+    """
 
     def __init__(self, console: Console, desc: AppProcessDescriptor, listener: ResponseListener):
         self.console = console
@@ -208,20 +239,40 @@ class AppSupervisor:
         listener.register(desc.name, self.commander)
 
     def send_command(
-        self,
-        cmd_id: str,
-        cmd_data: dict,
-        entry_state: str = "ANY",
-        exit_state: str = "ANY",
-        timeout: int = 10,
-    ):
+            self,
+            cmd_id: str,
+            cmd_data: dict,
+            entry_state: str = "ANY",
+            exit_state: str = "ANY",
+            ):
         self.last_sent_command = cmd_id
-        r = self.commander.send_command(
-            cmd_id, cmd_data, entry_state, exit_state, timeout
+        self.commander.send_command(
+            cmd_id, cmd_data, entry_state, exit_state
         )
+
+    def check_response(
+            self,
+            timeout: int = 0,
+        ):
+        r = self.commander.check_response(
+            timeout
+        )
+
         if r["result"] == "OK":
-            self.last_ok_command = cmd_id
+            self.last_ok_command = self.last_sent_command
+
         return r
+
+    def send_command_and_wait(
+            self,
+            cmd_id: str,
+            cmd_data: dict,
+            entry_state: str = "ANY",
+            exit_state: str = "ANY",
+            timeout: int = 10,
+        ):
+        self.send_command(cmd_id, cmd_data, entry_state, exit_state)
+        return self.check_response(timeout)
 
     def terminate(self):
         del self.commander
