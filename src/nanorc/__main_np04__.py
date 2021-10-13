@@ -28,8 +28,8 @@ from .cli import *
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
-@click.option('--cfg-dumpdir', type=click.Path(), default="./")
-@click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json")
+@click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
+@click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
 
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.pass_obj
