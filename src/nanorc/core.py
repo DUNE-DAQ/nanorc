@@ -1,4 +1,5 @@
 import logging
+import time
 import json
 import os
 from rich.console import Console
@@ -9,9 +10,13 @@ from rich.text import Text
 from .sshpm import SSHProcessManager
 from .cfgmgr import ConfigManager
 from .cfgsvr import ConfigSaver
-from .appctrl import AppSupervisor, ResponseListener
+from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
 from .credmgr import credentials
+
 from rich.traceback import Traceback
+
+from datetime import datetime
+
 
 from typing import Union, NoReturn
 
@@ -91,18 +96,54 @@ class NanoRC:
             self.return_code = 10
             return ok, failed
 
-        # Loop over data keys if no sequence is specified or all apps, if data is empty
         if not sequence:
-            sequence = data.keys() if data else self.apps.keys()
-        for n in sequence:
-            r = self.apps[n].send_command(cmd, data[n] if data else {}, state_entry, state_exit, self.timeout)
-            (ok if r['success'] else failed)[n] = r
+            # Loop over data keys if no sequence is specified or all apps, if data is empty
+            appset = list(data.keys() if data else self.apps.keys())
+            self.log.info(f"Sending {cmd} to {appset}")
+
+            for n in appset:
+                self.apps[n].send_command(cmd, data[n] if data else {}, state_entry, state_exit)
+
+            start = datetime.now()
+
+            while(appset):
+
+                done = []
+                for n in appset:
+                    try:
+                        r = self.apps[n].check_response()
+                    except NoResponse:
+                        continue
+                    # except AppCommander.ResponseTimeout 
+                        # failed[n] = {}
+                    done += [n]
+                    
+                    (ok if r['success'] else failed)[n] = r
+
+                for d in done:
+                    appset.remove(d)
+
+                now = datetime.now()
+                elapsed = (now - start).total_seconds()
+
+                if elapsed > self.timeout:
+                    raise RuntimeError("Send multicommand failed")
+
+                time.sleep(0.1)
+                self.log.info("tic toc")
+
+        else:
+            for n in sequence:
+                r = self.apps[n].send_command_and_wait(cmd, data[n] if data else {}, state_entry, state_exit, self.timeout)
+                (ok if r['success'] else failed)[n] = r
+
         if raise_on_fail and failed:
             self.log.error(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
             self.return_code = 13
             for a,r in failed.items():
                 self.log.error(f"{a}: {r}")
             raise RuntimeError(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
+
         self.return_code = 0
         return ok, failed
 
@@ -157,9 +198,10 @@ class NanoRC:
     def start(self, disable_data_storage: bool) -> NoReturn:
         """
         Sends start command to the applications
-
-        :param      disable_data_storage:    The disable data storage
-        :type       disable_data_storage:    bool
+        
+        Args:
+            run (int): Description
+            disable_data_storage (bool): Description
         """
 
         self.run = self.run_num_mgr.get_run_number()
@@ -168,10 +210,6 @@ class NanoRC:
                 "disable_data_storage": disable_data_storage,
                 "run": self.run,
             }
-
-        # TODO: delete 
-        # if not trigger_interval_ticks is None:
-        #     runtime_start_data["trigger_interval_ticks"] = trigger_interval_ticks
 
         start_data = self.cfg.runtime_start(runtime_start_data)
         cfg_save_dir = self.cfgsvr.save_on_start(start_data, self.run)
