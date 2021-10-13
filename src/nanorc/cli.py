@@ -151,9 +151,7 @@ def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_
     
     """
 
-    # nanorc::core increments the run number at start
-    # so we need to remove one here...
-    obj.rc.rnm.run_number = run-1
+    obj.rc.rnm.set_run_number(run)
     
     obj.rc.start(disable_data_storage)
     obj.rc.status()

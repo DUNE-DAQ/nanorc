@@ -176,12 +176,11 @@ class NanoRC:
         :type       disable_data_storage:    bool
         """
 
-        self.rnm.increment_run_number()
-        run = self.rnm.get_run_number()
+        self.run = self.rnm.get_run_number()
 
         runtime_start_data = {
                 "disable_data_storage": disable_data_storage,
-                "run": run,
+                "run": self.run,
             }
 
         # TODO: delete 
@@ -189,11 +188,11 @@ class NanoRC:
         #     runtime_start_data["trigger_interval_ticks"] = trigger_interval_ticks
 
         start_data = self.cfg.runtime_start(runtime_start_data)
-        cfg_save_dir = self.cfgsvr.save_on_start(start_data, run)
+        cfg_save_dir = self.cfgsvr.save_on_start(start_data, self.run)
 
         app_seq = getattr(self.cfg, 'start_order', None)
         ok, failed = self.send_many('start', start_data, 'CONFIGURED', 'RUNNING', sequence=app_seq, raise_on_fail=True)
-        self.console.log(f"[bold magenta]Started run #{run}, saving run data in {cfg_save_dir}[/bold magenta]")
+        self.console.log(f"[bold magenta]Started run #{self.run}, saving run data in {cfg_save_dir}[/bold magenta]")
 
 
     def stop(self) -> NoReturn:
@@ -203,9 +202,7 @@ class NanoRC:
 
         app_seq = getattr(self.cfg, 'stop_order', None)
         ok, failed = self.send_many('stop', self.cfg.stop, 'RUNNING', 'CONFIGURED', sequence=app_seq, raise_on_fail=True)
-        run = self.rnm.get_run_number()
-        self.rnm.update_stop(run)
-        self.console.log(f"[bold magenta]Stopped run #{run}[/bold magenta]")
+        self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
 
 
     def pause(self) -> NoReturn:
