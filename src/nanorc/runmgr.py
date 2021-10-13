@@ -36,18 +36,18 @@ class RunNumberDBManager:
                                auth=(self.API_USER, self.API_PSWD),
                                timeout=self.timeout)
             req.raise_for_status()
-        except requests.HTTPError:
+        except requests.HTTPError as exc:
             error = f"{__name__}: RunDB: Failed authentication"
             self.log.error(error)
-            raise RuntimeError(error)
-        except requests.ConnectionError:
+            raise RuntimeError(error) from exc
+        except requests.ConnectionError as exc:
             error = f"{__name__}: Connection to {self.API_SOCKET} wasn't successful"
             self.log.error(error)
-            raise RuntimeError(error)
-        except requests.Timeout:
+            raise RuntimeError(error) from exc
+        except requests.Timeout as exc:
             error = f"{__name__}: Connection to {self.API_SOCKET} timed out"
             self.log.error(error)
-            raise RuntimeError(error)
+            raise RuntimeError(error) from exc
         
         self.run = req.json()[0][0][0]
         return self.run
@@ -58,18 +58,18 @@ class RunNumberDBManager:
                                auth=(self.API_USER, self.API_PSWD),
                                timeout=self.timeout)
             req.raise_for_status()
-        except requests.HTTPError:
+        except requests.HTTPError as exc:
             error = f"{__name__}: RunDB: Failed authentication"
             self.log.error(error)
-            raise RuntimeError(error)
-        except requests.ConnectionError:
+            raise RuntimeError(error) from exc
+        except requests.ConnectionError as exc:
             error = f"{__name__}: Connection to {self.API_SOCKET} wasn't successful"
             self.log.error(error)
-            raise RuntimeError(error)
-        except requests.Timeout:
+            raise RuntimeError(error) from exc
+        except requests.Timeout as exc:
             error = f"{__name__}: Connection to {self.API_SOCKET} timed out"
             self.log.error(error)
-            raise RuntimeError(error)
+            raise RuntimeError(error) from exc
         
             
         self.run = req.json()[0][0][0]
@@ -81,18 +81,18 @@ class RunNumberDBManager:
                                auth=(self.API_USER, self.API_PSWD),
                                timeout=self.timeout)
             req.raise_for_status()
-        except requests.HTTPError:
+        except requests.HTTPError as exc:
             error = f"{__name__}: RunDB: Failed authentication"
             self.log.error(error)
-            raise RuntimeError(error)
-        except requests.ConnectionError:
+            raise RuntimeError(error) from exc
+        except requests.ConnectionError as exc:
             error = f"{__name__}: Connection to {self.API_SOCKET} wasn't successful"
             self.log.error(error)
-            raise RuntimeError(error)
-        except requests.Timeout:
+            raise RuntimeError(error) from exc
+        except requests.Timeout as exc:
             error = f"{__name__}: Connection to {self.API_SOCKET} timed out"
             self.log.error(error)
-            raise RuntimeError(error)
+            raise RuntimeError(error) from exc
         
         return req.json()[0][0][0]
 
