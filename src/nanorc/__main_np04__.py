@@ -19,6 +19,8 @@ from rich.traceback import Traceback
 from rich.progress import *
 
 from nanorc.core import NanoRC
+from nanorc.runmgr import RunNumberDBManager
+from nanorc.credmgr import credentials
 from .cli import *
 
 # ------------------------------------------------------------------------------
@@ -50,7 +52,16 @@ def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_outdir, dotnanorc, cfg_d
         updateLogLevel(loglevel)
 
     try:
-        rc = NanoRC(obj.console, cfg_dir, cfg_outdir, dotnanorc, timeout)
+        dotnanorc = os.path.expanduser(dotnanorc)
+        obj.console.print(f"[blue]Loading {dotnanorc}[/blue]")
+        f = open(dotnanorc)
+        dotnanorc = json.load(f)
+        credentials.add_login("rundb",
+                              dotnanorc["rundb"]["user"],
+                              dotnanorc["rundb"]["password"])
+        logging.getLogger("cli").info("RunDB socket "+dotnanorc["rundb"]["socket"])
+        rc = NanoRC(obj.console, cfg_dir, cfg_outdir,
+                    RunNumberDBManager(dotnanorc["rundb"]["socket"]), timeout)
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()

@@ -19,25 +19,12 @@ from typing import Union, NoReturn
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
-    def __init__(self, console: Console, cfg_dir: str, cfg_outdir: str, dotnanorc_file: str, timeout: int):
+    def __init__(self, console: Console, cfg_dir: str, cfg_outdir: str, run_num_mgr: str, timeout: int):
         super(NanoRC, self).__init__()     
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
         self.cfg = ConfigManager(cfg_dir)
-
-        if dotnanorc_file != "":
-            dotnanorc_file = os.path.expanduser(dotnanorc_file)
-            self.console.print(f"[blue]Loading {dotnanorc_file}[/blue]")
-            f = open(dotnanorc_file)
-            self.dotnanorc = json.load(f)
-            credentials.add_login("rundb",
-                                  self.dotnanorc["rundb"]["user"],
-                                  self.dotnanorc["rundb"]["password"])
-            self.log.info("RunDB socket "+self.dotnanorc["rundb"]["socket"])
-            self.rnm = RunNumberDBManager(self.dotnanorc["rundb"]["socket"])
-        else:
-            self.rnm = SimpleRunNumberManager()
-
+        self.run_num_mgr = run_num_mgr
         self.cfgsvr = ConfigSaver(self.cfg, cfg_outdir)
         self.timeout = timeout
         self.return_code = 0
@@ -176,7 +163,7 @@ class NanoRC:
         :type       disable_data_storage:    bool
         """
 
-        self.run = self.rnm.get_run_number()
+        self.run = self.run_num_mgr.get_run_number()
 
         runtime_start_data = {
                 "disable_data_storage": disable_data_storage,
