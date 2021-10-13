@@ -8,10 +8,6 @@ class SimpleRunNumberManager:
         self.requested_run_number = []
 
     def get_run_number(self):
-        if self.run_number in self.requested_run_number:
-            raise RuntimeError(f"ERROR: run {self.run_number} has already run")
-        
-        self.requested_run_number.append(self.run_number)
         return self.run_number
 
     def increment_run_number(self):
@@ -19,12 +15,12 @@ class SimpleRunNumberManager:
 
     def update_stop(self, run_number):
         pass
-        
-class RunNumberManager:
+
+class RunNumberDBManager:
     """A class that interacts with the run number db"""
-    
+
     def __init__(self, socket):
-        super(RunNumberManager, self).__init__()
+        super(RunNumberDBManager, self).__init__()
         self.run = None
         self.API_SOCKET=socket
         auth = credentials.get_login("rundb")
@@ -44,16 +40,16 @@ class RunNumberManager:
     def update_stop(self, run_number):
         req = requests.get(self.API_SOCKET+'/runnumber/updatestop/'+str(run_number), auth=(self.API_USER, self.API_PSWD))
         return req.json()[0][0][0]
-    
+
 
 def test_runmgr():
-    rnm = RunNumberManager()
+    rnm = RunNumberDBManager()
     rnm.get_run_number()
     print(f"Run: {rnm.run}")
     rnm.increment_run_number() 
     print(f"Run: {rnm.run} after incrementing")
     date = rnm.update_stop(rnm.run)
     print(f"Run {rnm.run} finished at: {date}")
-    
+
 if __name__ == '__main__':
     test_runmgr()

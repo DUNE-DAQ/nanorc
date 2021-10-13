@@ -1,4 +1,6 @@
 import logging
+import json
+import os
 from rich.console import Console
 from rich.style import Style
 from rich.pretty import Pretty
@@ -8,7 +10,8 @@ from .sshpm import SSHProcessManager
 from .cfgmgr import ConfigManager
 from .cfgsvr import ConfigSaver
 from .appctrl import AppSupervisor, ResponseListener
-from .runmgr import RunNumberManager, SimpleRunNumberManager
+from .runmgr import RunNumberDBManager, SimpleRunNumberManager
+from .credmgr import credentials
 from rich.traceback import Traceback
 
 from typing import Union, NoReturn
@@ -16,17 +19,25 @@ from typing import Union, NoReturn
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
-    def __init__(self, console: Console, cfg_dir: str, cfg_outdir: str, dotnanorc_file:str, timeout:int):
+    def __init__(self, console: Console, cfg_dir: str, cfg_outdir: str, dotnanorc_file: str, timeout: int):
         super(NanoRC, self).__init__()     
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
         self.cfg = ConfigManager(cfg_dir)
-        
+
         if dotnanorc_file != "":
-            self.rnm = RunNumberManager(rundb_svr_socket)
+            dotnanorc_file = os.path.expanduser(dotnanorc_file)
+            self.console.print(f"[blue]Loading {dotnanorc_file}[/blue]")
+            f = open(dotnanorc_file)
+            self.dotnanorc = json.load(f)
+            credentials.add_login("rundb",
+                                  self.dotnanorc["rundb"]["user"],
+                                  self.dotnanorc["rundb"]["password"])
+            self.log.info("RunDB socket "+self.dotnanorc["rundb"]["socket"])
+            self.rnm = RunNumberDBManager(self.dotnanorc["rundb"]["socket"])
         else:
             self.rnm = SimpleRunNumberManager()
-            
+
         self.cfgsvr = ConfigSaver(self.cfg, cfg_outdir)
         self.timeout = timeout
         self.return_code = 0
@@ -35,10 +46,11 @@ class NanoRC:
         self.apps = None
         self.listener = None
 
+
     def status(self) -> NoReturn:
         """
         Displays the status of the applications
-        
+
         :returns:   Nothing
         :rtype:     None
         """
@@ -72,7 +84,7 @@ class NanoRC:
     def send_many(self, cmd: str, data: dict, state_entry: str, state_exit: str, sequence: list = None, raise_on_fail: bool=False):
         """
         Sends many commands to all applications
-        
+
         :param      cmd:            The command
         :type       cmd:            str
         :param      data:           The data
@@ -126,6 +138,7 @@ class NanoRC:
         self.listener = ResponseListener(self.cfg.boot["response_listener"]["port"])
         self.apps = { n:AppSupervisor(self.console, d, self.listener) for n,d in self.pm.apps.items() }
 
+
     def terminate(self) -> NoReturn:
         if self.apps:
             for n,s in self.apps.items():
@@ -138,7 +151,6 @@ class NanoRC:
 
         self.log.warning("Terminating")
         self.pm.terminate()
-    
 
 
     def init(self) -> NoReturn:
@@ -147,6 +159,7 @@ class NanoRC:
         """
         ok, failed = self.send_many('init', self.cfg.init, 'NONE', 'INITIAL', raise_on_fail=True)
 
+
     def conf(self) -> NoReturn:
         """
         Sends configure command to the applications.
@@ -154,20 +167,18 @@ class NanoRC:
         app_seq = getattr(self.cfg, 'conf_order', None)
         ok, failed = self.send_many('conf', self.cfg.conf, 'INITIAL', 'CONFIGURED', sequence=app_seq, raise_on_fail=True)
 
-    def start(self, run:int, disable_data_storage: bool) -> NoReturn:
+
+    def start(self, disable_data_storage: bool) -> NoReturn:
         """
         Sends start command to the applications
-        
-        :param      run:  The run number
-        :type       run:  int
+
         :param      disable_data_storage:    The disable data storage
         :type       disable_data_storage:    bool
         """
 
-        if run is None:
-            self.rnm.increment_run_number()
-            run = self.rnm.get_run_number()
-            
+        self.rnm.increment_run_number()
+        run = self.rnm.get_run_number()
+
         runtime_start_data = {
                 "disable_data_storage": disable_data_storage,
                 "run": run,
@@ -182,8 +193,7 @@ class NanoRC:
 
         app_seq = getattr(self.cfg, 'start_order', None)
         ok, failed = self.send_many('start', start_data, 'CONFIGURED', 'RUNNING', sequence=app_seq, raise_on_fail=True)
-        self.console.log(f"[bold magenta]Started run #{run}[/bold magenta]")
-        self.console.log(f"Saving run data in {cfg_save_dir}")
+        self.console.log(f"[bold magenta]Started run #{run}, saving run data in {cfg_save_dir}[/bold magenta]")
 
 
     def stop(self) -> NoReturn:
@@ -193,10 +203,9 @@ class NanoRC:
 
         app_seq = getattr(self.cfg, 'stop_order', None)
         ok, failed = self.send_many('stop', self.cfg.stop, 'RUNNING', 'CONFIGURED', sequence=app_seq, raise_on_fail=True)
-        if self.rnm is not None:
-            run = self.rnm.get_run_number()
-            self.rnm.update_stop(run)
-            self.console.log(f"[bold magenta]Stopped run #{run}[/bold magenta]")
+        run = self.rnm.get_run_number()
+        self.rnm.update_stop(run)
+        self.console.log(f"[bold magenta]Stopped run #{run}[/bold magenta]")
 
 
     def pause(self) -> NoReturn:

@@ -22,7 +22,6 @@ from rich.traceback import Traceback
 from rich.progress import *
 
 from nanorc.core import NanoRC
-from .runmgr import TrivialRunNumberManager
 
 class NanoContext:
     """docstring for NanoContext"""
@@ -69,17 +68,18 @@ def updateLogLevel(loglevel):
         for handler in sh_command_logger.handlers:
             handler.setLevel(sh_command_level)
 
-
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
+@click.option('--cfg-outdir', type=click.Path(), default="./")
+@click.option('--dotnanorc', type=click.Path(), default="")
 
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_dir):
+def cli(ctx, obj, traceback, loglevel, timeout, cfg_outdir, dotnanorc, cfg_dir):
 
     obj.print_traceback = traceback
 
@@ -97,7 +97,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dir):
         updateLogLevel(loglevel)
 
     try:
-        rc = NanoRC(obj.console, cfg_dir, timeout)
+        rc = NanoRC(obj.console, cfg_dir, cfg_outdir, dotnanorc, timeout)
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()
@@ -107,9 +107,9 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dir):
         rc.terminate()
         ctx.exit(rc.return_code)
 
-    ctx.call_on_close(cleanup_rc)    
+    ctx.call_on_close(cleanup_rc)
     obj.rc = rc
-
+    
 
 @cli.command('status')
 @click.pass_obj
@@ -150,8 +150,12 @@ def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_
         disable_data_storage (bool): Flag to disable data writing to storage
     
     """
+
+    # nanorc::core increments the run number at start
+    # so we need to remove one here...
+    obj.rc.rnm.run_number = run-1
     
-    obj.rc.start(run, disable_data_storage)
+    obj.rc.start(disable_data_storage)
     obj.rc.status()
     time.sleep(resume_wait)
     obj.rc.resume(trigger_interval_ticks)
