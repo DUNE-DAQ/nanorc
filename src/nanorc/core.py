@@ -18,13 +18,13 @@ from typing import Union, NoReturn
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
-    def __init__(self, console: Console, cfg_dir: str, cfg_outdir: str, run_num_mgr: str, timeout: int):
+    def __init__(self, console: Console, cfg_dir: str, cfg_dumpdir: str, run_num_mgr: str, timeout: int):
         super(NanoRC, self).__init__()     
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
         self.cfg = ConfigManager(cfg_dir)
         self.run_num_mgr = run_num_mgr
-        self.cfgsvr = ConfigSaver(self.cfg, cfg_outdir)
+        self.cfgsvr = ConfigSaver(self.cfg, cfg_dumpdir)
         self.timeout = timeout
         self.return_code = 0
 
