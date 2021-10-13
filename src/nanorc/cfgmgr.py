@@ -106,9 +106,6 @@ class ConfigManager:
             
         # Conf:
         ips = {n: socket.gethostbyname(h) for n, h in self.boot["hosts"].items()}
-        # Set sender and receiver address to ips
-        for c in json_extract(self.conf, "sender_config") + json_extract(self.conf, "receiver_config"):
-            c["address"] = c["address"].format(**ips)
         # Set addresses to ips for networkmanager
         for connections in json_extract(self.init, "nwconnections"):
             for c in connections: c["address"] = c["address"].format(**ips) 
