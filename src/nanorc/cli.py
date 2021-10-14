@@ -20,7 +20,7 @@ from rich.panel import Panel
 from rich.console import Console
 from rich.traceback import Traceback
 from rich.progress import *
-
+from nanorc.runmgr import SimpleRunNumberManager
 from nanorc.core import NanoRC
 
 class NanoContext:
@@ -73,13 +73,12 @@ def updateLogLevel(loglevel):
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
-@click.option('--cfg-outdir', type=click.Path(), default="./")
-@click.option('--dotnanorc', type=click.Path(), default="")
+@click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_outdir, dotnanorc, cfg_dir):
+def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, cfg_dir):
 
     obj.print_traceback = traceback
 
@@ -97,7 +96,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_outdir, dotnanorc, cfg_dir):
         updateLogLevel(loglevel)
 
     try:
-        rc = NanoRC(obj.console, cfg_dir, cfg_outdir, dotnanorc, timeout)
+        rc = NanoRC(obj.console, cfg_dir, cfg_dumpdir, SimpleRunNumberManager(), timeout)
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()
@@ -151,7 +150,7 @@ def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_
     
     """
 
-    obj.rc.rnm.set_run_number(run)
+    obj.rc.run_num_mgr.set_run_number(run)
     
     obj.rc.start(disable_data_storage)
     obj.rc.status()

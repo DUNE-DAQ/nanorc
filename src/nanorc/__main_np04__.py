@@ -19,6 +19,8 @@ from rich.traceback import Traceback
 from rich.progress import *
 
 from nanorc.core import NanoRC
+from nanorc.runmgr import DBRunNumberManager
+from nanorc.credmgr import credentials
 from .cli import *
 
 # ------------------------------------------------------------------------------
@@ -26,14 +28,13 @@ from .cli import *
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
-@click.option('--cfg-outdir', type=click.Path(), default="./")
-@click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json")
+@click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
+@click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
 
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_outdir, dotnanorc, cfg_dir):
-    print(cfg_outdir)
+def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, cfg_dir):
     obj.print_traceback = traceback
 
     grid = Table(title='Shonky NanoRC', show_header=False, show_edge=False)
@@ -50,7 +51,16 @@ def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_outdir, dotnanorc, cfg_d
         updateLogLevel(loglevel)
 
     try:
-        rc = NanoRC(obj.console, cfg_dir, cfg_outdir, dotnanorc, timeout)
+        dotnanorc = os.path.expanduser(dotnanorc)
+        obj.console.print(f"[blue]Loading {dotnanorc}[/blue]")
+        f = open(dotnanorc)
+        dotnanorc = json.load(f)
+        credentials.add_login("rundb",
+                              dotnanorc["rundb"]["user"],
+                              dotnanorc["rundb"]["password"])
+        logging.getLogger("cli").info("RunDB socket "+dotnanorc["rundb"]["socket"])
+        rc = NanoRC(obj.console, cfg_dir, cfg_dumpdir,
+                    DBRunNumberManager(dotnanorc["rundb"]["socket"]), timeout)
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()

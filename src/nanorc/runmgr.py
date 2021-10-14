@@ -13,11 +13,11 @@ class SimpleRunNumberManager:
     def set_run_number(self, run:int):
         self.run_number = run
 
-class RunNumberDBManager:
+class DBRunNumberManager:
     """A class that interacts with the run number db"""
 
     def __init__(self, socket):
-        super(RunNumberDBManager, self).__init__()
+        super(DBRunNumberManager, self).__init__()
         self.log = logging.getLogger(self.__class__.__name__)
         self.run = None
         self.API_SOCKET=socket
@@ -98,7 +98,7 @@ class RunNumberDBManager:
 
 
 def test_runmgr():
-    rnm = RunNumberDBManager()
+    rnm = DBRunNumberManager()
     rnm.get_run_number()
     print(f"Run: {rnm.run}")
     rnm.increment_run_number() 
