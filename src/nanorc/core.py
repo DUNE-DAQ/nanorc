@@ -2,7 +2,6 @@ import logging
 import time
 import json
 import os
-import re
 from anytree import AnyNode, RenderTree, PreOrderIter
 from rich.console import Console
 from rich.style import Style
@@ -26,16 +25,12 @@ def search_tree(path:str, from_node:AnyNode):
     if path == "/" or path == "/root":
         return [from_node]
     
-    node_id = path.split("/")
-    node_name = node_id[-1]
-    
-    prog = re.compile(path)
     results = []
     for node in PreOrderIter(from_node):
         this_path = ""
         for parent in node.path:
             this_path += "/"+parent.id
-        if prog.fullmatch(this_path):
+        if this_path == path:
             results.append(node)
             
     return results
@@ -252,13 +247,13 @@ class NanoRC:
                 if hasattr(node, "pm") and node.pm:
                     node.pm.terminate()
                 del node
-                
+
 
     def ls(self) -> NoReturn:
         self.console.print("Legend:")
         self.console.print(" - [yellow]subsystems[/yellow]")
         self.console.print(" - [red]applications[/red]\n")
-        
+
         for pre, _, node in RenderTree(self.apps):
             if hasattr(node, "is_subsystem") and node.is_subsystem:
                 self.console.print(f"{pre}[yellow]{node.id}[/yellow]")
