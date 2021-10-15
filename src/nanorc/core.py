@@ -303,7 +303,7 @@ class NanoRC:
         ok, failed = self.send_to_tree("/", 'start', runtime_start_data,
                                        'CONFIGURED', 'RUNNING', raise_on_fail=True,
                                        cfg_method="runtime_start")
-        self.console.log(f"[bold magenta]Started run #{self.run}, saving run data in [/bold magenta]")
+        self.console.log(f"[bold magenta]Started run #{self.run}, saving run data in {cfg_save_dir}[/bold magenta]")
 
 
     def stop(self) -> NoReturn:
