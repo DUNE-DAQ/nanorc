@@ -123,15 +123,23 @@ def boot(obj):
     obj.rc.status()
 
 @cli.command('init')
+@click.argument('path', type=str, default="/")
 @click.pass_obj
-def init(obj):
-    obj.rc.init()
+def init(obj, path):
+    obj.rc.init(path)
     obj.rc.status()
 
-@cli.command('conf')
+@cli.command('ls')
 @click.pass_obj
-def conf(obj):
-    obj.rc.conf()
+def ls(obj):
+    obj.rc.ls()
+
+
+@cli.command('conf')
+@click.argument('path', type=str, default="/")
+@click.pass_obj
+def conf(obj, path):
+    obj.rc.conf(path)
     obj.rc.status()
 
 @cli.command('start')
@@ -156,42 +164,45 @@ def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_
     obj.rc.start(disable_data_storage)
     obj.rc.status()
     time.sleep(resume_wait)
-    obj.rc.resume(trigger_interval_ticks)
+    obj.rc.resume("/",trigger_interval_ticks)
     obj.rc.status()
 
 @cli.command('stop')
 @click.option('--stop-wait', type=int, default=0, help='Seconds to wait between Pause and Stop commands')
 @click.pass_obj
 def stop(obj, stop_wait:int):
-    obj.rc.pause()
+    obj.rc.pause("/")
     obj.rc.status()
     time.sleep(stop_wait)
     obj.rc.stop()
     obj.rc.status()
 
 @cli.command('pause')
+@click.argument('path', type=str, default="/")
 @click.pass_obj
-def pause(obj):
-    obj.rc.pause()
+def pause(obj, path):
+    obj.rc.pause(path)
     obj.rc.status()
 
 @cli.command('resume')
+@click.argument('path', type=str, default="/")
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.pass_obj
-def resume(obj:NanoContext, trigger_interval_ticks:int):
+def resume(obj:NanoContext, path:str, trigger_interval_ticks:int):
     """Resume Command
     
     Args:
         obj (NanoContext): Context object
         trigger_interval_ticks (int): Trigger separation in ticks
     """
-    obj.rc.resume(trigger_interval_ticks)
+    obj.rc.resume(path, trigger_interval_ticks)
     obj.rc.status()
 
 @cli.command('scrap')
+@click.argument('path', type=str, default="/")
 @click.pass_obj
-def scrap(obj):
-    obj.rc.scrap()
+def scrap(obj, path):
+    obj.rc.scrap(path)
     obj.rc.status()
 
 @cli.command('terminate')

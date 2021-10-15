@@ -2,13 +2,15 @@ import logging
 import time
 import json
 import os
+import re
+from anytree import AnyNode, RenderTree, PreOrderIter
 from rich.console import Console
 from rich.style import Style
 from rich.pretty import Pretty
 from rich.table import Table
 from rich.text import Text
 from .sshpm import SSHProcessManager
-from .cfgmgr import ConfigManager
+from .topcfgmgr import TopLevelConfigManager
 from .cfgsvr import ConfigSaver
 from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
 from .runmgr import RunNumberDBManager, SimpleRunNumberManager
@@ -18,17 +20,36 @@ from rich.traceback import Traceback
 
 from datetime import datetime
 
-
 from typing import Union, NoReturn
+
+def search_tree(path:str, from_node:AnyNode):
+    if path == "/" or path == "/root":
+        return [from_node]
+    
+    node_id = path.split("/")
+    node_name = node_id[-1]
+    
+    prog = re.compile(path)
+    results = []
+    for node in PreOrderIter(from_node):
+        this_path = ""
+        for parent in node.path:
+            this_path += "/"+parent.id
+        if prog.fullmatch(this_path):
+            results.append(node)
+            
+    return results
+        
 
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
-    def __init__(self, console: Console, cfg_dir: str, cfg_outdir: str, dotnanorc_file: str, timeout: int):
+    def __init__(self, console: Console, top_cfg: str, cfg_outdir: str, dotnanorc_file: str, timeout: int):
         super(NanoRC, self).__init__()     
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
-        self.cfg = ConfigManager(cfg_dir)
+        self.cfg = TopLevelConfigManager(top_cfg)
+        # self.cfg = ConfigManager(cfg_dir)
 
         if dotnanorc_file != "":
             dotnanorc_file = os.path.expanduser(dotnanorc_file)
@@ -47,8 +68,9 @@ class NanoRC:
         self.timeout = timeout
         self.return_code = 0
 
-        self.pm = SSHProcessManager(console)
-        self.apps = None
+        # self.pm = SSHProcessManager(console)
+        
+        self.apps = self.cfg.get_tree_structure()
         self.listener = None
 
 
@@ -71,25 +93,36 @@ class NanoRC:
         table.add_column("last cmd")
         table.add_column("last succ. cmd", style="green")
 
-        for app, sup in self.apps.items():
-            alive = sup.desc.proc.is_alive()
-            ping = sup.commander.ping()
-            last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
-            table.add_row(
-                app, 
-                sup.desc.host,
-                str(alive),
-                str(ping),
-                Text(str(sup.last_sent_command), style=('bold red' if last_cmd_failed else '')),
-                str(sup.last_ok_command)
-            )
+        for pre, _, node in RenderTree(self.apps):
+            if hasattr(node, "is_app") and node.is_app:
+                sup = node.app_supervisor
+                alive = sup.desc.proc.is_alive()
+                ping  = sup.commander.ping()
+                last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
+                table.add_row(
+                    pre+node.id, 
+                    sup.desc.host,
+                    str(alive),
+                    str(ping),
+                    Text(str(sup.last_sent_command), style=('bold red' if last_cmd_failed else '')),
+                    str(sup.last_ok_command)
+                )
+                
+            else:
+                table.add_row(pre+node.id)
+                
+                
         self.console.print(table)
 
 
-    def send_many(self, cmd: str, data: dict, state_entry: str, state_exit: str, sequence: list = None, raise_on_fail: bool=False):
+        
+    def send_to_tree(self, path: str, cmd: str, overwrite_data: dict,
+                     state_entry: str, state_exit: str, raise_on_fail: bool=False, cfg_method: str=None):
         """
         Sends many commands to all applications
 
+        :param      path:           The path to which we want to send the command to
+        :type       path:           str
         :param      cmd:            The command
         :type       cmd:            str
         :param      data:           The data
@@ -103,53 +136,72 @@ class NanoRC:
         :param      raise_on_fail:  Raise an exception if any application fails
         :type       raise_on_fail:  bool
         """
-
+        
+        nodes = search_tree(path, self.apps)
+        
         ok, failed = {}, {}
-        if not self.apps:
-            self.log.warning(f"No applications defined to send '{cmd}' to. Has 'boot' been executed?")
+        if not nodes:
+            self.log.warning(f"No applications defined to send '{cmd}' to.")
             self.return_code = 10
             return ok, failed
 
-        if not sequence:
-            # Loop over data keys if no sequence is specified or all apps, if data is empty
-            appset = list(data.keys() if data else self.apps.keys())
-            self.log.info(f"Sending {cmd} to {appset}")
-
-            for n in appset:
-                self.apps[n].send_command(cmd, data[n] if data else {}, state_entry, state_exit)
-
-            start = datetime.now()
-
-            while(appset):
-
-                done = []
-                for n in appset:
-                    try:
-                        r = self.apps[n].check_response()
-                    except NoResponse:
-                        continue
-                    # except AppCommander.ResponseTimeout 
-                        # failed[n] = {}
-                    done += [n]
+        for rootnode in nodes:
+            for node in PreOrderIter(rootnode):
+                if hasattr(node, "is_subsystem") and node.is_subsystem:
+                    print(f"Sending {cmd} to {node.id}")
                     
-                    (ok if r['success'] else failed)[n] = r
+                    sequence = getattr(node.config, cmd+'_order', None)
+                    if cfg_method:
+                        f=getattr(node.config,cfg_method)
+                        data = f(overwrite_data)
+                    else:
+                        data = getattr(node.config, cmd)
+                    
+                    
+                    appset = list(node.children)
+                    print(f"sequence? {sequence}")
+                    if not sequence:
+                        # Loop over data keys if no sequence is specified or all apps, if data is empty
+                        
+                        for n in appset:
+                            print(f"Sending {cmd} to {n.id}:"+str(hasattr(n,"app_supervisor")))
+                            n.app_supervisor.send_command(cmd, data[n.id] if data else {}, state_entry, state_exit)
 
-                for d in done:
-                    appset.remove(d)
+                        start = datetime.now()
 
-                now = datetime.now()
-                elapsed = (now - start).total_seconds()
+                        while(appset):
+                            done = []
+                            for n in appset:
+                                try:
+                                    r = n.app_supervisor.check_response()
+                                except NoResponse:
+                                    continue
+                                # except AppCommander.ResponseTimeout 
+                                # failed[n] = {}
+                                done += [n]
+                    
+                                (ok if r['success'] else failed)[n.id] = r
 
-                if elapsed > self.timeout:
-                    raise RuntimeError("Send multicommand failed")
+                            for d in done:
+                                appset.remove(d)
 
-                time.sleep(0.1)
-                self.log.info("tic toc")
+                            now = datetime.now()
+                            elapsed = (now - start).total_seconds()
 
-        else:
-            for n in sequence:
-                r = self.apps[n].send_command_and_wait(cmd, data[n] if data else {}, state_entry, state_exit, self.timeout)
-                (ok if r['success'] else failed)[n] = r
+                            if elapsed > self.timeout:
+                                raise RuntimeError("Send multicommand failed")
+
+                            time.sleep(0.1)
+                            self.log.info("tic toc")
+
+                    else:
+                        # There probably is a way to do that in a much nicer, pythonesque, way
+                        for n in sequence:
+                            for child_node in appset:
+                                if n == child_node.id:
+                                    r = child_node.app_supervisor.send_command_and_wait(cmd, data[n] if data else {},
+                                                                                        state_entry, state_exit, self.timeout)
+                            (ok if r['success'] else failed)[n] = r
 
         if raise_on_fail and failed:
             self.log.error(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
@@ -166,47 +218,71 @@ class NanoRC:
         """
         Boots applications
         """
-        
-        self.log.debug(str(self.cfg.boot))
+        for node in PreOrderIter(self.apps):
+            if node.is_subsystem:
+                self.log.debug(str(node.config.boot))
 
-        try:
-            self.pm.boot(self.cfg.boot)
-        except Exception as e:
-            self.console.print_exception()
-            self.return_code = 11
-            return
-
-        self.listener = ResponseListener(self.cfg.boot["response_listener"]["port"])
-        self.apps = { n:AppSupervisor(self.console, d, self.listener) for n,d in self.pm.apps.items() }
+                try:
+                    node.pm = SSHProcessManager(self.console)
+                    node.pm.boot(node.config.boot)
+                except Exception as e:
+                    self.console.print_exception()
+                    self.return_code = 11
+                    return
+                
+                node.listener = ResponseListener(node.config.boot["response_listener"]["port"])
+                children = [ AnyNode(id=n, is_app = True, is_subsystem = False,
+                                     app_supervisor=AppSupervisor(self.console, d, node.listener))
+                             for n,d in node.pm.apps.items() ]
+                node.children = children
 
 
     def terminate(self) -> NoReturn:
-        if self.apps:
-            for n,s in self.apps.items():
-                s.terminate()
-                if self.listener:
-                    self.listener.unregister(n)
-            self.apps = None
-        if self.listener:
-            self.listener.terminate()
+        for node in PreOrderIter(self.apps):
+            if hasattr(node, "is_app") and node.is_app:
+                node.app_supervisor.terminate()
+                if node.parent.listener:
+                    node.parent.listener.unregister(node.id)
+                node.parent = None
 
-        self.log.warning("Terminating")
-        self.pm.terminate()
+        for node in PreOrderIter(self.apps):
+            if hasattr(node, "is_subsystem") and node.is_subsystem:
+                if hasattr(node, "listener") and node.listener:
+                    node.listener.terminate()
+                if hasattr(node, "pm") and node.pm:
+                    node.pm.terminate()
+                del node
+                
+
+    def ls(self) -> NoReturn:
+        self.console.print("Legend:")
+        self.console.print(" - [yellow]subsystems[/yellow]")
+        self.console.print(" - [red]applications[/red]\n")
+        
+        for pre, _, node in RenderTree(self.apps):
+            if hasattr(node, "is_subsystem") and node.is_subsystem:
+                self.console.print(f"{pre}[yellow]{node.id}[/yellow]")
+            elif hasattr(node, "is_app") and node.is_app:
+                self.console.print(f"{pre}[red]{node.id}[/red]")
+            else:
+                self.console.print(f"{pre}{node.id}")
 
 
-    def init(self) -> NoReturn:
+    def init(self, path:str) -> NoReturn:
         """
         Initializes the applications.
         """
-        ok, failed = self.send_many('init', self.cfg.init, 'NONE', 'INITIAL', raise_on_fail=True)
+        # def send_to_tree(self, path: str, cmd: str, data: dict,
+        #              state_entry: str, state_exit: str, raise_on_fail: bool=False):
+
+        ok, failed = self.send_to_tree(path, 'init', None, 'NONE', 'INITIAL', raise_on_fail=True)
 
 
-    def conf(self) -> NoReturn:
+    def conf(self, path:str) -> NoReturn:
         """
         Sends configure command to the applications.
         """
-        app_seq = getattr(self.cfg, 'conf_order', None)
-        ok, failed = self.send_many('conf', self.cfg.conf, 'INITIAL', 'CONFIGURED', sequence=app_seq, raise_on_fail=True)
+        ok, failed = self.send_to_tree(path, 'conf', None, 'INITIAL', 'CONFIGURED', raise_on_fail=True)
 
 
     def start(self, disable_data_storage: bool) -> NoReturn:
@@ -214,7 +290,6 @@ class NanoRC:
         Sends start command to the applications
         
         Args:
-            run (int): Description
             disable_data_storage (bool): Description
         """
 
@@ -225,12 +300,14 @@ class NanoRC:
                 "run": self.run,
             }
 
-        start_data = self.cfg.runtime_start(runtime_start_data)
-        cfg_save_dir = self.cfgsvr.save_on_start(start_data, self.run)
+        # start_data = self.cfg.runtime_start(runtime_start_data)
+        # cfg_save_dir = self.cfgsvr.save_on_start(start_data, self.run)
 
-        app_seq = getattr(self.cfg, 'start_order', None)
-        ok, failed = self.send_many('start', start_data, 'CONFIGURED', 'RUNNING', sequence=app_seq, raise_on_fail=True)
-        self.console.log(f"[bold magenta]Started run #{self.run}, saving run data in {cfg_save_dir}[/bold magenta]")
+        # app_seq = getattr(self.cfg, 'start_order', None)
+        # ok, failed = self.send_many('start', start_data, 'CONFIGURED', 'RUNNING', sequence=app_seq, raise_on_fail=True)
+        ok, failed = self.send_to_tree("/", 'start', runtime_start_data, 'CONFIGURED', 'RUNNING', raise_on_fail=True, cfg_method="runtime_start")
+        self.console.log(f"[bold magenta]Started run #{self.run}, saving run data in [/bold magenta]")
+        # self.console.log(f"[bold magenta]Started run #{self.run}, saving run data in {cfg_save_dir}[/bold magenta]")
 
 
     def stop(self) -> NoReturn:
@@ -238,20 +315,22 @@ class NanoRC:
         Sends stop command
         """
 
-        app_seq = getattr(self.cfg, 'stop_order', None)
-        ok, failed = self.send_many('stop', self.cfg.stop, 'RUNNING', 'CONFIGURED', sequence=app_seq, raise_on_fail=True)
+        # app_seq = getattr(self.cfg, 'stop_order', None)
+        ok, failed = self.send_to_tree("/", 'stop', None, 'RUNNING', 'CONFIGURED', raise_on_fail=True)
+        # ok, failed = self.send_many('stop', self.cfg.stop, 'RUNNING', 'CONFIGURED', sequence=app_seq, raise_on_fail=True)
         self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
 
 
-    def pause(self) -> NoReturn:
+    def pause(self, path:str) -> NoReturn:
         """
         Sends pause command
         """
-        app_seq = getattr(self.cfg, 'pause_order', None)
-        ok, failed = self.send_many('pause', self.cfg.pause, 'RUNNING', 'RUNNING', app_seq, raise_on_fail=True)
+        # app_seq = getattr(self.cfg, 'pause_order', None)
+        # ok, failed = self.send_many('pause', self.cfg.pause, 'RUNNING', 'RUNNING', app_seq, raise_on_fail=True)
+        ok, failed = self.send_to_tree(path, 'pause', None, 'RUNNING', 'RUNNING', raise_on_fail=True)
 
 
-    def resume(self, trigger_interval_ticks: Union[int, None]) -> NoReturn:
+    def resume(self, path:str, trigger_interval_ticks: Union[int, None]) -> NoReturn:
         """
         Sends resume command
         
@@ -263,16 +342,19 @@ class NanoRC:
         if not trigger_interval_ticks is None:
             runtime_resume_data["trigger_interval_ticks"] = trigger_interval_ticks
 
-        resume_data = self.cfg.runtime_resume(runtime_resume_data)
-        self.cfgsvr.save_on_resume(resume_data)
+        # resume_data = self.cfg.runtime_resume(runtime_resume_data)
+        # self.cfgsvr.save_on_resume(resume_data)
 
-        app_seq = getattr(self.cfg, 'resume_order', None)
-        ok, failed = self.send_many('resume', resume_data, 'RUNNING', 'RUNNING', sequence=app_seq, raise_on_fail=True)
+        # app_seq = getattr(self.cfg, 'resume_order', None)
+        ok, failed = self.send_to_tree(path, 'resume', runtime_resume_data, 'RUNNING', 'RUNNING', raise_on_fail=True, cfg_method="runtime_resume")
+        ##ok, failed = self.send_to_tree("/", 'start', runtime_start_data, 'CONFIGURED', 'RUNNING', raise_on_fail=True, cfg_method="runtime_start")
+        # ok, failed = self.send_many('resume', resume_data, 'RUNNING', 'RUNNING', sequence=app_seq, raise_on_fail=True)
 
 
-    def scrap(self) -> NoReturn:
+    def scrap(self, path:str) -> NoReturn:
         """
         Send scrap command
         """
-        app_seq = getattr(self.cfg, 'scrap_order', None)
-        ok, failed = self.send_many('scrap', self.cfg.scrap, 'CONFIGURED', 'INITIAL', sequence=app_seq, raise_on_fail=True)
+        # app_seq = getattr(self.cfg, 'scrap_order', None)
+        # ok, failed = self.send_many('scrap', self.cfg.scrap, 'CONFIGURED', 'INITIAL', sequence=app_seq, raise_on_fail=True)
+        ok, failed = self.send_to_tree(path, 'scrap', None, 'CONFIGURED', 'INITIAL', raise_on_fail=True)
