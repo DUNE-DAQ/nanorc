@@ -2,12 +2,13 @@ import logging
 import time
 import json
 import os
-from anytree import AnyNode, RenderTree, PreOrderIter
+from anytree import RenderTree, PreOrderIter
 from rich.console import Console
 from rich.style import Style
 from rich.pretty import Pretty
 from rich.table import Table
 from rich.text import Text
+from .node import DAQNode, SubsystemNode, ApplicationNode
 from .sshpm import SSHProcessManager
 from .topcfgmgr import TopLevelConfigManager
 from .cfgsvr import ConfigSaver
@@ -21,7 +22,7 @@ from datetime import datetime
 
 from typing import Union, NoReturn
 
-def search_tree(path:str, from_node:AnyNode):
+def search_tree(path:str, from_node:DAQNode)->[DAQNode]:
     if path == "/" or path == "/root":
         return [from_node]
     
@@ -29,7 +30,7 @@ def search_tree(path:str, from_node:AnyNode):
     for node in PreOrderIter(from_node):
         this_path = ""
         for parent in node.path:
-            this_path += "/"+parent.id
+            this_path += "/"+parent.name
         if this_path == path:
             results.append(node)
             
@@ -89,13 +90,13 @@ class NanoRC:
         table.add_column("last succ. cmd", style="green")
 
         for pre, _, node in RenderTree(self.apps):
-            if hasattr(node, "is_app") and node.is_app:
-                sup = node.app_supervisor
+            if isinstance(node, ApplicationNode):
+                sup = node.sup
                 alive = sup.desc.proc.is_alive()
                 ping  = sup.commander.ping()
                 last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
                 table.add_row(
-                    pre+node.id, 
+                    pre+node.name,
                     sup.desc.host,
                     str(alive),
                     str(ping),
@@ -104,7 +105,7 @@ class NanoRC:
                 )
                 
             else:
-                table.add_row(pre+node.id)
+                table.add_row(pre+node.name)
                 
                 
         self.console.print(table)
@@ -142,15 +143,15 @@ class NanoRC:
 
         for rootnode in nodes:
             for node in PreOrderIter(rootnode):
-                if hasattr(node, "is_subsystem") and node.is_subsystem:
-                    print(f"Sending {cmd} to {node.id}")
+                if isinstance(node, SubsystemNode):
+                    print(f"Sending {cmd} to {node.name}")
                     
-                    sequence = getattr(node.config, cmd+'_order', None)
+                    sequence = getattr(node.cfgmgr, cmd+'_order', None)
                     if cfg_method:
-                        f=getattr(node.config,cfg_method)
+                        f=getattr(node.cfgmgr,cfg_method)
                         data = f(overwrite_data)
                     else:
-                        data = getattr(node.config, cmd)
+                        data = getattr(node.cfgmgr, cmd)
                     
                     
                     appset = list(node.children)
@@ -159,8 +160,8 @@ class NanoRC:
                         # Loop over data keys if no sequence is specified or all apps, if data is empty
                         
                         for n in appset:
-                            print(f"Sending {cmd} to {n.id}:"+str(hasattr(n,"app_supervisor")))
-                            n.app_supervisor.send_command(cmd, data[n.id] if data else {}, state_entry, state_exit)
+                            print(f"Sending {cmd} to {n.name}:"+str(hasattr(n,"app_supervisor")))
+                            n.sup.send_command(cmd, data[n.name] if data else {}, state_entry, state_exit)
 
                         start = datetime.now()
 
@@ -168,14 +169,14 @@ class NanoRC:
                             done = []
                             for n in appset:
                                 try:
-                                    r = n.app_supervisor.check_response()
+                                    r = n.sup.check_response()
                                 except NoResponse:
                                     continue
                                 # except AppCommander.ResponseTimeout 
                                 # failed[n] = {}
                                 done += [n]
                     
-                                (ok if r['success'] else failed)[n.id] = r
+                                (ok if r['success'] else failed)[n.name] = r
 
                             for d in done:
                                 appset.remove(d)
@@ -193,9 +194,9 @@ class NanoRC:
                         # There probably is a way to do that in a much nicer, pythonesque, way
                         for n in sequence:
                             for child_node in appset:
-                                if n == child_node.id:
-                                    r = child_node.app_supervisor.send_command_and_wait(cmd, data[n] if data else {},
-                                                                                        state_entry, state_exit, self.timeout)
+                                if n == child_node.name:
+                                    r = child_node.sup.send_command_and_wait(cmd, data[n] if data else {},
+                                                                             state_entry, state_exit, self.timeout)
                             (ok if r['success'] else failed)[n] = r
 
         if raise_on_fail and failed:
@@ -214,37 +215,38 @@ class NanoRC:
         Boots applications
         """
         for node in PreOrderIter(self.apps):
-            if node.is_subsystem:
-                self.log.debug(str(node.config.boot))
+            if isinstance(node, SubsystemNode):
+                self.log.debug(str(node.cfgmgr.boot))
 
                 try:
                     node.pm = SSHProcessManager(self.console)
-                    node.pm.boot(node.config.boot)
+                    node.pm.boot(node.cfgmgr.boot)
                 except Exception as e:
                     self.console.print_exception()
                     self.return_code = 11
                     return
                 
-                node.listener = ResponseListener(node.config.boot["response_listener"]["port"])
-                children = [ AnyNode(id=n, is_app = True, is_subsystem = False,
-                                     app_supervisor=AppSupervisor(self.console, d, node.listener))
+                node.listener = ResponseListener(node.cfgmgr.boot["response_listener"]["port"])
+                children = [ ApplicationNode(name=n,
+                                             sup=AppSupervisor(self.console, d, node.listener),
+                                             parent=node)
                              for n,d in node.pm.apps.items() ]
                 node.children = children
 
 
     def terminate(self) -> NoReturn:
         for node in PreOrderIter(self.apps):
-            if hasattr(node, "is_app") and node.is_app:
-                node.app_supervisor.terminate()
+            if isinstance(node, ApplicationNode):
+                node.sup.terminate()
                 if node.parent.listener:
-                    node.parent.listener.unregister(node.id)
+                    node.parent.listener.unregister(node.name)
                 node.parent = None
 
         for node in PreOrderIter(self.apps):
-            if hasattr(node, "is_subsystem") and node.is_subsystem:
-                if hasattr(node, "listener") and node.listener:
+            if isinstance(node, SubsystemNode):
+                if node.listener:
                     node.listener.terminate()
-                if hasattr(node, "pm") and node.pm:
+                if node.pm:
                     node.pm.terminate()
                 del node
 
@@ -255,12 +257,12 @@ class NanoRC:
         self.console.print(" - [red]applications[/red]\n")
 
         for pre, _, node in RenderTree(self.apps):
-            if hasattr(node, "is_subsystem") and node.is_subsystem:
-                self.console.print(f"{pre}[yellow]{node.id}[/yellow]")
-            elif hasattr(node, "is_app") and node.is_app:
-                self.console.print(f"{pre}[red]{node.id}[/red]")
+            if isinstance(node, SubsystemNode):
+                self.console.print(f"{pre}[yellow]{node.name}[/yellow]")
+            elif isinstance(node, ApplicationNode):
+                self.console.print(f"{pre}[red]{node.name}[/red]")
             else:
-                self.console.print(f"{pre}{node.id}")
+                self.console.print(f"{pre}{node.name}")
 
 
     def init(self, path:str) -> NoReturn:
