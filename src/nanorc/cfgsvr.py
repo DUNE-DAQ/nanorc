@@ -1,6 +1,8 @@
+from anytree import PreOrderIter
 import os.path
 import json
 import copy
+from .node import DAQNode, SubsystemNode
 from .cfgmgr import ConfigManager
 from distutils.dir_util import copy_tree
 
@@ -28,7 +30,7 @@ class ConfigSaver:
             
         return outdir+"/"
 
-    def _get_new_resume_file_name(self) -> str:
+    def _get_new_resume_file_name(self, path:str) -> str:
         """
         Create a new name for saving the runtime configuration each time resume is issued
 
@@ -37,7 +39,7 @@ class ConfigSaver:
         """
         postfix = ""
         counter = 1
-        filename = self.thisrun_outdir+"/resume_parsed"
+        filename = path+"/resume_parsed"
         ext=".json"
         while os.path.exists(filename+postfix+ext):
             counter+=1
@@ -45,39 +47,70 @@ class ConfigSaver:
 
         return filename+postfix+ext
 
-    def save_on_start(self, data: dict, run:int) -> str:
+    def save_on_start(self, apps:DAQNode, run:int,
+                      overwrite_data:dict, cfg_method:str) -> str:
         """
         Save the configuration runtime start parameter set
-        :param      data:  The data
-        :type       data:  dict
+        :param      apps:  the application tree
+        :type       apps:  DAQNode
         :param      run :  run number
         :type       run :  int
+        :param      overwrite_data :  the runtime start data
+        :type       overwrite_data :  dict
+        :param      cfg_method :  which config method to call on start
+        :type       cfg_method :  str
 
         :returns:   Path of the saved config
         :rtype:     str
         """
         self.thisrun_outdir = self._get_new_out_dir_name(run)
-        os.makedirs(self.thisrun_outdir)
-        copy_tree(self.cfgmgr.cfg_dir, self.thisrun_outdir)
+        for node in PreOrderIter(apps):
+            if isinstance(node, SubsystemNode):
+                this_path = ""
+                for parent in node.path:
+                    this_path += "/"+parent.name
+                    
+                full_path = self.thisrun_outdir+this_path
+                os.makedirs(full_path)
+                copy_tree(node.cfgmgr.cfg_dir, full_path)
+                
+                if cfg_method:
+                    f=getattr(node.cfgmgr,cfg_method)
+                    data = f(overwrite_data)
 
-        f = open(self.thisrun_outdir+"start_parsed.json", "w")
-        f.write(json.dumps(data, indent=2))
-        f.close()
+                f = open(full_path+"/start_parsed.json", "w")
+                f.write(json.dumps(data, indent=2))
+                f.close()
 
         return self.thisrun_outdir
 
 
-    def save_on_resume(self, data: dict) -> dict:
+    def save_on_resume(self, apps:DAQNode, overwrite_data: dict, cfg_method:str) -> dict:
         """
-        Generates runtime resume parameter set
-        :param      data:  The data
-        :type       data:  dict
+        :param      apps:  the application tree
+        :type       apps:  DAQNode
+        :param      overwrite_data :  the runtime start data
+        :type       overwrite_data :  dict
+        :param      cfg_method :  which config method to call on start
+        :type       cfg_method :  str
 
         :returns: None
         """
-        f = open(self._get_new_resume_file_name(), "w")
-        f.write(json.dumps(data, indent=2))
-        f.close()
+        for node in PreOrderIter(apps):
+            if isinstance(node, SubsystemNode):
+                this_path = ""
+                for parent in node.path:
+                    this_path += "/"+parent.name
+                    
+                full_path = self.thisrun_outdir+this_path
+                
+                if cfg_method:
+                    f=getattr(node.cfgmgr,cfg_method)
+                    data = f(overwrite_data)
+
+                f = open(self._get_new_resume_file_name(full_path), "w")
+                f.write(json.dumps(data, indent=2))
+                f.close()
 
 
 

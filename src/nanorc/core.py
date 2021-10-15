@@ -269,17 +269,16 @@ class NanoRC:
         """
         Initializes the applications.
         """
-        # def send_to_tree(self, path: str, cmd: str, data: dict,
-        #              state_entry: str, state_exit: str, raise_on_fail: bool=False):
-
-        ok, failed = self.send_to_tree(path, 'init', None, 'NONE', 'INITIAL', raise_on_fail=True)
+        ok, failed = self.send_to_tree(path, 'init', None,
+                                       'NONE', 'INITIAL', raise_on_fail=True)
 
 
     def conf(self, path:str) -> NoReturn:
         """
         Sends configure command to the applications.
         """
-        ok, failed = self.send_to_tree(path, 'conf', None, 'INITIAL', 'CONFIGURED', raise_on_fail=True)
+        ok, failed = self.send_to_tree(path, 'conf', None,
+                                       'INITIAL', 'CONFIGURED', raise_on_fail=True)
 
 
     def start(self, disable_data_storage: bool) -> NoReturn:
@@ -297,14 +296,14 @@ class NanoRC:
                 "run": self.run,
             }
 
-        # start_data = self.cfg.runtime_start(runtime_start_data)
-        # cfg_save_dir = self.cfgsvr.save_on_start(start_data, self.run)
+        cfg_save_dir = self.cfgsvr.save_on_start(self.apps, run=self.run,
+                                                 overwrite_data=runtime_start_data,
+                                                 cfg_method="runtime_start")
 
-        # app_seq = getattr(self.cfg, 'start_order', None)
-        # ok, failed = self.send_many('start', start_data, 'CONFIGURED', 'RUNNING', sequence=app_seq, raise_on_fail=True)
-        ok, failed = self.send_to_tree("/", 'start', runtime_start_data, 'CONFIGURED', 'RUNNING', raise_on_fail=True, cfg_method="runtime_start")
+        ok, failed = self.send_to_tree("/", 'start', runtime_start_data,
+                                       'CONFIGURED', 'RUNNING', raise_on_fail=True,
+                                       cfg_method="runtime_start")
         self.console.log(f"[bold magenta]Started run #{self.run}, saving run data in [/bold magenta]")
-        # self.console.log(f"[bold magenta]Started run #{self.run}, saving run data in {cfg_save_dir}[/bold magenta]")
 
 
     def stop(self) -> NoReturn:
@@ -312,9 +311,8 @@ class NanoRC:
         Sends stop command
         """
 
-        # app_seq = getattr(self.cfg, 'stop_order', None)
-        ok, failed = self.send_to_tree("/", 'stop', None, 'RUNNING', 'CONFIGURED', raise_on_fail=True)
-        # ok, failed = self.send_many('stop', self.cfg.stop, 'RUNNING', 'CONFIGURED', sequence=app_seq, raise_on_fail=True)
+        ok, failed = self.send_to_tree("/", 'stop', None,
+                                       'RUNNING', 'CONFIGURED', raise_on_fail=True)
         self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
 
 
@@ -322,9 +320,9 @@ class NanoRC:
         """
         Sends pause command
         """
-        # app_seq = getattr(self.cfg, 'pause_order', None)
-        # ok, failed = self.send_many('pause', self.cfg.pause, 'RUNNING', 'RUNNING', app_seq, raise_on_fail=True)
-        ok, failed = self.send_to_tree(path, 'pause', None, 'RUNNING', 'RUNNING', raise_on_fail=True)
+
+        ok, failed = self.send_to_tree(path, 'pause', None,
+                                       'RUNNING', 'RUNNING', raise_on_fail=True)
 
 
     def resume(self, path:str, trigger_interval_ticks: Union[int, None]) -> NoReturn:
@@ -339,19 +337,18 @@ class NanoRC:
         if not trigger_interval_ticks is None:
             runtime_resume_data["trigger_interval_ticks"] = trigger_interval_ticks
 
-        # resume_data = self.cfg.runtime_resume(runtime_resume_data)
-        # self.cfgsvr.save_on_resume(resume_data)
+        self.cfgsvr.save_on_resume(self.apps,
+                                   overwrite_data=runtime_resume_data,
+                                   cfg_method="runtime_resume")
 
-        # app_seq = getattr(self.cfg, 'resume_order', None)
-        ok, failed = self.send_to_tree(path, 'resume', runtime_resume_data, 'RUNNING', 'RUNNING', raise_on_fail=True, cfg_method="runtime_resume")
-        ##ok, failed = self.send_to_tree("/", 'start', runtime_start_data, 'CONFIGURED', 'RUNNING', raise_on_fail=True, cfg_method="runtime_start")
-        # ok, failed = self.send_many('resume', resume_data, 'RUNNING', 'RUNNING', sequence=app_seq, raise_on_fail=True)
+        ok, failed = self.send_to_tree(path, 'resume', runtime_resume_data,
+                                       'RUNNING', 'RUNNING', raise_on_fail=True,
+                                       cfg_method="runtime_resume")
 
 
     def scrap(self, path:str) -> NoReturn:
         """
         Send scrap command
         """
-        # app_seq = getattr(self.cfg, 'scrap_order', None)
-        # ok, failed = self.send_many('scrap', self.cfg.scrap, 'CONFIGURED', 'INITIAL', sequence=app_seq, raise_on_fail=True)
-        ok, failed = self.send_to_tree(path, 'scrap', None, 'CONFIGURED', 'INITIAL', raise_on_fail=True)
+        ok, failed = self.send_to_tree(path, 'scrap', None,
+                                       'CONFIGURED', 'INITIAL', raise_on_fail=True)
