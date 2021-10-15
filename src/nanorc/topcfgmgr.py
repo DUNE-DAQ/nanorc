@@ -24,7 +24,7 @@ class TopLevelConfigManager:
         # self._load()
         from anytree import RenderTree
         for pre, _, node in RenderTree(self.root):
-            print(f"{pre}{node.name} - {type(node)}")
+            print(f"{pre}{node.name}")
         
     # This should get changed so that it copies the node, and strips the config
     def get_tree_structure(self):

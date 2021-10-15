@@ -144,7 +144,7 @@ class NanoRC:
         for rootnode in nodes:
             for node in PreOrderIter(rootnode):
                 if isinstance(node, SubsystemNode):
-                    print(f"Sending {cmd} to {node.name}")
+                    self.log.debug(f"Sending {cmd} to {node.name}")
                     
                     sequence = getattr(node.cfgmgr, cmd+'_order', None)
                     if cfg_method:
@@ -155,12 +155,10 @@ class NanoRC:
                     
                     
                     appset = list(node.children)
-                    print(f"sequence? {sequence}")
                     if not sequence:
                         # Loop over data keys if no sequence is specified or all apps, if data is empty
                         
                         for n in appset:
-                            print(f"Sending {cmd} to {n.name}:"+str(hasattr(n,"app_supervisor")))
                             n.sup.send_command(cmd, data[n.name] if data else {}, state_entry, state_exit)
 
                         start = datetime.now()
