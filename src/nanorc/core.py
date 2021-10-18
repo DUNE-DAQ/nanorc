@@ -127,81 +127,36 @@ class NanoRC:
         :type       state_entry:    str
         :param      state_exit:     The state exit
         :type       state_exit:     str
-        :param      sequence:       The sequence
-        :type       sequence:       list
         :param      raise_on_fail:  Raise an exception if any application fails
         :type       raise_on_fail:  bool
         """
         
         nodes = search_tree(path, self.apps)
         
-        ok, failed = {}, {}
+        ok, failed, excpt = {}, {}, {}
+        
         if not nodes:
             self.log.warning(f"No applications defined to send '{cmd}' to.")
             self.return_code = 10
             return ok, failed
-
+        
         for rootnode in nodes:
             for node in PreOrderIter(rootnode):
                 if isinstance(node, SubsystemNode):
-                    self.log.debug(f"Sending {cmd} to {node.name}")
-                    
-                    sequence = getattr(node.cfgmgr, cmd+'_order', None)
-                    if cfg_method:
-                        f=getattr(node.cfgmgr,cfg_method)
-                        data = f(overwrite_data)
-                    else:
-                        data = getattr(node.cfgmgr, cmd)
-                    
-                    
-                    appset = list(node.children)
-                    if not sequence:
-                        # Loop over data keys if no sequence is specified or all apps, if data is empty
+                    print(f"Sending {cmd} to {node.name}")
+                    ok, failed = node.send_command(cmd, overwrite_data[node.name] if overwrite_data else {}, state_entry, state_exit)
+                    # try:
+                    #     ok, failed = node.send_command(cmd, data[node.name] if data else {}, state_entry, state_exit)
+                    # except Exception as e:
+                    #     excpt[node.name] = e
                         
-                        for n in appset:
-                            n.sup.send_command(cmd, data[n.name] if data else {}, state_entry, state_exit)
 
-                        start = datetime.now()
-
-                        while(appset):
-                            done = []
-                            for n in appset:
-                                try:
-                                    r = n.sup.check_response()
-                                except NoResponse:
-                                    continue
-                                # except AppCommander.ResponseTimeout 
-                                # failed[n] = {}
-                                done += [n]
-                    
-                                (ok if r['success'] else failed)[n.name] = r
-
-                            for d in done:
-                                appset.remove(d)
-
-                            now = datetime.now()
-                            elapsed = (now - start).total_seconds()
-
-                            if elapsed > self.timeout:
-                                raise RuntimeError("Send multicommand failed")
-
-                            time.sleep(0.1)
-                            self.log.info("tic toc")
-
-                    else:
-                        # There probably is a way to do that in a much nicer, pythonesque, way
-                        for n in sequence:
-                            for child_node in appset:
-                                if n == child_node.name:
-                                    r = child_node.sup.send_command_and_wait(cmd, data[n] if data else {},
-                                                                             state_entry, state_exit, self.timeout)
-                            (ok if r['success'] else failed)[n] = r
-
-        if raise_on_fail and failed:
+        if raise_on_fail and len(failed)>0:
             self.log.error(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
             self.return_code = 13
             for a,r in failed.items():
-                self.log.error(f"{a}: {r}")
+                self.log.error(f"{a}: {r}\nEXCEPTION:\n{excpt['node.name']}")
+                print(f"{a}: {r}\nEXCEPTION:\n{excpt['node.name']}")
             raise RuntimeError(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
 
         self.return_code = 0
