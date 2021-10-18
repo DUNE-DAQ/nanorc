@@ -1,9 +1,17 @@
 import os.path
+import tarfile
 import json
 import copy
 from .cfgmgr import ConfigManager
 from distutils.dir_util import copy_tree
 
+
+# Straight from stack overflow
+# https://stackoverflow.com/a/17081026/8475064
+def make_tarfile(output_filename, source_dir):
+    with tarfile.open(output_filename, "w:gz") as tar:
+        tar.add(source_dir, arcname=os.path.basename(source_dir))
+        
 class ConfigSaver:
     """docstring for ConfigManager"""
 
@@ -63,7 +71,12 @@ class ConfigSaver:
         f = open(self.thisrun_outdir+"start_parsed.json", "w")
         f.write(json.dumps(data, indent=2))
         f.close()
+        
+        tgz_path = os.path.normpath(self.thisrun_outdir)+".tgz"
+        make_tarfile(output_filename=tgz_path, source_dir=self.thisrun_outdir)
 
+        
+        
         return self.thisrun_outdir
 
 
