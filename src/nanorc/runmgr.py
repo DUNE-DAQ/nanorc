@@ -16,7 +16,7 @@ class SimpleRunNumberManager:
 class DBRunNumberManager:
     """A class that interacts with the run number db"""
 
-    def __init__(self, socket):
+    def __init__(self, socket:str):
         super(DBRunNumberManager, self).__init__()
         self.log = logging.getLogger(self.__class__.__name__)
         self.run = None
@@ -37,7 +37,7 @@ class DBRunNumberManager:
                                timeout=self.timeout)
             req.raise_for_status()
         except requests.HTTPError as exc:
-            error = f"{__name__}: RunDB: Failed authentication"
+            error = f"{__name__}: HTTP Error (maybe failed auth, maybe ill-formed post message, ...)"
             self.log.error(error)
             raise RuntimeError(error) from exc
         except requests.ConnectionError as exc:
@@ -59,7 +59,7 @@ class DBRunNumberManager:
                                timeout=self.timeout)
             req.raise_for_status()
         except requests.HTTPError as exc:
-            error = f"{__name__}: RunDB: Failed authentication"
+            error = f"{__name__}: HTTP Error (maybe failed auth, maybe ill-formed post message, ...)"
             self.log.error(error)
             raise RuntimeError(error) from exc
         except requests.ConnectionError as exc:
@@ -82,7 +82,7 @@ class DBRunNumberManager:
                                timeout=self.timeout)
             req.raise_for_status()
         except requests.HTTPError as exc:
-            error = f"{__name__}: RunDB: Failed authentication"
+            error = f"{__name__}: HTTP Error (maybe failed auth, maybe ill-formed post message, ...)"
             self.log.error(error)
             raise RuntimeError(error) from exc
         except requests.ConnectionError as exc:
