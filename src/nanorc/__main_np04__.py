@@ -94,13 +94,13 @@ np04cli.add_command(wait, 'wait')
 np04cli.add_command(terminate, 'terminate')
 
 @np04cli.command('start')
+@click.argument('run-type', required=True,
+                type=click.Choice(['TEST', 'PROD']))
 @click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.option('--resume-wait', type=int, default=0, help='Seconds to wait between Start and Resume commands')
-@click.option('--run-type', help='Run for example TEST, PROD', required=True,
-              type=click.Choice(['TEST', 'PROD']))
 @click.pass_obj
-def start(obj:NanoContext, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, run_type:str):
+def start(obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int):
     """
     Start Command
 
