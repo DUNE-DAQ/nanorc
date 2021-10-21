@@ -44,8 +44,7 @@ class NanoRC:
         super(NanoRC, self).__init__()     
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
-        self.cfg = TopLevelConfigManager(top_cfg)
-        # self.cfg = ConfigManager(cfg_dir)
+        self.cfg = TopLevelConfigManager(top_cfg, self.console)
 
         if dotnanorc_file != "":
             dotnanorc_file = os.path.expanduser(dotnanorc_file)
@@ -64,8 +63,6 @@ class NanoRC:
         self.timeout = timeout
         self.return_code = 0
 
-        # self.pm = SSHProcessManager(console)
-        
         self.apps = self.cfg.get_tree_structure()
         self.listener = None
 
@@ -140,23 +137,23 @@ class NanoRC:
             self.return_code = 10
             return ok, failed
         
+        if len(nodes)>1:
+            self.log.error(f"Something weird is going one, {path} correspond to several nodes")
+            self.return_code = 10
+            return ok, failed
+
         for rootnode in nodes:
-            for node in PreOrderIter(rootnode):
-                if isinstance(node, SubsystemNode):
-                    print(f"Sending {cmd} to {node.name}")
-                    ok, failed = node.send_command(cmd, overwrite_data[node.name] if overwrite_data else {}, state_entry, state_exit)
-                    # try:
-                    #     ok, failed = node.send_command(cmd, data[node.name] if data else {}, state_entry, state_exit)
-                    # except Exception as e:
-                    #     excpt[node.name] = e
-                        
+            ok, failed = rootnode.send_command(cmd=cmd,
+                                               state_entry=state_entry, state_exit=state_exit,
+                                               cfg_method=cfg_method,
+                                               overwrite_data=overwrite_data if overwrite_data else {},
+                                               timeout=self.timeout)
 
         if raise_on_fail and len(failed)>0:
             self.log.error(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
             self.return_code = 13
             for a,r in failed.items():
-                self.log.error(f"{a}: {r}\nEXCEPTION:\n{excpt['node.name']}")
-                print(f"{a}: {r}\nEXCEPTION:\n{excpt['node.name']}")
+                self.log.error(f"{a}: {r}")
             raise RuntimeError(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
 
         self.return_code = 0
@@ -167,41 +164,14 @@ class NanoRC:
         """
         Boots applications
         """
-        for node in PreOrderIter(self.apps):
-            if isinstance(node, SubsystemNode):
-                self.log.debug(str(node.cfgmgr.boot))
-
-                try:
-                    node.pm = SSHProcessManager(self.console)
-                    node.pm.boot(node.cfgmgr.boot)
-                except Exception as e:
-                    self.console.print_exception()
-                    self.return_code = 11
-                    return
-                
-                node.listener = ResponseListener(node.cfgmgr.boot["response_listener"]["port"])
-                children = [ ApplicationNode(name=n,
-                                             sup=AppSupervisor(self.console, d, node.listener),
-                                             parent=node)
-                             for n,d in node.pm.apps.items() ]
-                node.children = children
+        self.apps.boot()
 
 
     def terminate(self) -> NoReturn:
-        for node in PreOrderIter(self.apps):
-            if isinstance(node, ApplicationNode):
-                node.sup.terminate()
-                if node.parent.listener:
-                    node.parent.listener.unregister(node.name)
-                node.parent = None
-
-        for node in PreOrderIter(self.apps):
-            if isinstance(node, SubsystemNode):
-                if node.listener:
-                    node.listener.terminate()
-                if node.pm:
-                    node.pm.terminate()
-                del node
+        """
+        Terminates applications (but keep all the subsystems structure)
+        """
+        self.apps.terminate()
 
 
     def ls(self) -> NoReturn:
