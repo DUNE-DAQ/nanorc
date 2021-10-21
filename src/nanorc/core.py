@@ -28,9 +28,12 @@ class NanoRC:
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
         self.cfg = ConfigManager(cfg_dir)
+        self.apparatus_id = "_".join(self.cfg.boot["apps"].keys())
+
         self.run_num_mgr = run_num_mgr
         self.cfgsvr = run_registry
         self.cfgsvr.cfgmgr = self.cfg
+        self.cfgsvr.apparatus_id = self.apparatus_id
         self.timeout = timeout
         self.return_code = 0
 

@@ -106,13 +106,13 @@ class SimpleConfigSaver:
         
 
 class DBConfigSaver:
-    def __init__(self, apparatus_id:str, socket:str):
+    def __init__(self, socket:str):
         self.API_SOCKET = socket
         auth = credentials.get_login("runregistrydb")
         self.API_USER = auth.user
         self.API_PSWD = auth.password
         self.timeout = 2
-        self.apparatus_id = apparatus_id
+        self.apparatus_id = None
         self.log = logging.getLogger(self.__class__.__name__)
         
     def save_on_resume(self, data:dict) -> str:
