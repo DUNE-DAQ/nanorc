@@ -106,13 +106,13 @@ class SimpleConfigSaver:
         
 
 class DBConfigSaver:
-    def __init__(self, installation_id:str, socket:str):
+    def __init__(self, apparatus_id:str, socket:str):
         self.API_SOCKET = socket
         auth = credentials.get_login("runregistrydb")
         self.API_USER = auth.user
         self.API_PSWD = auth.password
         self.timeout = 2
-        self.installation_id = installation_id
+        self.apparatus_id = apparatus_id
         self.log = logging.getLogger(self.__class__.__name__)
         
     def save_on_resume(self, data:dict) -> str:
@@ -130,7 +130,7 @@ class DBConfigSaver:
         with open(fname, "rb") as f:
             files = {'file': f}
             post_data = {"run_num": str(run),
-                         "det_id": self.installation_id,
+                         "det_id": self.apparatus_id,
                          "run_type": run_type}
 
             try:
