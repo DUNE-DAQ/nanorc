@@ -62,7 +62,7 @@ class NanoRC:
         self.timeout = timeout
         self.return_code = 0
 
-        self.apps = self.cfg.get_tree_structure()
+        self.topnode = self.cfg.get_tree_structure()
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
         self.ls(leg=False)
 
@@ -77,7 +77,7 @@ class NanoRC:
         :rtype:     None
         """
 
-        if not self.apps:
+        if not self.topnode:
             return
 
         table = Table(title=f"{self.cfg.apparatus_id} apps")
@@ -88,7 +88,7 @@ class NanoRC:
         table.add_column("last cmd")
         table.add_column("last succ. cmd", style="green")
 
-        for pre, _, node in RenderTree(self.apps):
+        for pre, _, node in RenderTree(self.topnode):
             if isinstance(node, ApplicationNode):
                 sup = node.sup
                 alive = sup.desc.proc.is_alive()
@@ -130,7 +130,7 @@ class NanoRC:
         :type       raise_on_fail:  bool
         """
         
-        nodes = search_tree(path, self.apps)
+        nodes = search_tree(path, self.topnode)
         
         ok, failed, excpt = {}, {}, {}
         
@@ -166,20 +166,20 @@ class NanoRC:
         """
         Boots applications
         """
-        self.apps.boot()
+        self.topnode.boot()
 
 
     def terminate(self) -> NoReturn:
         """
         Terminates applications (but keep all the subsystems structure)
         """
-        self.apps.terminate()
+        self.topnode.terminate()
 
 
     def ls(self, leg:boot=True) -> NoReturn:
 
-        for pre, _, node in RenderTree(self.apps):
-            if node == self.apps:
+        for pre, _, node in RenderTree(self.topnode):
+            if node == self.topnode:
                 self.console.print(f"{pre}[red]{node.name}[/red]")
             elif isinstance(node, SubsystemNode):
                 self.console.print(f"{pre}[yellow]{node.name}[/yellow]")
@@ -226,7 +226,7 @@ class NanoRC:
                 "run": self.run,
             }
 
-        cfg_save_dir = self.cfgsvr.save_on_start(self.apps, run=self.run,
+        cfg_save_dir = self.cfgsvr.save_on_start(self.topnode, run=self.run,
                                                  overwrite_data=runtime_start_data,
                                                  cfg_method="runtime_start")
 
@@ -267,7 +267,7 @@ class NanoRC:
         if not trigger_interval_ticks is None:
             runtime_resume_data["trigger_interval_ticks"] = trigger_interval_ticks
 
-        self.cfgsvr.save_on_resume(self.apps,
+        self.cfgsvr.save_on_resume(self.topnode,
                                    overwrite_data=runtime_resume_data,
                                    cfg_method="runtime_resume")
 
