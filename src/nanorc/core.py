@@ -22,21 +22,6 @@ from datetime import datetime
 
 from typing import Union, NoReturn
 
-def search_tree(path:str, from_node:GroupNode)->[GroupNode]:
-    if path == "/" or path == "/root":
-        return [from_node]
-    
-    results = []
-    for node in PreOrderIter(from_node):
-        this_path = ""
-        for parent in node.path:
-            this_path += "/"+parent.name
-        if this_path == path:
-            results.append(node)
-            
-    return results
-        
-
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
@@ -111,45 +96,42 @@ class NanoRC:
 
 
         
-    def send_to_tree(self, path: str, cmd: str, overwrite_data: dict,
+    def send_to_node(self, node, cmd: str, overwrite_data: dict,
                      state_entry: str, state_exit: str, raise_on_fail: bool=False, cfg_method: str=None):
         """
         Sends many commands to all applications
 
-        :param      path:           The path to which we want to send the command to
-        :type       path:           str
+        :param      node:           The node to which we want to send the command to
+        :type       node:           GroupNode or SubsystemNode
         :param      cmd:            The command
         :type       cmd:            str
-        :param      data:           The data
-        :type       data:           dict
+        :param      overwrite_data: The data
+        :type       overwrite_data: dict
         :param      state_entry:    The state entry
         :type       state_entry:    str
         :param      state_exit:     The state exit
         :type       state_exit:     str
         :param      raise_on_fail:  Raise an exception if any application fails
         :type       raise_on_fail:  bool
+        :param      cfg_method:     The method that we can execute to get the data... ugly hack
+        :type       cfg_method:     str
         """
-        
-        nodes = search_tree(path, self.topnode)
-        
-        ok, failed, excpt = {}, {}, {}
-        
-        if not nodes:
+
+        ok, failed = {}, {}
+
+        if not node:
             self.log.warning(f"No applications defined to send '{cmd}' to.")
             self.return_code = 10
             return ok, failed
-        
-        if len(nodes)>1:
-            self.log.error(f"Something weird is going one, {path} correspond to several nodes")
-            self.return_code = 10
-            return ok, failed
 
-        for rootnode in nodes:
-            ok, failed = rootnode.send_command(cmd=cmd,
-                                               state_entry=state_entry, state_exit=state_exit,
-                                               cfg_method=cfg_method,
-                                               overwrite_data=overwrite_data if overwrite_data else {},
-                                               timeout=self.timeout)
+        try:
+            ok, failed = node.send_command(cmd=cmd,
+                                           state_entry=state_entry, state_exit=state_exit,
+                                           cfg_method=cfg_method,
+                                           overwrite_data=overwrite_data if overwrite_data else {},
+                                           timeout=self.timeout)
+        except RuntimeError as ex:
+            raise RuntimeError("Cannot send command to this node") from ex
 
         if raise_on_fail and len(failed)>0:
             self.log.error(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
@@ -176,7 +158,7 @@ class NanoRC:
         self.topnode.terminate()
 
 
-    def ls(self, leg:boot=True) -> NoReturn:
+    def ls(self, leg:bool=True) -> NoReturn:
 
         for pre, _, node in RenderTree(self.topnode):
             if node == self.topnode:
@@ -195,26 +177,26 @@ class NanoRC:
             self.console.print(" - [blue]applications[/blue]\n")
 
 
-    def init(self, path:str) -> NoReturn:
+    def init(self, node) -> NoReturn:
         """
         Initializes the applications.
         """
-        ok, failed = self.send_to_tree(path, 'init', None,
+        ok, failed = self.send_to_node(node, 'init', None,
                                        'NONE', 'INITIAL', raise_on_fail=True)
 
 
-    def conf(self, path:str) -> NoReturn:
+    def conf(self, node) -> NoReturn:
         """
         Sends configure command to the applications.
         """
-        ok, failed = self.send_to_tree(path, 'conf', None,
+        ok, failed = self.send_to_node(node, 'conf', None,
                                        'INITIAL', 'CONFIGURED', raise_on_fail=True)
 
 
     def start(self, disable_data_storage: bool) -> NoReturn:
         """
         Sends start command to the applications
-        
+
         Args:
             disable_data_storage (bool): Description
         """
@@ -230,7 +212,7 @@ class NanoRC:
                                                  overwrite_data=runtime_start_data,
                                                  cfg_method="runtime_start")
 
-        ok, failed = self.send_to_tree("/", 'start', runtime_start_data,
+        ok, failed = self.send_to_node(self.topnode, 'start', runtime_start_data,
                                        'CONFIGURED', 'RUNNING', raise_on_fail=True,
                                        cfg_method="runtime_start")
         self.console.log(f"[bold magenta]Started run #{self.run}, saving run data in {cfg_save_dir}[/bold magenta]")
@@ -241,21 +223,21 @@ class NanoRC:
         Sends stop command
         """
 
-        ok, failed = self.send_to_tree("/", 'stop', None,
+        ok, failed = self.send_to_node(self.topnode, 'stop', None,
                                        'RUNNING', 'CONFIGURED', raise_on_fail=True)
         self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
 
 
-    def pause(self, path:str) -> NoReturn:
+    def pause(self, node) -> NoReturn:
         """
         Sends pause command
         """
 
-        ok, failed = self.send_to_tree(path, 'pause', None,
+        ok, failed = self.send_to_node(node, 'pause', None,
                                        'RUNNING', 'RUNNING', raise_on_fail=True)
 
 
-    def resume(self, path:str, trigger_interval_ticks: Union[int, None]) -> NoReturn:
+    def resume(self, node, trigger_interval_ticks: Union[int, None]) -> NoReturn:
         """
         Sends resume command
         
@@ -271,14 +253,14 @@ class NanoRC:
                                    overwrite_data=runtime_resume_data,
                                    cfg_method="runtime_resume")
 
-        ok, failed = self.send_to_tree(path, 'resume', runtime_resume_data,
+        ok, failed = self.send_to_node(node, 'resume', runtime_resume_data,
                                        'RUNNING', 'RUNNING', raise_on_fail=True,
                                        cfg_method="runtime_resume")
 
 
-    def scrap(self, path:str) -> NoReturn:
+    def scrap(self, node) -> NoReturn:
         """
         Send scrap command
         """
-        ok, failed = self.send_to_tree(path, 'scrap', None,
+        ok, failed = self.send_to_node(node, 'scrap', None,
                                        'CONFIGURED', 'INITIAL', raise_on_fail=True)
