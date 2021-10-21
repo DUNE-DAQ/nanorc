@@ -66,7 +66,7 @@ def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, cfg_
         logging.getLogger("cli").info("RunRegistryDB socket "+dotnanorc["runregistrydb"]["socket"])
         rc = NanoRC(obj.console, cfg_dir,
                     DBRunNumberManager(dotnanorc["rundb"]["socket"]),
-                    DBConfigSaver(cfg_dumpdir,dotnanorc["runregistrydb"]["socket"]),
+                    DBConfigSaver("foobar",dotnanorc["runregistrydb"]["socket"]),
                     timeout)
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")

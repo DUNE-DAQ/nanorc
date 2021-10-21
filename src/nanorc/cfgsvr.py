@@ -1,9 +1,11 @@
+import os
 import os.path
 import logging
 import tarfile
 import json
 import copy
 import requests
+import tempfile
 from .cfgmgr import ConfigManager
 from .credmgr import credentials,Authentication
 from distutils.dir_util import copy_tree
@@ -103,47 +105,55 @@ class SimpleConfigSaver:
 
         
 
-class DBConfigSaver(SimpleConfigSaver):
-    def __init__(self, cfg_outdir:str, socket:str):
-        super().__init__(cfg_outdir)
-        
+class DBConfigSaver:
+    def __init__(self, installation_id:str, socket:str):
         self.API_SOCKET = socket
         auth = credentials.get_login("runregistrydb")
         self.API_USER = auth.user
         self.API_PSWD = auth.password
         self.timeout = 2
+        self.installation_id = installation_id
         self.log = logging.getLogger(self.__class__.__name__)
-
-    def save_on_start(self, data: dict, run:int, run_type:str) -> tuple:
-        cfg_dir, cfg_file = super().save_on_start(data, run, run_type)
-        det_id = '_'.join(self.cfgmgr.boot['apps'].keys())
-
-        files = {'file': open(cfg_file,'rb')}
-        post_data = {"run_num": str(run),
-                     "det_id": det_id,
-                     "run_type": run_type
-                     }
         
-        try:
-            r = requests.post(self.API_SOCKET+"/runregistry/insertRun/",
-                              files=files,
-                              data=post_data,
-                              auth=(self.API_USER, self.API_PSWD),
-                              timeout=self.timeout)
-        except requests.HTTPError as exc:
-            error = f"{__name__}: RunRegistryDB: HTTP Error (maybe failed auth, maybe ill-formed post message, ...)"
-            self.log.error(error)
-            raise RuntimeError(error) from exc
-        except requests.ConnectionError as exc:
-            error = f"{__name__}: Connection to {self.API_SOCKET} wasn't successful"
-            self.log.error(error)
-            raise RuntimeError(error) from exc
-        except requests.Timeout as exc:
-            error = f"{__name__}: Connection to {self.API_SOCKET} timed out"
-            self.log.error(error)
-            raise RuntimeError(error) from exc
+    def save_on_resume(self, data:dict) -> str:
+        return "not_saving_to_db_on_resume"
+    
+    def save_on_start(self, data: dict, run:int, run_type:str) -> str:
+        fname=None
+        with tempfile.NamedTemporaryFile(suffix='.tar.gz', delete=False) as f:
+            with tarfile.open(fileobj=f, mode='w:gz') as tar:
+                tar.add(self.cfgmgr.cfg_dir, arcname=os.path.basename(self.cfgmgr.cfg_dir))
+            f.flush()
+            f.seek(0)
+            fname = f.name
 
-        return cfg_dir, cfg_file, "run_registry_db"
+        with open(fname, "rb") as f:
+            files = {'file': f}
+            post_data = {"run_num": str(run),
+                         "det_id": self.installation_id,
+                         "run_type": run_type}
+
+            try:
+                r = requests.post(self.API_SOCKET+"/runregistry/insertRun/",
+                                  files=files,
+                                  data=post_data,
+                                  auth=(self.API_USER, self.API_PSWD),
+                                  timeout=self.timeout)
+            except requests.HTTPError as exc:
+                error = f"{__name__}: RunRegistryDB: HTTP Error (maybe failed auth, maybe ill-formed post message, ...)"
+                self.log.error(error)
+                raise RuntimeError(error) from exc
+            except requests.ConnectionError as exc:
+                error = f"{__name__}: Connection to {self.API_SOCKET} wasn't successful"
+                self.log.error(error)
+                raise RuntimeError(error) from exc
+            except requests.Timeout as exc:
+                error = f"{__name__}: Connection to {self.API_SOCKET} timed out"
+                self.log.error(error)
+                raise RuntimeError(error) from exc
+
+        os.remove(fname)
+        return "run_registry_db"
 
     def save_on_stop(self, run:str) -> None:
         try:
