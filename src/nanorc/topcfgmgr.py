@@ -20,13 +20,11 @@ class TopLevelConfigManager:
         f = open(top_cfg, 'r')
         self.console = console
         self.top_cfg = json.load(f)
-        self.root = DAQNode("root")
+        self.apparatus_id = self.top_cfg["apparatus_id"]
+        del self.top_cfg["apparatus_id"]
+        self.root = DAQNode(self.apparatus_id)
         self.extract_json_to_nodes(self.top_cfg, self.root)
-        
-        from anytree import RenderTree
-        for pre, _, node in RenderTree(self.root):
-            print(f"{pre}{node.name}")
-        
+
     # This should get changed so that it copies the node, and strips the config
     def get_tree_structure(self):
         return self.root

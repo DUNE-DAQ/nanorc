@@ -45,7 +45,6 @@ class NanoRC:
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
         self.cfg = TopLevelConfigManager(top_cfg, self.console)
-
         if dotnanorc_file != "":
             dotnanorc_file = os.path.expanduser(dotnanorc_file)
             self.console.print(f"[blue]Loading {dotnanorc_file}[/blue]")
@@ -64,6 +63,9 @@ class NanoRC:
         self.return_code = 0
 
         self.apps = self.cfg.get_tree_structure()
+        self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
+        self.ls(leg=False)
+
         self.listener = None
 
 
@@ -78,7 +80,7 @@ class NanoRC:
         if not self.apps:
             return
 
-        table = Table(title="Apps")
+        table = Table(title=f"{self.cfg.apparatus_id} apps")
         table.add_column("name", style="blue")
         table.add_column("host", style="magenta")
         table.add_column("alive", style="magenta")
@@ -174,18 +176,23 @@ class NanoRC:
         self.apps.terminate()
 
 
-    def ls(self) -> NoReturn:
-        self.console.print("Legend:")
-        self.console.print(" - [yellow]subsystems[/yellow]")
-        self.console.print(" - [red]applications[/red]\n")
+    def ls(self, leg:boot=True) -> NoReturn:
 
         for pre, _, node in RenderTree(self.apps):
-            if isinstance(node, SubsystemNode):
+            if node == self.apps:
+                self.console.print(f"{pre}[red]{node.name}[/red]")
+            elif isinstance(node, SubsystemNode):
                 self.console.print(f"{pre}[yellow]{node.name}[/yellow]")
             elif isinstance(node, ApplicationNode):
-                self.console.print(f"{pre}[red]{node.name}[/red]")
+                self.console.print(f"{pre}[blue]{node.name}[/blue]")
             else:
                 self.console.print(f"{pre}{node.name}")
+
+        if leg:
+            self.console.print("\nLegend:")
+            self.console.print(" - [red]root node[/red]")
+            self.console.print(" - [yellow]subsystems[/yellow]")
+            self.console.print(" - [blue]applications[/blue]\n")
 
 
     def init(self, path:str) -> NoReturn:
