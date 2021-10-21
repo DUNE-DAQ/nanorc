@@ -2,7 +2,7 @@ from anytree import PreOrderIter
 import os.path
 import json
 import copy
-from .node import DAQNode, SubsystemNode
+from .node import GroupNode, SubsystemNode
 from .cfgmgr import ConfigManager
 from distutils.dir_util import copy_tree
 
@@ -47,12 +47,12 @@ class ConfigSaver:
 
         return filename+postfix+ext
 
-    def save_on_start(self, apps:DAQNode, run:int,
+    def save_on_start(self, apps:GroupNode, run:int,
                       overwrite_data:dict, cfg_method:str) -> str:
         """
         Save the configuration runtime start parameter set
         :param      apps:  the application tree
-        :type       apps:  DAQNode
+        :type       apps:  GroupNode
         :param      run :  run number
         :type       run :  int
         :param      overwrite_data :  the runtime start data
@@ -85,10 +85,10 @@ class ConfigSaver:
         return self.thisrun_outdir
 
 
-    def save_on_resume(self, apps:DAQNode, overwrite_data: dict, cfg_method:str) -> dict:
+    def save_on_resume(self, apps:GroupNode, overwrite_data: dict, cfg_method:str) -> dict:
         """
         :param      apps:  the application tree
-        :type       apps:  DAQNode
+        :type       apps:  GroupNode
         :param      overwrite_data :  the runtime start data
         :type       overwrite_data :  dict
         :param      cfg_method :  which config method to call on start

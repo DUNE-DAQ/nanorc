@@ -8,7 +8,7 @@ from rich.style import Style
 from rich.pretty import Pretty
 from rich.table import Table
 from rich.text import Text
-from .node import DAQNode, SubsystemNode, ApplicationNode
+from .node import GroupNode, SubsystemNode, ApplicationNode
 from .sshpm import SSHProcessManager
 from .topcfgmgr import TopLevelConfigManager
 from .cfgsvr import ConfigSaver
@@ -22,7 +22,7 @@ from datetime import datetime
 
 from typing import Union, NoReturn
 
-def search_tree(path:str, from_node:DAQNode)->[DAQNode]:
+def search_tree(path:str, from_node:GroupNode)->[GroupNode]:
     if path == "/" or path == "/root":
         return [from_node]
     

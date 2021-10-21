@@ -8,7 +8,7 @@ from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoRespons
 from typing import Union, NoReturn
 
 # This one is just to give a nicer name
-class DAQNode(NodeMixin):
+class GroupNode(NodeMixin):
     def __init__(self, name:str, parent=None, children=None):
         self.name = name
         self.parent = parent

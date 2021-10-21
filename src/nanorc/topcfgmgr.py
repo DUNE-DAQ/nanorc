@@ -1,10 +1,10 @@
-from .node import DAQNode, SubsystemNode
+from .node import GroupNode, SubsystemNode
 from .cfgmgr import ConfigManager
 import json
 
 
 class TopLevelConfigManager:
-    def extract_json_to_nodes(self, js, mother) -> DAQNode:
+    def extract_json_to_nodes(self, js, mother) -> GroupNode:
     
         for n,d in js.items():
             if "conf-dir" in d:
@@ -13,7 +13,7 @@ class TopLevelConfigManager:
                                        console=self.console,
                                        parent=mother)
             else:
-                child = DAQNode(name=n, parent=mother)
+                child = GroupNode(name=n, parent=mother)
                 self.extract_json_to_nodes(d, child)
 
     def __init__(self, top_cfg, console):
@@ -22,7 +22,7 @@ class TopLevelConfigManager:
         self.top_cfg = json.load(f)
         self.apparatus_id = self.top_cfg["apparatus_id"]
         del self.top_cfg["apparatus_id"]
-        self.root = DAQNode(self.apparatus_id)
+        self.root = GroupNode(self.apparatus_id)
         self.extract_json_to_nodes(self.top_cfg, self.root)
 
     # This should get changed so that it copies the node, and strips the config
