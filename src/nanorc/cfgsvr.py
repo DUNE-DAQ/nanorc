@@ -1,17 +1,30 @@
 from anytree import PreOrderIter
+import os
+import json
 import os.path
+import logging
+import tarfile
 import json
 import copy
+import requests
+import tempfile
 from .node import GroupNode, SubsystemNode
 from .cfgmgr import ConfigManager
+from .credmgr import credentials,Authentication
 from distutils.dir_util import copy_tree
 
-class ConfigSaver:
+# Straight from stack overflow
+# https://stackoverflow.com/a/17081026/8475064
+def make_tarfile(output_filename, source_dir):
+    with tarfile.open(output_filename, "w:gz") as tar:
+        tar.add(source_dir, arcname=os.path.basename(source_dir))
+        
+class SimpleConfigSaver:
     """docstring for ConfigManager"""
 
-    def __init__(self, cfgmgr:ConfigManager, cfg_outdir:str):
-        super(ConfigSaver, self).__init__()
-        self.cfgmgr = cfgmgr
+    def __init__(self, cfg_outdir:str):
+        super(SimpleConfigSaver, self).__init__()
+        self.cfgmgr = None
         self.outdir = cfg_outdir
 
     def _get_new_out_dir_name(self, run:int) -> str:
@@ -47,7 +60,7 @@ class ConfigSaver:
 
         return filename+postfix+ext
 
-    def save_on_start(self, apps:GroupNode, run:int,
+    def save_on_start(self, apps:GroupNode, run:int, run_type:str,
                       overwrite_data:dict, cfg_method:str) -> str:
         """
         Save the configuration runtime start parameter set
@@ -59,11 +72,17 @@ class ConfigSaver:
         :type       overwrite_data :  dict
         :param      cfg_method :  which config method to call on start
         :type       cfg_method :  str
+        :param      run_type :  run type
+        :type       run_type :  str
 
         :returns:   Path of the saved config
         :rtype:     str
         """
+        if not self.cfgmgr:
+            raise RuntimeError(f"{__name__}: ERROR : You need to set the cfgmgr of this ConfigSaver")
+        
         self.thisrun_outdir = self._get_new_out_dir_name(run)
+
         for node in PreOrderIter(apps):
             if isinstance(node, SubsystemNode):
                 this_path = ""
@@ -81,11 +100,14 @@ class ConfigSaver:
                 f = open(full_path+"/start_parsed.json", "w")
                 f.write(json.dumps(data, indent=2))
                 f.close()
+        
+        tgz_path = os.path.normpath(self.thisrun_outdir)+".tgz"
+        make_tarfile(output_filename=tgz_path, source_dir=self.thisrun_outdir)
 
-        return self.thisrun_outdir
+        return self.thisrun_outdir, tgz_path
 
 
-    def save_on_resume(self, apps:GroupNode, overwrite_data: dict, cfg_method:str) -> dict:
+    def save_on_resume(self, topnode:GroupNode, overwrite_data: dict, cfg_method:str) -> dict:
         """
         :param      apps:  the application tree
         :type       apps:  GroupNode
@@ -96,7 +118,7 @@ class ConfigSaver:
 
         :returns: None
         """
-        for node in PreOrderIter(apps):
+        for node in PreOrderIter(topnode):
             if isinstance(node, SubsystemNode):
                 this_path = ""
                 for parent in node.path:
@@ -112,7 +134,112 @@ class ConfigSaver:
                 f.write(json.dumps(data, indent=2))
                 f.close()
 
+    
+    def save_on_stop(self, run:int):
+        pass
+        
 
+        
+
+class DBConfigSaver:
+    def __init__(self, socket:str):
+        self.API_SOCKET = socket
+        auth = credentials.get_login("runregistrydb")
+        self.API_USER = auth.user
+        self.API_PSWD = auth.password
+        self.timeout = 2
+        self.apparatus_id = None
+        self.log = logging.getLogger(self.__class__.__name__)
+        
+    def save_on_resume(self, topnode, overwrite_data:dict, cfg_method:str) -> str:
+        return "not_saving_to_db_on_resume"
+    
+    def save_on_start(self, topnode,
+                      run:int, run_type:str,
+                      overwrite_data:dict, cfg_method:str) -> str:
+
+        fname=None
+        dname=None
+
+        with tempfile.TemporaryDirectory() as dir_name:
+            dname = dir_name
+            json_object = json.dumps(self.topcfgmgr.top_cfg, indent = 4)
+            with open(dname+"/top_config.json", "w") as outfile:
+                outfile.write(json_object)
+            
+            for node in PreOrderIter(topnode):
+                if isinstance(node, SubsystemNode):
+                    this_path = ""
+                    for parent in node.path:
+                        this_path += "/"+parent.name
+                    
+                    full_path = dir_name+this_path
+                    os.makedirs(full_path)
+                    copy_tree(node.cfgmgr.cfg_dir, full_path)
+                
+                    if cfg_method:
+                        f=getattr(node.cfgmgr,cfg_method)
+                        data = f(overwrite_data)
+
+                    f = open(full_path+"/start_parsed.json", "w")
+                    f.write(json.dumps(data, indent=2))
+                    f.close()
+            
+            with tempfile.NamedTemporaryFile(suffix='.tar.gz', delete=False) as f:
+                with tarfile.open(fileobj=f, mode='w:gz') as tar:
+                    tar.add(dname, arcname=os.path.basename(dname))
+                f.flush()
+                f.seek(0)
+                fname = f.name
+
+            with open(fname, "rb") as f:
+                files = {'file': f}
+                post_data = {"run_num": str(run),
+                             "det_id": self.apparatus_id,
+                             "run_type": run_type}
+
+                try:
+                    r = requests.post(self.API_SOCKET+"/runregistry/insertRun/",
+                                      files=files,
+                                      data=post_data,
+                                      auth=(self.API_USER, self.API_PSWD),
+                                      timeout=self.timeout)
+                except requests.HTTPError as exc:
+                    error = f"{__name__}: RunRegistryDB: HTTP Error (maybe failed auth, maybe ill-formed post message, ...)"
+                    self.log.error(error)
+                    raise RuntimeError(error) from exc
+                except requests.ConnectionError as exc:
+                    error = f"{__name__}: Connection to {self.API_SOCKET} wasn't successful"
+                    self.log.error(error)
+                    raise RuntimeError(error) from exc
+                except requests.Timeout as exc:
+                    error = f"{__name__}: Connection to {self.API_SOCKET} timed out"
+                    self.log.error(error)
+                    raise RuntimeError(error) from exc
+        
+            os.remove(fname)
+            
+        return "run_registry_db"
+
+    def save_on_stop(self, run:str) -> None:
+        try:
+            r = requests.get(self.API_SOCKET+"/runregistry/updateStopTime/"+str(run),
+                              auth=(self.API_USER, self.API_PSWD),
+                              timeout=self.timeout)
+        except requests.HTTPError as exc:
+            error = f"{__name__}: RunRegistryDB: HTTP Error (maybe failed auth, maybe ill-formed post message, ...)"
+            self.log.error(error)
+            raise RuntimeError(error) from exc
+        except requests.ConnectionError as exc:
+            error = f"{__name__}: Connection to {self.API_SOCKET} wasn't successful"
+            self.log.error(error)
+            raise RuntimeError(error) from exc
+        except requests.Timeout as exc:
+            error = f"{__name__}: Connection to {self.API_SOCKET} timed out"
+            self.log.error(error)
+            raise RuntimeError(error) from exc
+        
+        
 
 if __name__ == "__main__":
     import sys

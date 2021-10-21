@@ -120,7 +120,6 @@ class ConfigManager:
         :rtype:     dict
         """
 
-        print(f"executing runtime_start! {data}")
         start = copy.deepcopy(self.start)
 
         for c in json_extract(start, "modules"):
@@ -137,7 +136,6 @@ class ConfigManager:
         :returns:   Complete parameter set.
         :rtype:     dict
         """
-        print(f"executing runtime_resume! {data}")
         resume = copy.deepcopy(self.resume)
 
         for c in json_extract(resume, "modules"):

@@ -11,9 +11,8 @@ from rich.text import Text
 from .node import GroupNode, SubsystemNode, ApplicationNode
 from .sshpm import SSHProcessManager
 from .topcfgmgr import TopLevelConfigManager
-from .cfgsvr import ConfigSaver
+from .cfgsvr import SimpleConfigSaver, DBConfigSaver
 from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
-from .runmgr import RunNumberDBManager, SimpleRunNumberManager
 from .credmgr import credentials
 
 from rich.traceback import Traceback
@@ -25,25 +24,17 @@ from typing import Union, NoReturn
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
-    def __init__(self, console: Console, top_cfg: str, cfg_outdir: str, dotnanorc_file: str, timeout: int):
+    def __init__(self, console: Console, top_cfg: str, run_num_mgr: str, run_registry: str, timeout: int):
         super(NanoRC, self).__init__()     
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
         self.cfg = TopLevelConfigManager(top_cfg, self.console)
-        if dotnanorc_file != "":
-            dotnanorc_file = os.path.expanduser(dotnanorc_file)
-            self.console.print(f"[blue]Loading {dotnanorc_file}[/blue]")
-            f = open(dotnanorc_file)
-            self.dotnanorc = json.load(f)
-            credentials.add_login("rundb",
-                                  self.dotnanorc["rundb"]["user"],
-                                  self.dotnanorc["rundb"]["password"])
-            self.log.info("RunDB socket "+self.dotnanorc["rundb"]["socket"])
-            self.rnm = RunNumberDBManager(self.dotnanorc["rundb"]["socket"])
-        else:
-            self.rnm = SimpleRunNumberManager()
+        self.apparatus_id = self.cfg.apparatus_id
 
-        self.cfgsvr = ConfigSaver(self.cfg, cfg_outdir)
+        self.run_num_mgr = run_num_mgr
+        self.cfgsvr = run_registry
+        self.cfgsvr.topcfgmgr = self.cfg
+        self.cfgsvr.apparatus_id = self.apparatus_id
         self.timeout = timeout
         self.return_code = 0
 
@@ -193,22 +184,23 @@ class NanoRC:
                                        'INITIAL', 'CONFIGURED', raise_on_fail=True)
 
 
-    def start(self, disable_data_storage: bool) -> NoReturn:
+    def start(self, disable_data_storage: bool, run_type:str) -> NoReturn:
         """
         Sends start command to the applications
 
         Args:
             disable_data_storage (bool): Description
+            run_type (str): Description
         """
 
-        self.run = self.rnm.get_run_number()
+        self.run = self.run_num_mgr.get_run_number()
 
         runtime_start_data = {
                 "disable_data_storage": disable_data_storage,
                 "run": self.run,
             }
 
-        cfg_save_dir = self.cfgsvr.save_on_start(self.topnode, run=self.run,
+        cfg_save_dir = self.cfgsvr.save_on_start(self.topnode, run=self.run, run_type=run_type,
                                                  overwrite_data=runtime_start_data,
                                                  cfg_method="runtime_start")
 
@@ -223,8 +215,10 @@ class NanoRC:
         Sends stop command
         """
 
+        app_seq = getattr(self.cfg, 'stop_order', None)
         ok, failed = self.send_to_node(self.topnode, 'stop', None,
                                        'RUNNING', 'CONFIGURED', raise_on_fail=True)
+        self.cfgsvr.save_on_stop(self.run)
         self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
 
 

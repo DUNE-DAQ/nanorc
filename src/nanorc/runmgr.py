@@ -13,11 +13,11 @@ class SimpleRunNumberManager:
     def set_run_number(self, run:int):
         self.run_number = run
 
-class RunNumberDBManager:
+class DBRunNumberManager:
     """A class that interacts with the run number db"""
 
-    def __init__(self, socket):
-        super(RunNumberDBManager, self).__init__()
+    def __init__(self, socket:str):
+        super(DBRunNumberManager, self).__init__()
         self.log = logging.getLogger(self.__class__.__name__)
         self.run = None
         self.API_SOCKET=socket
@@ -27,17 +27,16 @@ class RunNumberDBManager:
         self.timeout = 2
         
     def get_run_number(self):
-        self._increment_run_number()
-        return self._get_run_number()
+        return self._getnew_run_number()
     
-    def _get_run_number(self):
+    def _getnew_run_number(self):
         try:
-            req = requests.get(self.API_SOCKET+'/runnumber/get',
+            req = requests.get(self.API_SOCKET+'/runnumber/getnew',
                                auth=(self.API_USER, self.API_PSWD),
                                timeout=self.timeout)
             req.raise_for_status()
         except requests.HTTPError as exc:
-            error = f"{__name__}: RunDB: Failed authentication"
+            error = f"{__name__}: HTTP Error (maybe failed auth, maybe ill-formed post message, ...)"
             self.log.error(error)
             raise RuntimeError(error) from exc
         except requests.ConnectionError as exc:
@@ -49,29 +48,6 @@ class RunNumberDBManager:
             self.log.error(error)
             raise RuntimeError(error) from exc
         
-        self.run = req.json()[0][0][0]
-        return self.run
-
-    def _increment_run_number(self):
-        try:
-            req = requests.get(self.API_SOCKET+'/runnumber/increment',
-                               auth=(self.API_USER, self.API_PSWD),
-                               timeout=self.timeout)
-            req.raise_for_status()
-        except requests.HTTPError as exc:
-            error = f"{__name__}: RunDB: Failed authentication"
-            self.log.error(error)
-            raise RuntimeError(error) from exc
-        except requests.ConnectionError as exc:
-            error = f"{__name__}: Connection to {self.API_SOCKET} wasn't successful"
-            self.log.error(error)
-            raise RuntimeError(error) from exc
-        except requests.Timeout as exc:
-            error = f"{__name__}: Connection to {self.API_SOCKET} timed out"
-            self.log.error(error)
-            raise RuntimeError(error) from exc
-        
-            
         self.run = req.json()[0][0][0]
         return self.run
 
@@ -82,7 +58,7 @@ class RunNumberDBManager:
                                timeout=self.timeout)
             req.raise_for_status()
         except requests.HTTPError as exc:
-            error = f"{__name__}: RunDB: Failed authentication"
+            error = f"{__name__}: HTTP Error (maybe failed auth, maybe ill-formed post message, ...)"
             self.log.error(error)
             raise RuntimeError(error) from exc
         except requests.ConnectionError as exc:
@@ -98,7 +74,7 @@ class RunNumberDBManager:
 
 
 def test_runmgr():
-    rnm = RunNumberDBManager()
+    rnm = DBRunNumberManager()
     rnm.get_run_number()
     print(f"Run: {rnm.run}")
     rnm.increment_run_number() 
