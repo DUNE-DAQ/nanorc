@@ -62,7 +62,8 @@ class ApplicationNode(NodeMixin):
         self.parent = parent
         # Absolutely no children for applicationnode
 
-
+    def send_command(self, *args, **kwargs):
+        raise RuntimeError("ERROR: You can't send a command directly to an application! Send it to the parent subsystem!")
 
 class SubsystemNode(NodeMixin):
     def __init__(self, name:str, cfgmgr, console, parent=None, children=None):
