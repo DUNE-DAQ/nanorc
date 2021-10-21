@@ -20,6 +20,7 @@ from rich.progress import *
 
 from nanorc.core import NanoRC
 from nanorc.runmgr import DBRunNumberManager
+from nanorc.cfgsvr import DBConfigSaver
 from nanorc.credmgr import credentials
 from .cli import *
 
@@ -58,9 +59,15 @@ def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, cfg_
         credentials.add_login("rundb",
                               dotnanorc["rundb"]["user"],
                               dotnanorc["rundb"]["password"])
+        credentials.add_login("runregistrydb",
+                              dotnanorc["runregistrydb"]["user"],
+                              dotnanorc["runregistrydb"]["password"])
         logging.getLogger("cli").info("RunDB socket "+dotnanorc["rundb"]["socket"])
-        rc = NanoRC(obj.console, cfg_dir, cfg_dumpdir,
-                    DBRunNumberManager(dotnanorc["rundb"]["socket"]), timeout)
+        logging.getLogger("cli").info("RunRegistryDB socket "+dotnanorc["runregistrydb"]["socket"])
+        rc = NanoRC(obj.console, cfg_dir,
+                    DBRunNumberManager(dotnanorc["rundb"]["socket"]),
+                    DBConfigSaver(dotnanorc["runregistrydb"]["socket"]),
+                    timeout)
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()
@@ -87,11 +94,13 @@ np04cli.add_command(wait, 'wait')
 np04cli.add_command(terminate, 'terminate')
 
 @np04cli.command('start')
+@click.argument('run-type', required=True,
+                type=click.Choice(['TEST', 'PROD']))
 @click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.option('--resume-wait', type=int, default=0, help='Seconds to wait between Start and Resume commands')
 @click.pass_obj
-def start(obj:NanoContext, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int):
+def start(obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int):
     """
     Start Command
 
@@ -100,7 +109,7 @@ def start(obj:NanoContext, disable_data_storage:bool, trigger_interval_ticks:int
         disable_data_storage (bool): Flag to disable data writing to storage
     """
 
-    obj.rc.start(disable_data_storage)
+    obj.rc.start(disable_data_storage, run_type)
     obj.rc.status()
     time.sleep(resume_wait)
     obj.rc.resume(trigger_interval_ticks)

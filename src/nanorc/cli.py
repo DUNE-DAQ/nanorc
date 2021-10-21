@@ -21,6 +21,7 @@ from rich.console import Console
 from rich.traceback import Traceback
 from rich.progress import *
 from nanorc.runmgr import SimpleRunNumberManager
+from nanorc.cfgsvr import SimpleConfigSaver
 from nanorc.core import NanoRC
 
 class NanoContext:
@@ -96,7 +97,10 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, cfg_dir):
         updateLogLevel(loglevel)
 
     try:
-        rc = NanoRC(obj.console, cfg_dir, cfg_dumpdir, SimpleRunNumberManager(), timeout)
+        rc = NanoRC(obj.console, cfg_dir,
+                    SimpleRunNumberManager(),
+                    SimpleConfigSaver(cfg_dumpdir),
+                    timeout)
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()
@@ -151,8 +155,7 @@ def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_
     """
 
     obj.rc.run_num_mgr.set_run_number(run)
-    
-    obj.rc.start(disable_data_storage)
+    obj.rc.start(disable_data_storage, "TEST")
     obj.rc.status()
     time.sleep(resume_wait)
     obj.rc.resume(trigger_interval_ticks)

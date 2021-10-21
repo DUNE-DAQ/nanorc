@@ -9,7 +9,7 @@ from rich.table import Table
 from rich.text import Text
 from .sshpm import SSHProcessManager
 from .cfgmgr import ConfigManager
-from .cfgsvr import ConfigSaver
+from .cfgsvr import SimpleConfigSaver, DBConfigSaver
 from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
 from .credmgr import credentials
 
@@ -23,13 +23,17 @@ from typing import Union, NoReturn
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
-    def __init__(self, console: Console, cfg_dir: str, cfg_dumpdir: str, run_num_mgr: str, timeout: int):
+    def __init__(self, console: Console, cfg_dir: str, run_num_mgr: str, run_registry: str, timeout: int):
         super(NanoRC, self).__init__()     
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
         self.cfg = ConfigManager(cfg_dir)
+        self.apparatus_id = "_".join(self.cfg.boot["apps"].keys())
+
         self.run_num_mgr = run_num_mgr
-        self.cfgsvr = ConfigSaver(self.cfg, cfg_dumpdir)
+        self.cfgsvr = run_registry
+        self.cfgsvr.cfgmgr = self.cfg
+        self.cfgsvr.apparatus_id = self.apparatus_id
         self.timeout = timeout
         self.return_code = 0
 
@@ -195,13 +199,14 @@ class NanoRC:
         ok, failed = self.send_many('conf', self.cfg.conf, 'INITIAL', 'CONFIGURED', sequence=app_seq, raise_on_fail=True)
 
 
-    def start(self, disable_data_storage: bool) -> NoReturn:
+    def start(self, disable_data_storage: bool, run_type:str) -> NoReturn:
         """
         Sends start command to the applications
         
         Args:
             run (int): Description
             disable_data_storage (bool): Description
+            run_type (str): Description
         """
 
         self.run = self.run_num_mgr.get_run_number()
@@ -212,7 +217,7 @@ class NanoRC:
             }
 
         start_data = self.cfg.runtime_start(runtime_start_data)
-        cfg_save_dir = self.cfgsvr.save_on_start(start_data, self.run)
+        cfg_save_dir = self.cfgsvr.save_on_start(start_data, self.run, run_type)
 
         app_seq = getattr(self.cfg, 'start_order', None)
         ok, failed = self.send_many('start', start_data, 'CONFIGURED', 'RUNNING', sequence=app_seq, raise_on_fail=True)
@@ -226,6 +231,7 @@ class NanoRC:
 
         app_seq = getattr(self.cfg, 'stop_order', None)
         ok, failed = self.send_many('stop', self.cfg.stop, 'RUNNING', 'CONFIGURED', sequence=app_seq, raise_on_fail=True)
+        self.cfgsvr.save_on_stop(self.run)
         self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
 
 
