@@ -31,7 +31,13 @@ class ConfigManager:
     """docstring for ConfigManager"""
 
     def __init__(self, cfg_dir):
-        super(ConfigManager, self).__init__()
+        super().__init__()
+
+        cfg_dir = os.path.expandvars(cfg_dir)
+        
+        if not (os.path.exists(cfg_dir) and os.path.isdir(cfg_dir)):
+            raise RuntimeError(f"'{cfg_dir}' does not exist or is not a directory")
+
         self.cfg_dir = cfg_dir
 
         self._load()
@@ -119,6 +125,7 @@ class ConfigManager:
         :returns:   Complete parameter set.
         :rtype:     dict
         """
+
         start = copy.deepcopy(self.start)
 
         for c in json_extract(start, "modules"):

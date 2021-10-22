@@ -14,6 +14,7 @@ import click
 import click_shell
 import os.path
 import logging
+from anytree.resolver import Resolver
 
 from rich.table import Table
 from rich.panel import Panel
@@ -69,6 +70,19 @@ def updateLogLevel(loglevel):
         for handler in sh_command_logger.handlers:
             handler.setLevel(sh_command_level)
 
+def validatePath(ctx, param, prompted_path):
+    hierarchy = prompted_path.split("/")
+
+    topnode = ctx.obj.rc.topnode
+
+    r = Resolver('name')
+    try:
+        node = r.get(topnode, prompted_path)
+    except Exception as ex:
+        raise click.BadParameter(f"Couldn't find {prompted_path} in the tree") from ex
+
+    return hierarchy
+
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
@@ -76,10 +90,10 @@ def updateLogLevel(loglevel):
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 
-@click.argument('cfg_dir', type=click.Path(exists=True))
+@click.argument('top_cfg', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, cfg_dir):
+def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, top_cfg):
 
     obj.print_traceback = traceback
 
@@ -97,7 +111,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, cfg_dir):
         updateLogLevel(loglevel)
 
     try:
-        rc = NanoRC(obj.console, cfg_dir,
+        rc = NanoRC(obj.console, top_cfg,
                     SimpleRunNumberManager(),
                     SimpleConfigSaver(cfg_dumpdir),
                     timeout)
@@ -126,15 +140,23 @@ def boot(obj):
     obj.rc.status()
 
 @cli.command('init')
+@click.argument('path', type=str, default="", callback=validatePath)
 @click.pass_obj
-def init(obj):
-    obj.rc.init()
+def init(obj, path):
+    obj.rc.init(path)
     obj.rc.status()
 
-@cli.command('conf')
+@cli.command('ls')
 @click.pass_obj
-def conf(obj):
-    obj.rc.conf()
+def ls(obj):
+    obj.rc.ls()
+
+
+@cli.command('conf')
+@click.argument('path', type=str, default="", callback=validatePath)
+@click.pass_obj
+def conf(obj, path):
+    obj.rc.conf(path)
     obj.rc.status()
 
 @cli.command('start')
@@ -158,42 +180,45 @@ def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_
     obj.rc.start(disable_data_storage, "TEST")
     obj.rc.status()
     time.sleep(resume_wait)
-    obj.rc.resume(trigger_interval_ticks)
+    obj.rc.resume(None, trigger_interval_ticks)
     obj.rc.status()
 
 @cli.command('stop')
 @click.option('--stop-wait', type=int, default=0, help='Seconds to wait between Pause and Stop commands')
 @click.pass_obj
 def stop(obj, stop_wait:int):
-    obj.rc.pause()
+    obj.rc.pause(None)
     obj.rc.status()
     time.sleep(stop_wait)
     obj.rc.stop()
     obj.rc.status()
 
 @cli.command('pause')
+@click.argument('path', type=str, default="", callback=validatePath)
 @click.pass_obj
-def pause(obj):
-    obj.rc.pause()
+def pause(obj, path):
+    obj.rc.pause(path)
     obj.rc.status()
 
 @cli.command('resume')
+@click.argument('path', type=str, default="", callback=validatePath)
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.pass_obj
-def resume(obj:NanoContext, trigger_interval_ticks:int):
+def resume(obj:NanoContext, path:str, trigger_interval_ticks:int):
     """Resume Command
     
     Args:
         obj (NanoContext): Context object
         trigger_interval_ticks (int): Trigger separation in ticks
     """
-    obj.rc.resume(trigger_interval_ticks)
+    obj.rc.resume(path, trigger_interval_ticks)
     obj.rc.status()
 
 @cli.command('scrap')
+@click.argument('path', type=str, default="", callback=validatePath)
 @click.pass_obj
-def scrap(obj):
-    obj.rc.scrap()
+def scrap(obj, path):
+    obj.rc.scrap(path)
     obj.rc.status()
 
 @cli.command('terminate')
