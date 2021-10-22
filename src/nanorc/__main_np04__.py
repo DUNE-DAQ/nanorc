@@ -38,7 +38,7 @@ from .cli import *
 def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, cfg_dir):
     obj.print_traceback = traceback
 
-    grid = Table(title='Shonky NanoRC', show_header=False, show_edge=False)
+    grid = Table(title='Shonky Nano04RC', show_header=False, show_edge=False)
     grid.add_column()
     grid.add_row("This is an admittedly shonky nanp RC to control DUNE-DAQ applications.")
     grid.add_row("  Give it a command and it will do your biddings,")

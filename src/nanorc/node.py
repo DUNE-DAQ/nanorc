@@ -147,6 +147,7 @@ class GroupNode(NodeMixin):
             child.boot()
         return 0
 
+
 # Now on to useful stuff
 class ApplicationNode(NodeMixin):
     def __init__(self, name, sup, parent=None):
@@ -160,6 +161,7 @@ class ApplicationNode(NodeMixin):
 
     def send_command(self, *args, **kwargs):
         raise RuntimeError("ERROR: You can't send a command directly to an application! Send it to the parent subsystem!")
+
 
 class SubsystemNode(NodeMixin):
     def __init__(self, name:str, cfgmgr, console, parent=None, children=None):
