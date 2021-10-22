@@ -1,13 +1,16 @@
-from anytree import NodeMixin
+from anytree import NodeMixin, RenderTree, PreOrderIter
+from anytree.resolver import Resolver
 import time
 from datetime import datetime
+from rich.console import Console
+from rich.table import Table
+from rich.text import Text
 
 import logging
 from .sshpm import SSHProcessManager
 from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
 from typing import Union, NoReturn
 
-# This one is just to give a nicer name
 class GroupNode(NodeMixin):
     def __init__(self, name:str, parent=None, children=None):
         self.name = name
@@ -16,36 +19,125 @@ class GroupNode(NodeMixin):
         if children:
             self.children = children
 
-    def send_command(self, cmd:str,
+
+    def print_status(self, apparatus_id:str=None, console:Console=None) -> int:
+        if apparatus_id:
+            table = Table(title=f"{apparatus_id} apps")
+        else:
+            table = Table(title=f"{apparatus_id} apps")
+        table.add_column("name", style="blue")
+        table.add_column("host", style="magenta")
+        table.add_column("alive", style="magenta")
+        table.add_column("pings", style="magenta")
+        table.add_column("last cmd")
+        table.add_column("last succ. cmd", style="green")
+
+        for pre, _, node in RenderTree(self):
+            if isinstance(node, ApplicationNode):
+                sup = node.sup
+                alive = sup.desc.proc.is_alive()
+                ping  = sup.commander.ping()
+                last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
+                table.add_row(
+                    pre+node.name,
+                    sup.desc.host,
+                    str(alive),
+                    str(ping),
+                    Text(str(sup.last_sent_command), style=('bold red' if last_cmd_failed else '')),
+                    str(sup.last_ok_command)
+                )
+
+            else:
+                table.add_row(pre+node.name)
+
+        console.print(table)
+
+    def print(self, leg:bool=False, console:Console=None) -> int:
+        if console:
+            print_func = console.print
+        else:
+            print_func = print
+
+        try:
+            for pre, _, node in RenderTree(self):
+                if node == self:
+                    print_func(f"{pre}[red]{node.name}[/red]")
+                elif isinstance(node, SubsystemNode):
+                    print_func(f"{pre}[yellow]{node.name}[/yellow]")
+                elif isinstance(node, ApplicationNode):
+                    print_func(f"{pre}[blue]{node.name}[/blue]")
+                else:
+                    print_func(f"{pre}{node.name}")
+
+            if leg:
+                print_func("\nLegend:")
+                print_func(" - [red]top node[/red]")
+                print_func(" - [yellow]subsystems[/yellow]")
+                print_func(" - [blue]applications[/blue]\n")
+
+        except Exception as ex:
+            self.log.error(f"Tree is corrupted!")
+            self.return_code = 14
+            raise RuntimeError(f"Tree is corrupted")
+        return 0
+
+    def send_command(self, path:[str], cmd:str,
                      state_entry:str, state_exit:str,
                      cfg_method:str=None, overwrite_data:dict={},
-                     timeout:int=None) -> tuple:
-        self.log.debug(f"Sending {cmd} to {self.name}")
+                     raise_on_fail:bool=True,
+                     timeout:int=None) -> int:
+        if path:
+            r = Resolver('name')
+            prompted_path = "/".join(path)
+            print(f"node.send_command prompted path {prompted_path}")
+            node = r.get(self, prompted_path)
+        else:
+            node = self
 
-        if not self.children:
-            return
+        self.log.debug(f"Sending {cmd} to {node.name}")
 
-        ok, failed = {},{}
+        if not node: return
+
+        ok, failed = node._propagate_command(cmd=cmd, state_entry=state_entry, state_exit=state_exit,
+                                             cfg_method=cfg_method, overwrite_data=overwrite_data,
+                                             timeout=timeout)
+
+        if raise_on_fail and len(failed)>0:
+            self.log.error(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
+            self.return_code = 13
+            for a,r in failed.items():
+                self.log.error(f"{a}: {r}")
+            raise RuntimeError(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
+
+        return 0
+
+
+    def _propagate_command(self, cmd:str, state_entry:str, state_exit:str,
+                          cfg_method:str=None, overwrite_data:dict={},
+                          timeout:int=None) -> tuple:
+
+        ok, failed = {}, {}
 
         for child in self.children:
-            o, f = child.send_command(cmd=cmd,
-                                      state_entry = state_entry, state_exit = state_exit,
-                                      cfg_method = cfg_method, overwrite_data = overwrite_data,
-                                      timeout = timeout)
+            o, f = child._propagate_command(cmd=cmd,
+                                           state_entry = state_entry, state_exit = state_exit,
+                                           cfg_method = cfg_method, overwrite_data = overwrite_data,
+                                           timeout = timeout)
             ok.update(o)
             failed.update(f)
 
         return (ok, failed)
 
-    def terminate(self)-> NoReturn:
+    def terminate(self) -> int:
         self.log.debug(f"Sending terminate to {self.name}")
         if not self.children:
             return
 
         for child in self.children:
             child.terminate()
+        return 0
 
-    def boot(self) -> NoReturn:
+    def boot(self) -> int:
         self.log.debug(f"Sending boot to {self.name}")
 
         if not self.children:
@@ -53,6 +145,7 @@ class GroupNode(NodeMixin):
 
         for child in self.children:
             child.boot()
+        return 0
 
 # Now on to useful stuff
 class ApplicationNode(NodeMixin):
@@ -61,6 +154,9 @@ class ApplicationNode(NodeMixin):
         self.sup = sup
         self.parent = parent
         # Absolutely no children for applicationnode
+
+    def _propagate_command(self, *args, **kwargs):
+        raise RuntimeError("ERROR: You can't send a command directly to an application! Send it to the parent subsystem!")
 
     def send_command(self, *args, **kwargs):
         raise RuntimeError("ERROR: You can't send a command directly to an application! Send it to the parent subsystem!")
@@ -108,10 +204,10 @@ class SubsystemNode(NodeMixin):
             self.pm.terminate()
 
 
-    def send_command(self, cmd:str,
-                     state_entry:str, state_exit:str,
-                     cfg_method:str=None, overwrite_data:dict={},
-                     timeout:int=None) -> tuple:
+    def _propagate_command(self, cmd:str,
+                          state_entry:str, state_exit:str,
+                          cfg_method:str=None, overwrite_data:dict={},
+                          timeout:int=None) -> tuple:
         self.log.debug(f"Sending {cmd} to {self.name}")
 
         sequence = getattr(self.cfgmgr, cmd+'_order', None)

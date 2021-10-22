@@ -112,7 +112,7 @@ def start(obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_inte
     obj.rc.start(disable_data_storage, run_type)
     obj.rc.status()
     time.sleep(resume_wait)
-    obj.rc.resume(obj.rc.topnode,trigger_interval_ticks)
+    obj.rc.resume(None,trigger_interval_ticks)
     obj.rc.status()
 
 
