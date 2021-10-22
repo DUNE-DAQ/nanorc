@@ -163,7 +163,7 @@ class DBConfigSaver:
 
         with tempfile.TemporaryDirectory() as dir_name:
             dname = dir_name
-            json_object = json.dumps(self.topcfgmgr.top_cfg, indent = 4)
+            json_object = json.dumps(self.cfgmgr.top_cfg, indent=4)
             with open(dname+"/top_config.json", "w") as outfile:
                 outfile.write(json_object)
             
