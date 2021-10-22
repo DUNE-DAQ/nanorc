@@ -34,7 +34,8 @@ class ConfigManager:
         super().__init__()
 
         cfg_dir = os.path.expandvars(cfg_dir)
-        if not (os.path.exists(cfg_dir) and os.path.isdir()):
+        
+        if not (os.path.exists(cfg_dir) and os.path.isdir(cfg_dir)):
             raise RuntimeError(f"'{cfg_dir}' does not exist or is not a directory")
 
         self.cfg_dir = cfg_dir
