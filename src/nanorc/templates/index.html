@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+    <head>
+        <title>{{ title }}</title>
+    </head>
+    <body>
+      <p>Top level config: <code>{{ top_level }}</code></p>
+      <hr>
+      <p>Last action: <code>{{ last_action }}</code></p>
+      <hr>
+      <p>
+      {% for button in buttons %}
+        {{ button|safe }}
+      {% endfor %}
+      </p>
+      <hr>
+      <p>App status
+        {{ status|safe }}
+      </p>
+      <hr>
+    </body>
+    <foot>
+      User: {{ username }}
+    </foot>
+</html>
