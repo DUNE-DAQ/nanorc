@@ -1,5 +1,6 @@
 from .node import GroupNode, SubsystemNode
 from .cfgmgr import ConfigManager
+import os
 import json
 from collections import OrderedDict
 from json import JSONDecoder
@@ -14,7 +15,7 @@ def dict_raise_on_duplicates(ordered_pairs):
             d[k]=v
     return d
 
-class TopLevelConfigManager:
+class TreeBuilder:
     def extract_json_to_nodes(self, js, mother) -> GroupNode:
         for n,d in js.items():
             if isinstance(d, dict):
@@ -29,12 +30,22 @@ class TopLevelConfigManager:
                 raise RuntimeError(f"ERROR processing the tree {n}: {d} I don't know what that's supposed to mean?")
 
     def __init__(self, top_cfg, console):
-        f = open(top_cfg, 'r')
+        if os.path.isdir(top_cfg):
+            data = {
+                "apparatus_id": top_cfg,
+                top_cfg:top_cfg
+            }
+            data = json.dumps(data)
+        elif os.path.isfile(top_cfg):
+            f = open(top_cfg, 'r')
+            data = f.read()
+        else:
+            raise RuntimeError(f"{top_cfg} You must provide either a top level json file or a directory name")
+            
         self.console = console
+        
         try:
-            # decoder = JSONDecoder(object_pairs_hook=dict_raise_on_duplicates)
-            # self.top_cfg = decoder.decode(f)
-            self.top_cfg = json.load(f, object_pairs_hook=dict_raise_on_duplicates)
+            self.top_cfg = json.loads(data, object_pairs_hook=dict_raise_on_duplicates)
             
         except Exception as e:
             raise RuntimeError("Failed to parse your top level json, please check it again") from e

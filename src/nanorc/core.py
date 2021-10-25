@@ -7,7 +7,7 @@ from rich.style import Style
 from rich.pretty import Pretty
 from .node import GroupNode
 # from .sshpm import SSHProcessManager
-from .topcfgmgr import TopLevelConfigManager
+from .treebuilder import TreeBuilder
 from .cfgsvr import SimpleConfigSaver, DBConfigSaver
 # from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
 from .credmgr import credentials
@@ -25,7 +25,7 @@ class NanoRC:
         super(NanoRC, self).__init__()     
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
-        self.cfg = TopLevelConfigManager(top_cfg, self.console)
+        self.cfg = TreeBuilder(top_cfg, self.console)
         self.apparatus_id = self.cfg.apparatus_id
 
         self.run_num_mgr = run_num_mgr
