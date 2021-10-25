@@ -39,7 +39,6 @@ class TreeBuilder:
         elif os.path.isfile(top_cfg):
             f = open(top_cfg, 'r')
             data = f.read()
-            print(data)
         else:
             raise RuntimeError(f"{top_cfg} You must provide either a top level json file or a directory name")
             
