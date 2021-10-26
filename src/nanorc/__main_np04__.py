@@ -12,6 +12,7 @@ import click_shell
 import os.path
 import logging
 
+from . import __version__
 from rich.table import Table
 from rich.panel import Panel
 from rich.console import Console
@@ -26,6 +27,7 @@ from .cli import *
 
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky np04rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
+@click.version_option(__version__)
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')

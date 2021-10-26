@@ -99,15 +99,13 @@ class ResponseListener:
         
         self.handlers[app] = handler
 
-    def unregister(self, app: str):
+    def unregister(self, app: str) -> NoReturn:
         """
         De-register a notification handler
         
-        :param      app:  The application
-        :type       app:  str
+        Args:
+            app (str): application name
         
-        :returns:   { description_of_the_return_value }
-        :rtype:     { return_type_description }
         """
         if not app in self.handlers:
             return RuntimeError(f"No handler registered for app {app}")
@@ -236,7 +234,8 @@ class AppSupervisor:
         )
         self.last_sent_command = None
         self.last_ok_command = None
-        listener.register(desc.name, self.commander)
+        self.listener = listener
+        self.listener.register(desc.name, self.commander)
 
     def send_command(
             self,
@@ -275,6 +274,7 @@ class AppSupervisor:
         return self.check_response(timeout)
 
     def terminate(self):
+        self.listener.unregister(self.desc.name)
         del self.commander
 
 

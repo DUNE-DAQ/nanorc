@@ -14,8 +14,9 @@ import click
 import click_shell
 import os.path
 import logging
-from anytree.resolver import Resolver
 
+from . import __version__
+from anytree.resolver import Resolver
 from rich.table import Table
 from rich.panel import Panel
 from rich.console import Console
@@ -85,11 +86,11 @@ def validatePath(ctx, param, prompted_path):
 
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
+@click.version_option(__version__)
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
-
 @click.argument('top_cfg', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
