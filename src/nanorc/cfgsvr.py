@@ -194,7 +194,7 @@ class DBConfigSaver:
 
             with open(fname, "rb") as f:
                 files = {'file': f}
-                post_data = {"run_num": 1,
+                post_data = {"run_num": run,
                              "det_id": self.apparatus_id,
                              "run_type": run_type,
                              ## Big hack of the version!
