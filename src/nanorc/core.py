@@ -62,7 +62,7 @@ class NanoRC:
         """
 
         self.return_code = self.topnode.boot()
-
+        print("exiting boot")
 
     def terminate(self) -> NoReturn:
         """

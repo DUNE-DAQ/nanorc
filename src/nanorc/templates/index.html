@@ -1,22 +1,64 @@
 <!doctype html>
 <html>
     <head>
-        <title>{{ title }}</title>
+        <title>nanorc web {{ title }}</title>
     </head>
     <body>
+      <script>
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '{{ url_for('statusstream') }}');
+        xhr.send();
+        var position = 0;
+        
+        function handleNewData() {
+            // the response text include the entire response so far
+            // split the messages, then take the messages that haven't been handled yet
+            // position tracks how many messages have been handled
+            // messages end with a newline, so split will always show one extra empty message at the end
+            var nanorcstatus = document.getElementById('nanorcstatus')
+            const messages = xhr.responseText.split('<code>');
+            if (messages.length < 1) {
+                return
+            }
+            const  message = messages[messages.length-1]
+            console.log(messages);
+            nanorcstatus.innerHTML = message;
+            
+            // output = xhr.responseText;
+            // var messages = xhr.responseText.split('\n');
+            // messages.slice(position, -1).forEach(function(value) {
+            //     latest.textContent = value;  // update the latest value in place
+            //     // build and append a new item to a list to log all output
+            //     var item = document.createElement('li');
+            //     item.textContent = value;
+            //     output.appendChild(item);
+            // });
+            // position = 0;//messages.length - 1;
+        }
+
+        var timer;
+        timer = setInterval(function() {
+            // check the response for new data
+            handleNewData();
+            // stop checking once the response has ended
+            if (xhr.readyState == XMLHttpRequest.DONE) {
+                clearInterval(timer);
+            }
+        }, 1000);
+      </script>
+
       <p>Top level config: <code>{{ top_level }}</code></p>
       <hr>
       <p>Last action: <code>{{ last_action }}</code></p>
       <hr>
+      <!-- sdfsdfg -->
       <p>
       {% for button in buttons %}
         {{ button|safe }}
       {% endfor %}
       </p>
       <hr>
-      <p>App status
-        {{ status|safe }}
-      </p>
+      <div id='nanorcstatus'></div>
       <hr>
     </body>
     <foot>

@@ -5,8 +5,10 @@ Command Line Interface for NanoRC
 """
 
 import click
-from flask import Flask, render_template, request, make_response
+import time
+from flask import Flask, render_template, request, make_response, stream_with_context, render_template_string, url_for, redirect
 from nanorc.auth import auth
+from threading import Thread
 # from flask_sso import SSO
 
 from rich.console import Console
@@ -38,16 +40,16 @@ app = Flask("nanorc")
 #     session['user'] = user_info
 
 html_buttons = {
-    "status":"<form method=\"GET\" action=\"/\"><input type=\"submit\" value=\"STATUS\" name=\"button\"/></form>",
-    "boot":"<form method=\"POST\" action=\"/\"><input type=\"submit\" value=\"BOOT\" name=\"button\"/></form>",
-    "init":"<form method=\"POST\" action=\"/\"><input type=\"submit\" value=\"INIT\" name=\"button\"/></form>",
-    "conf":"<form method=\"POST\" action=\"/\"><input type=\"submit\" value=\"CONF\" name=\"button\"/></form>",
-    "start":"<form method=\"POST\" action=\"/\"><input type=\"submit\" value=\"START\" name=\"button\"/></form>",
-    "stop":"<form method=\"POST\" action=\"/\"><input type=\"submit\" value=\"STOP\" name=\"button\"/></form>",
-    "scrap":"<form method=\"POST\" action=\"/\"><input type=\"submit\" value=\"SCRAP\" name=\"button\"/></form>",
-    "terminate":"<form method=\"POST\" action=\"/\"><input type=\"submit\" value=\"TERMINATE\" name=\"button\"/></form>",
-    "pause":"<form method=\"POST\" action=\"/\"><input type=\"submit\" value=\"PAUSE\" name=\"button\"/></form>",
-    "resume":"<form method=\"POST\" action=\"/\"><input type=\"submit\" value=\"RESUME\" name=\"button\"/></form>"
+    "status":"<form method=\"GET\" action=\"/sendcmd\"><input type=\"submit\" value=\"STATUS\" name=\"button\"/></form>",
+    "boot":"<form method=\"POST\" action=\"/sendcmd\"><input type=\"submit\" value=\"BOOT\" name=\"button\"/></form>",
+    "init":"<form method=\"POST\" action=\"/sendcmd\"><input type=\"submit\" value=\"INIT\" name=\"button\"/></form>",
+    "conf":"<form method=\"POST\" action=\"/sendcmd\"><input type=\"submit\" value=\"CONF\" name=\"button\"/></form>",
+    "start":"<form method=\"POST\" action=\"/sendcmd\"><input type=\"submit\" value=\"START\" name=\"button\"/></form>",
+    "stop":"<form method=\"POST\" action=\"/sendcmd\"><input type=\"submit\" value=\"STOP\" name=\"button\"/></form>",
+    "scrap":"<form method=\"POST\" action=\"/sendcmd\"><input type=\"submit\" value=\"SCRAP\" name=\"button\"/></form>",
+    "terminate":"<form method=\"POST\" action=\"/sendcmd\"><input type=\"submit\" value=\"TERMINATE\" name=\"button\"/></form>",
+    "pause":"<form method=\"POST\" action=\"/sendcmd\"><input type=\"submit\" value=\"PAUSE\" name=\"button\"/></form>",
+    "resume":"<form method=\"POST\" action=\"/sendcmd\"><input type=\"submit\" value=\"RESUME\" name=\"button\"/></form>"
 }
 @app.after_request
 def add_header(response):
@@ -57,47 +59,60 @@ def add_header(response):
         response.headers['Cache-Control'] = 'public, max-age=0'
     return response
 
-@app.route('/', methods=["GET","POST"])
-@app.route('/index', methods=["GET","POST"])
-@auth.login_required
-def index():
-    global last_action
+@app.route("/statusstream")
+def statusstream():
+    @stream_with_context
+    def generate():
+        counter = 0 
+        while True:
+            if rc_context:
+                text=rc_context.rc.console.export_html()
+                rc_context.rc.status()
+                status_text=rc_context.rc.console.export_html()
+                start=status_text.find("<body>")
+                end=status_text.find("</body>")
+                status_text=status_text[start+6:end]
+                title_text=rc_context.rc.apparatus_id+str(counter)
+                counter+=1
+                yield f"{counter} {status_text}<!-- separator -->"
+                time.sleep(2)
+            else:
+                return
+
+    return app.response_class(generate())
+
+@app.route('/sendcmd', methods=['POST'])
+def sendcmd():
     if rc_context:
         if request.method == "POST":
             if request.form.get('button') == 'BOOT':
                 last_action = "BOOT"
                 print("BOOTING")
-                rc_context.rc.boot()
+                Thread(target=rc_context.rc.boot).start()
+                print("BOOTING2")
                 
             elif request.form.get('button') == 'TERMINATE':
                 last_action = "TERMINATE"
                 print("TERMINATING")
-                rc_context.rc.terminate()
+                Thread(target=rc_context.rc.terminate).start()
+                print("TERMINATING2")
             else:
                 pass
         else:
             pass
-        
-        rc_context.rc.status()
-        text=rc_context.rc.console.export_html()
-        start=text.find("<body>")
-        end=text.find("</body>")
-        text=text[start+6:end]
-        content = {
-            "last_action": last_action,
-            "title" : rc_context.rc.apparatus_id,
-            "status" : text,
-            "top_level" : rc_context.top_json,
-            "buttons" : [html_buttons["status"],html_buttons["boot"],html_buttons["terminate"]],
-            "username": "Bruno Pontecorvo"#request.form.get("current_user")["name"]
-        }
-        
-        response = make_response(render_template("index.html", **content))
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        response.headers['Pragma'] = 'no-cache'
-        return response
+    return redirect(url_for("index"))
+    
+@app.route('/')
+@app.route('/index')
+@auth.login_required
+def index():
+    if rc_context:
+        return render_template("index.html",
+                               title=rc_context.rc.apparatus_id,
+                               top_level=rc_context.rc.cfg.top_cfg,
+                               buttons=[html_buttons["boot"], html_buttons["terminate"]])
     else:
-        return "No NanoRC instance!"
+        return "Best thing since light saber"
 
 @click.command()
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
@@ -131,9 +146,8 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, top_cfg):
                         timeout)
         rc_context = obj
         rc_context.top_json = top_cfg
-        rc_context.rc =rc
-        print(rc_context.rc)
-        app.run(host='0.0.0.0', port=5000, debug=True)
+        rc_context.rc = rc
+        app.run(host='0.0.0.0', port=5001, debug=True, use_reloader=False )
 
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
@@ -147,8 +161,9 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, top_cfg):
     ctx.call_on_close(cleanup_rc)
     
 def main():
+    print("main")
     global rc_context
-    global last_action
+    # global last_action
     from rich.logging import RichHandler
 
     logging.basicConfig(
@@ -175,4 +190,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
