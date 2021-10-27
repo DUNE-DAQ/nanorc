@@ -1,12 +1,10 @@
 <!doctype html>
 <html>
     <head>
-        <title>nanorc web {{ title }}</title>
-	{{css|safe}}
+        <title>{{ title }}</title>
     </head>
     <body>
       <p>Top level config: <code>{{ top_level }}</code></p>
-      <p>Current run: {{ run }}</p>
       <hr>
       <p>Last action: <code>{{ last_action }}</code></p>
       <hr>
@@ -16,10 +14,9 @@
       {% endfor %}
       </p>
       <hr>
-      {{ nanorc_status|safe }}
-      <hr>
-      <p>Logs:</p>
-      <div id='logelement'></div>
+      <p>App status
+        {{ status|safe }}
+      </p>
       <hr>
     </body>
     <foot>

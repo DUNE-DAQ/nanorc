@@ -7,7 +7,7 @@ NanoRC's REST API
 import click
 import time
 import re
-from flask import Flask, render_template, request, make_response, stream_with_context, render_template_string, url_for, redirect
+from flask import Flask, render_template, request, make_response, stream_with_context, render_template_string, url_for, redirect, jsonify
 from flask_restful import Api, Resource
 
 from nanorc.auth import auth
@@ -28,52 +28,47 @@ rc_context = None
 app = Flask("nanorc_rest_api")
 api = Api(app)
 
-def return_code(return_code):
+def convert_nanorc_return_code(return_code:int):
     return 200 if return_code == 0 else 500
 
-@api.resource('/nanorcrest/sendcmd', methods=['POST'])
+@api.resource('/nanorcrest/sendCmd', methods=['POST'])
 class sendcmd(Resource):
     @auth.login_required
     def post(self):
+        print("got an call!")
         try:
-            # Flush the console
-            _=rc_context.rc.console.export_html()
-            
-            if request.form['cmd'] == 'BOOT':
-                target = rc_context.rc.boot()
-                resp = make_response(rc_context.rc.console.export_html(), return_code(target))
-            elif request.form['cmd'] == 'TERMINATE':
-                target = rc_context.rc.terminate()
-                resp = make_response(rc_context.rc.console.export_html(), return_code(target))
-            elif request.form['cmd'] == 'STATUS':
-                target = rc_context.rc.status()
-                resp = make_response(rc_context.rc.console.export_html(), return_code(target))
-            elif request.form['cmd'] == 'INIT':
-                target = rc_context.rc.init()
-                resp = make_response(rc_context.rc.console.export_html(), return_code(target))
-            elif request.form['cmd'] == 'CONF':
-                target = rc_context.rc.conf()
-                resp = make_response(rc_context.rc.console.export_html(), return_code(target))
-            elif request.form['cmd'] == 'START':
-                target = rc_context.rc.start()
-                resp = make_response(rc_context.rc.console.export_html(), return_code(target))
-            elif request.form['cmd'] == 'STOP':
-                target = rc_context.rc.stop()
-                resp = make_response(rc_context.rc.console.export_html(), return_code(target))
-            elif request.form['cmd'] == 'PAUSE':
-                target = rc_context.rc.pause()
-                resp = make_response(rc_context.rc.console.export_html(), return_code(target))
-            elif request.form['cmd'] == 'RESUME':
-                target = rc_context.rc.resume()
-                resp = make_response(rc_context.rc.console.export_html(), return_code(target))
-            elif request.form['cmd'] == 'SCRAP':
-                target = rc_context.rc.scrap()
-                resp = make_response(rc_context.rc.console.export_html(), return_code(target))
+            if   request.form['cmd'] == 'BOOT':      method = rc_context.rc.boot
+            elif request.form['cmd'] == 'TERMINATE': method = rc_context.rc.terminate
+            elif request.form['cmd'] == 'STATUS':    method = rc_context.rc.status # humm
+            elif request.form['cmd'] == 'INIT':      method = rc_context.rc.init
+            elif request.form['cmd'] == 'CONF':      method = rc_context.rc.conf
+            elif request.form['cmd'] == 'START':     method = rc_context.rc.start
+            elif request.form['cmd'] == 'STOP':      method = rc_context.rc.stop
+            elif request.form['cmd'] == 'PAUSE':     method = rc_context.rc.pause
+            elif request.form['cmd'] == 'RESUME':    method = rc_context.rc.resume
+            elif request.form['cmd'] == 'SCRAP':     method = rc_context.rc.scrap
             else:
                 raise RuntimeError(f"I don't know of command {request.form['cmd']}")
+            
+            ## TODO put this in a Thread? and immediately return an ack?
+            return_code = method()
+
+            # Flush the console
+            _=rc_context.rc.console.export_html()
+            rc_context.rc.status()
+            
+            data = {
+                "console_html": rc_context.rc.console.export_html(),
+                "top_cfg"     : rc_context.top_json,
+                "apparatus_id": rc_context.rc.apparatus_id,
+                "sent_cmd"    : request.form['cmd'],
+                "run_number"  : rc_context.rc.run
+            }
+            resp = make_response(data, convert_nanorc_return_code(return_code))
+
         except Exception as e:
             print(e)
-            resp = make_response(e.text)
+            resp = make_response(jsonify({"Exception": str(e)}))
 
         return resp
     
@@ -116,7 +111,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, host, port, top_cfg
         rc_context = obj
         rc_context.top_json = top_cfg
         rc_context.rc = rc
-        print(f"Starting up on {host}:{port}")
+        obj.console.log(f"Starting up on {host}:{port}")
         app.run(host=host, port=port, debug=True, use_reloader=False)
 
     except Exception as e:
