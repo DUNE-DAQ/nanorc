@@ -6,9 +6,11 @@ Command Line Interface for NanoRC
 
 import click
 import time
+import re
 from flask import Flask, render_template, request, make_response, stream_with_context, render_template_string, url_for, redirect
 from nanorc.auth import auth
 from threading import Thread
+from nanorc.tail import Tail
 # from flask_sso import SSO
 
 from rich.console import Console
@@ -53,7 +55,6 @@ html_buttons = {
 }
 @app.after_request
 def add_header(response):
-    print("add header")
     response.headers['X-UA-Compatible'] = 'IE=Edge,chrome=1'
     if ('Cache-Control' not in response.headers):
         response.headers['Cache-Control'] = 'public, max-age=0'
@@ -72,48 +73,96 @@ def statusstream():
                 start=status_text.find("<body>")
                 end=status_text.find("</body>")
                 status_text=status_text[start+6:end]
-                title_text=rc_context.rc.apparatus_id+str(counter)
                 counter+=1
-                ### How nice would it be, if <!-- separator --> could actually be the separator
-                ### Unfortunately, it gets stripped somewhere, and in index.html, we have to use <code>
-                ### to separate, which is extremely distaceful
-                yield f"{counter} {status_text}<!-- separator -->"
+                yield f"Frame: {counter} {status_text}<!-- separator -->"
                 time.sleep(2)
             else:
                 return
 
     return app.response_class(generate())
 
+@app.route("/taillog")
+def taillog():
+    @stream_with_context
+    def generate():
+        tails = []
+        logs = []
+        
+        def callback(line):
+            return logs.append(line)
+        
+        while True:
+            for f in os.listdir("."):
+                if re.match("log_.*txt", f):
+                    t = Tail(f)
+                    t.register_callback(callback)
+                    tails.append(Thread(target=t.follow).start())
+                    
+            time.sleep(1)
+            if len(tails):
+                break
+        print(f"yay threads {len(tails)}")
+                
+        while True:
+            # print("<!-- separator-->".join(log))
+            yield "lots_of_log"
+            time.sleep(1)
+            
+    return app.response_class(generate())
+            
+## We need to execute this as fast as possible,
+## and redirect the user to index...
+## Otherwise, in a frenzy, he/she might hit refresh.
+## God only knows what happens in this case
 @app.route('/sendcmd', methods=['POST'])
 def sendcmd():
     if rc_context:
         if request.method == "POST":
             if request.form.get('button') == 'BOOT':
-                last_action = "BOOT"
-                print("BOOTING")
                 Thread(target=rc_context.rc.boot).start()
-                print("BOOTING2")
+                messages = json.dumps({"cmd":"BOOT"})
+                resp = redirect(url_for("index", messages=messages))
+                return resp
                 
             elif request.form.get('button') == 'TERMINATE':
-                last_action = "TERMINATE"
-                print("TERMINATING")
+                sent_cmd = "TERMINATE"
                 Thread(target=rc_context.rc.terminate).start()
-                print("TERMINATING2")
-            else:
-                pass
-        else:
-            pass
-    return redirect(url_for("index"))
+                messages = json.dumps({"cmd":"TERMINATE"})
+                resp = redirect(url_for("index", messages=messages))
+                return resp
+    
+    resp = make_response(redirect(url_for("index")))
+    return resp
     
 @app.route('/')
-@app.route('/index')
+@app.route('/index', methods=['GET'])
 @auth.login_required
 def index():
     if rc_context:
+        last_cmd = "None"
+        buttons = [html_buttons["boot"]]
+
+        if len(request.args): ## we came from sencmd
+            last_cmd = json.loads(request.args["messages"])
+            last_cmd = last_cmd["cmd"]
+                            
+            ## absolutely fab FSM
+            if   last_cmd == "BOOT": buttons = [html_buttons["init"], html_buttons["terminate"]]
+            elif last_cmd == "INIT": buttons = [html_buttons["conf"], html_buttons["terminate"]]
+            elif last_cmd == "CONF": buttons = [html_buttons["start"],html_buttons["scrap"]]
+            elif last_cmd == "START" or last_cmd == "RESUME":
+                buttons = [html_buttons["stop"], html_buttons["pause"]]
+            elif last_cmd == "PAUSE": buttons = [html_buttons["resume"]]
+            elif last_cmd == "STOP": buttons = [html_buttons["scrap"]]
+            elif last_cmd == "SCRAP": buttons = [html_buttons["terminate"]]
+            
         return render_template("index.html",
+                               last_action=last_cmd,
                                title=rc_context.rc.apparatus_id,
-                               top_level=rc_context.rc.cfg.top_cfg,
-                               buttons=[html_buttons["boot"], html_buttons["terminate"]])
+                               top_level=rc_context.rc.top_cfg_file,
+                               buttons=buttons,
+                               run="<b style='color:red;'>"+str(rc_context.rc.run)+"</b>" if rc_context.rc.run else "NOT RUNNING"
+                               )
     else:
         return "Best thing since light saber"
 
@@ -164,9 +213,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, top_cfg):
     ctx.call_on_close(cleanup_rc)
     
 def main():
-    print("main")
     global rc_context
-    # global last_action
     from rich.logging import RichHandler
 
     logging.basicConfig(
@@ -180,7 +227,6 @@ def main():
     rc_context = NanoContext(console)
 
     try:
-        print("calling cli")
         cli(obj=rc_context, show_default=True)
         
     except Exception as e:

@@ -29,11 +29,13 @@ class NanoRC:
         self.apparatus_id = self.cfg.apparatus_id
 
         self.run_num_mgr = run_num_mgr
+        self.top_cfg_file = top_cfg
         self.cfgsvr = run_registry
         self.cfgsvr.cfgmgr = self.cfg
         self.cfgsvr.apparatus_id = self.apparatus_id
         self.timeout = timeout
         self.return_code = 0
+        self.run=None
 
         self.topnode = self.cfg.get_tree_structure()
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
@@ -62,7 +64,6 @@ class NanoRC:
         """
 
         self.return_code = self.topnode.boot()
-        print("exiting boot")
 
     def terminate(self) -> NoReturn:
         """
@@ -136,12 +137,13 @@ class NanoRC:
         """
         Sends stop command
         """
-
+        
         self.return_code = self.topnode.send_command(None, 'stop',
                                                      'RUNNING', 'CONFIGURED',
                                                      raise_on_fail=True,
                                                      timeout=self.timeout)
         self.cfgsvr.save_on_stop(self.run)
+        self.run=None
         self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
 
 
