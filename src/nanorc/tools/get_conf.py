@@ -3,6 +3,7 @@ import io
 import tempfile
 import tarfile
 import sh
+from flask import Flask
 import sys
 import time
 import json
@@ -18,6 +19,8 @@ from rich.traceback import Traceback
 from rich.progress import *
 
 from nanorc.credmgr import credentials
+html_text = ""
+app = Flask("conf_viewer")
 
 def query(socket:str, query:str, user:str, password:str, log) -> dict:
     try:
@@ -93,24 +96,35 @@ def print_run_config(obj, run_number, get_config, dotnanorc):
                  dotnanorc["runregistrydb"]["user"],
                  dotnanorc["runregistrydb"]["password"], log)
 
-    f = tempfile.NamedTemporaryFile(mode="w",suffix='.tar.gz', delete=False)
-    print(data.headers)
-    print(type(data.text.encode('utf-8')))
-    f.write(data.text)
+    f = tempfile.NamedTemporaryFile(mode="w+b",suffix='.tar.gz', delete=False)
+    f.write(data.content)
     fname = f.name
-    f.close()
     f = open(fname)
-    print(f.read(2))
-    print(b'0x1f0x8b')
-    dir_name = tempfile.TemporaryDirectory()
-    tar = tarfile.open(fname, "r:gz")
-    tar.extractall(dir_name)
-    tar.close()
-    
-    obj.console.print_json(dir_name+"/top_level.json")
-    
+    with tempfile.TemporaryDirectory() as temp_name:
+        tar = tarfile.open(fname, "r:gz")
+        tar.extractall(temp_name)
+        tar.close()
+        for rootn, dirn, filen in os.walk(temp_name):
+            for f in filen:
+                name = rootn+"/"+f
+                name = "/".join(name.split("/")[4:])
+                print(name)
+                
+                fi = open(name, "r")
+                obj.console.print(fi.read())
+                
     os.remove(fname)
-    os.remove(dir_name)
+    
+    html_text = obj.console.export_html()
+    @app.route('/')
+    @app.route('/index')
+    def index():
+        global html_text
+        return html_text
+    
+    app.run(host='0.0.0.0', port=5001, debug=True)
+        
+
     
     
 class minimal_context:
@@ -118,7 +132,7 @@ class minimal_context:
         self.console = console
         
 def main():
-    obj = minimal_context(Console())
+    obj = minimal_context(Console(record=True))
     try:
         print_run_config(obj=obj)
     except Exception as e:
