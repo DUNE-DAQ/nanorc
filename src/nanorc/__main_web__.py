@@ -74,6 +74,9 @@ def statusstream():
                 status_text=status_text[start+6:end]
                 title_text=rc_context.rc.apparatus_id+str(counter)
                 counter+=1
+                ### How nice would it be, if <!-- separator --> could actually be the separator
+                ### Unfortunately, it gets stripped somewhere, and in index.html, we have to use <code>
+                ### to separate, which is extremely distaceful
                 yield f"{counter} {status_text}<!-- separator -->"
                 time.sleep(2)
             else:
