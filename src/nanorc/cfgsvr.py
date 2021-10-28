@@ -194,9 +194,11 @@ class DBConfigSaver:
 
             with open(fname, "rb") as f:
                 files = {'file': f}
-                post_data = {"run_num": str(run),
+                post_data = {"run_num": run,
                              "det_id": self.apparatus_id,
-                             "run_type": run_type}
+                             "run_type": run_type,
+                             ## Big hack of the version!
+                             "software_version": "dunedaq-v2.8.1"}
 
                 try:
                     r = requests.post(self.API_SOCKET+"/runregistry/insertRun/",
