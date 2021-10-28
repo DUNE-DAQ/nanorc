@@ -77,10 +77,12 @@ def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, cfg_
     def cleanup_rc():
         logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
         rc.terminate()
-        ctx.exit(rc.return_code)
+        if rc.return_code:
+            ctx.exit(rc.return_code)
 
     ctx.call_on_close(cleanup_rc)
     obj.rc = rc
+    rc.ls(False)
 
 
 np04cli.add_command(status, 'status')

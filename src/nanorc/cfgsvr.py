@@ -19,11 +19,11 @@ def make_tarfile(output_filename, source_dir):
     with tarfile.open(output_filename, "w:gz") as tar:
         tar.add(source_dir, arcname=os.path.basename(source_dir))
         
-class SimpleConfigSaver:
+class FileConfigSaver:
     """docstring for ConfigManager"""
 
     def __init__(self, cfg_outdir:str):
-        super(SimpleConfigSaver, self).__init__()
+        super(FileConfigSaver, self).__init__()
         self.cfgmgr = None
         self.outdir = cfg_outdir
 
@@ -101,10 +101,10 @@ class SimpleConfigSaver:
                 f.write(json.dumps(data, indent=2))
                 f.close()
         
-        tgz_path = os.path.normpath(self.thisrun_outdir)+".tgz"
-        make_tarfile(output_filename=tgz_path, source_dir=self.thisrun_outdir)
+        # tgz_path = os.path.normpath(self.thisrun_outdir)+".tgz"
+        # make_tarfile(output_filename=tgz_path, source_dir=self.thisrun_outdir)
 
-        return self.thisrun_outdir, tgz_path
+        return self.thisrun_outdir
 
 
     def save_on_resume(self, topnode:GroupNode, overwrite_data: dict, cfg_method:str) -> dict:

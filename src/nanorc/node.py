@@ -5,6 +5,7 @@ from datetime import datetime
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
+from rich.panel import Panel
 
 import logging
 from .sshpm import SSHProcessManager
@@ -58,16 +59,22 @@ class GroupNode(NodeMixin):
         else:
             print_func = print
 
+        rows = []
         try:
             for pre, _, node in RenderTree(self):
                 if node == self:
-                    print_func(f"{pre}[red]{node.name}[/red]")
+                    # print_func(f"{pre}[red]{node.name}[/red]")
+                    rows.append(f"{pre}[red]{node.name}[/red]")
                 elif isinstance(node, SubsystemNode):
-                    print_func(f"{pre}[yellow]{node.name}[/yellow]")
+                    # print_func(f"{pre}[yellow]{node.name}[/yellow]")
+                    rows.append(f"{pre}[yellow]{node.name}[/yellow]")
                 elif isinstance(node, ApplicationNode):
-                    print_func(f"{pre}[blue]{node.name}[/blue]")
+                    # print_func(f"{pre}[blue]{node.name}[/blue]")
+                    rows.append(f"{pre}[blue]{node.name}[/blue]")
                 else:
-                    print_func(f"{pre}{node.name}")
+                    rows.append(f"{pre}{node.name}")
+
+            print_func(Panel.fit('\n'.join(rows)))
 
             if leg:
                 print_func("\nLegend:")
@@ -86,10 +93,13 @@ class GroupNode(NodeMixin):
                      cfg_method:str=None, overwrite_data:dict={},
                      raise_on_fail:bool=True,
                      timeout:int=None) -> int:
+        import ipdb
+        ipdb.set_trace()
+        
         if path:
             r = Resolver('name')
             prompted_path = "/".join(path)
-            print(f"node.send_command prompted path {prompted_path}")
+            self.log.info(f"node.send_command prompted path {prompted_path}")
             node = r.get(self, prompted_path)
         else:
             node = self

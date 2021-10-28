@@ -8,7 +8,7 @@ from rich.pretty import Pretty
 from .node import GroupNode
 # from .sshpm import SSHProcessManager
 from .treebuilder import TreeBuilder
-from .cfgsvr import SimpleConfigSaver, DBConfigSaver
+from .cfgsvr import FileConfigSaver, DBConfigSaver
 # from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
 from .credmgr import credentials
 
@@ -33,11 +33,10 @@ class NanoRC:
         self.cfgsvr.cfgmgr = self.cfg
         self.cfgsvr.apparatus_id = self.apparatus_id
         self.timeout = timeout
-        self.return_code = 0
+        self.return_code = None
 
         self.topnode = self.cfg.get_tree_structure()
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
-        self.return_code = self.ls(leg=False)
 
         self.listener = None
 
@@ -145,18 +144,18 @@ class NanoRC:
         self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
 
 
-    def pause(self, path) -> NoReturn:
+    def pause(self) -> NoReturn:
         """
         Sends pause command
         """
 
-        self.return_code = self.topnode.send_command(path, 'pause',
+        self.return_code = self.topnode.send_command(None, 'pause',
                                                      'RUNNING', 'RUNNING',
                                                      raise_on_fail=True,
                                                      timeout=self.timeout)
 
 
-    def resume(self, path, trigger_interval_ticks: Union[int, None]) -> NoReturn:
+    def resume(self, trigger_interval_ticks: Union[int, None]) -> NoReturn:
         """
         Sends resume command
         
@@ -173,7 +172,7 @@ class NanoRC:
                                    overwrite_data=runtime_resume_data,
                                    cfg_method="runtime_resume")
 
-        self.return_code = self.topnode.send_command(path, 'resume',
+        self.return_code = self.topnode.send_command(None, 'resume',
                                                      'RUNNING', 'RUNNING',
                                                      raise_on_fail=True,
                                                      cfg_method="runtime_resume",
