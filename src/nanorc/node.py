@@ -93,8 +93,6 @@ class GroupNode(NodeMixin):
                      cfg_method:str=None, overwrite_data:dict={},
                      raise_on_fail:bool=True,
                      timeout:int=None) -> int:
-        import ipdb
-        ipdb.set_trace()
         
         if path:
             r = Resolver('name')
