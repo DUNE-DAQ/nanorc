@@ -22,7 +22,7 @@ class GroupNode(NodeMixin):
             self.children = children
 
 
-    def print_status(self, apparatus_id:str=None, console:Console=None) -> int:
+    def print_status(self, apparatus_id:str=None) -> int:
         if apparatus_id:
             table = Table(title=f"{apparatus_id} apps")
         else:
@@ -52,14 +52,10 @@ class GroupNode(NodeMixin):
             else:
                 table.add_row(pre+node.name)
 
-        console.print(table)
+        self.console.print(table)
 
-    def print(self, leg:bool=False, console:Console=None) -> int:
-        if console:
-            print_func = console.print
-        else:
-            print_func = print
-
+    def print(self, leg:bool=False) -> int:
+        print_func = self.console.print
         rows = []
         try:
             for pre, _, node in RenderTree(self):

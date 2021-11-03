@@ -52,7 +52,7 @@ class NanoRC:
         if not self.topnode:
             return
 
-        self.topnode.print_status(self.apparatus_id, self.console)
+        self.topnode.print_status(self.apparatus_id)
 
 
     def boot(self) -> NoReturn:
@@ -76,7 +76,7 @@ class NanoRC:
         Print the nodes
         """
 
-        self.return_code = self.topnode.print(leg, self.console)
+        self.return_code = self.topnode.print(leg)
 
 
     def init(self, path) -> NoReturn:
