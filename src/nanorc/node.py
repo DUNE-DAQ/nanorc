@@ -13,7 +13,8 @@ from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoRespons
 from typing import Union, NoReturn
 
 class GroupNode(NodeMixin):
-    def __init__(self, name:str, parent=None, children=None):
+    def __init__(self, name:str, console, parent=None, children=None):
+        self.console = console
         self.name = name
         self.parent = parent
         self.log = logging.getLogger(self.__class__.__name__+"_"+self.name)
@@ -97,7 +98,6 @@ class GroupNode(NodeMixin):
         if path:
             r = Resolver('name')
             prompted_path = "/".join(path)
-            self.log.info(f"node.send_command prompted path {prompted_path}")
             node = r.get(self, prompted_path)
         else:
             node = self
@@ -157,12 +157,11 @@ class GroupNode(NodeMixin):
 
 
 # Now on to useful stuff
-class ApplicationNode(NodeMixin):
-    def __init__(self, name, sup, parent=None):
-        self.name = name
-        self.sup = sup
-        self.parent = parent
+class ApplicationNode(GroupNode):
+    def __init__(self, name, sup, console, parent=None):
         # Absolutely no children for applicationnode
+        super().__init__(name=name, console=console, parent=parent, children=None)
+        self.sup = sup
 
     def _propagate_command(self, *args, **kwargs):
         raise RuntimeError("ERROR: You can't send a command directly to an application! Send it to the parent subsystem!")
@@ -171,17 +170,13 @@ class ApplicationNode(NodeMixin):
         raise RuntimeError("ERROR: You can't send a command directly to an application! Send it to the parent subsystem!")
 
 
-class SubsystemNode(NodeMixin):
+class SubsystemNode(GroupNode):
     def __init__(self, name:str, cfgmgr, console, parent=None, children=None):
-        self.name = name
+        super().__init__(name=name, console=console, parent=parent, children=children)
         self.cfgmgr = cfgmgr
         self.pm = None
         self.listener = None
-        self.parent = parent
-        self.console = console
         self.log = logging.getLogger(self.__class__.__name__+"_"+self.name)
-        if children:
-            self.children = children
 
     def boot(self) -> NoReturn:
         self.log.debug(f"Sending boot to {self.name}")
@@ -195,6 +190,7 @@ class SubsystemNode(NodeMixin):
 
         self.listener = ResponseListener(self.cfgmgr.boot["response_listener"]["port"])
         children = [ ApplicationNode(name=n,
+                                     console=self.console,
                                      sup=AppSupervisor(self.console, d, self.listener),
                                      parent=self)
                      for n,d in self.pm.apps.items() ]
@@ -213,7 +209,9 @@ class SubsystemNode(NodeMixin):
         if self.pm:
             self.pm.terminate()
 
-
+    def send_command(self, *args, **kwargs):
+        self._propagate_command(args, kwargs)
+        
     def _propagate_command(self, cmd:str,
                           state_entry:str, state_exit:str,
                           cfg_method:str=None, overwrite_data:dict={},

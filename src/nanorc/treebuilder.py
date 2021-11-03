@@ -19,7 +19,7 @@ class TreeBuilder:
     def extract_json_to_nodes(self, js, mother) -> GroupNode:
         for n,d in js.items():
             if isinstance(d, dict):
-                child = GroupNode(name=n, parent=mother)
+                child = GroupNode(name=n, parent=mother, console=self.console)
                 self.extract_json_to_nodes(d, child)
             elif isinstance(d, str):
                 node = SubsystemNode(name=n,
@@ -51,7 +51,7 @@ class TreeBuilder:
             raise RuntimeError("Failed to parse your top level json, please check it again") from e
         self.apparatus_id = self.top_cfg["apparatus_id"]
         del self.top_cfg["apparatus_id"]
-        self.root = GroupNode(self.apparatus_id)
+        self.root = GroupNode(self.apparatus_id, console=self.console)
         self.extract_json_to_nodes(self.top_cfg, self.root)
 
     # This should get changed so that it copies the node, and strips the config
