@@ -50,7 +50,7 @@ class GroupNode(NodeMixin):
                 ping  = sup.commander.ping()
                 last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
                 table.add_row(
-                    pre+node.name+f" ({node.state})",
+                    Text(pre)+Text(node.name+f" ({node.state})", style=('bold red' if node.is_error() else "")),
                     sup.desc.host,
                     str(alive),
                     str(ping),
@@ -59,7 +59,7 @@ class GroupNode(NodeMixin):
                 )
 
             else:
-                table.add_row(pre+node.name+f" ({node.state})",)
+                table.add_row(Text(pre)+Text(node.name+f" ({node.state})", style=('bold red' if node.is_error() else "")))
 
         self.console.print(table)
 
@@ -97,10 +97,20 @@ class GroupNode(NodeMixin):
     def on_enter_error(self, event):
         kwargs = event.kwargs
         excp = kwargs.get("exception")
-        print(kwargs)
-        if excp:
-            self.log.error(f"Upon trying to  on {self.name}, an excption was thrown: {str(excp)}")
+        trace = kwargs.get('trace')
+        original_event = kwargs.get('event')
+        trigger = ""
+        etext=""
 
+        if original_event: trigger = original_event.event.name
+        
+        if trigger != "unknown_command" and kwargs.get('command'):
+            trigger = kwargs.get('command') 
+
+        if excp: etext = ", an exception was thrown: {str(excp)},\ntrace: {trace}"
+        
+        self.log.error(f"while trying to \"{trigger}\" \"{self.name}\""+etext)
+            
     def send_to_process(self, *args, **kwargs):
         pass
 
@@ -113,7 +123,8 @@ class GroupNode(NodeMixin):
             self.send_to_process(trigger, *event.args, **event.kwargs)
         except Exception as e:
             self.log.error(e)
-            self.to_error(raise_on_fail, exception=e, event=event)
+            self.to_error(exception=e, event=event)
+            return
         
         finalisor = getattr(self, "end_"+trigger)
         finalisor()
@@ -151,7 +162,8 @@ class GroupNode(NodeMixin):
 
         for child in children:
             child.send_cmd(cmd=cmd, path=None, *args, **kwargs)
-
+            if child.is_error():
+                self.to_error(command=cmd)
         return 0
 
 
@@ -196,7 +208,7 @@ class SubsystemNode(GroupNode):
     def send_to_process(self, *args, **kwargs):
         pass
 
-        
+
     def on_enter_boot_ing(self, event) -> NoReturn:
         try:
             self.pm = SSHProcessManager(self.console)
@@ -219,14 +231,14 @@ class SubsystemNode(GroupNode):
                 child.to_booted()
             else:
                 failed.append(n)
-                child.to_error(event, name)
+                child.to_error(event=event, command='boot')
             children.append(child)
         self.children = children
         
         if not failed:
             self.end_boot()
         else:
-            self.to_error(event, failed)
+            self.to_error(event=event, command='boot')
 
 
     def on_enter_terminate_ing(self, _) -> NoReturn:
