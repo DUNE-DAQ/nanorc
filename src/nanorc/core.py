@@ -94,10 +94,7 @@ class NanoRC:
         Sends configure command to the applications.
         """
 
-        self.return_code = self.topnode.send_command(path, 'conf',
-                                                     'INITIAL', 'CONFIGURED',
-                                                     raise_on_fail=True,
-                                                     timeout=self.timeout)
+        self.return_code = self.topnode.conf(path, raise_on_fail=True, timeout=self.timeout)
 
 
     def start(self, disable_data_storage: bool, run_type:str) -> NoReturn:
@@ -120,12 +117,11 @@ class NanoRC:
                                                  overwrite_data=runtime_start_data,
                                                  cfg_method="runtime_start")
 
-        self.return_code = self.topnode.send_command(None, 'start',
-                                                     'CONFIGURED', 'RUNNING',
-                                                     raise_on_fail=True,
-                                                     cfg_method="runtime_start",
-                                                     overwrite_data=runtime_start_data,
-                                                     timeout=self.timeout)
+        self.return_code = self.topnode.start(None,
+                                              raise_on_fail=True,
+                                              cfg_method="runtime_start",
+                                              overwrite_data=runtime_start_data,
+                                              timeout=self.timeout)
 
         self.console.log(f"[bold magenta]Started run #{self.run}, saving run data in {cfg_save_dir}[/bold magenta]")
 
@@ -135,10 +131,7 @@ class NanoRC:
         Sends stop command
         """
 
-        self.return_code = self.topnode.send_command(None, 'stop',
-                                                     'RUNNING', 'CONFIGURED',
-                                                     raise_on_fail=True,
-                                                     timeout=self.timeout)
+        self.return_code = self.topnode.stop(None, raise_on_fail=True, timeout=self.timeout)
         self.cfgsvr.save_on_stop(self.run)
         self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
 
@@ -148,10 +141,7 @@ class NanoRC:
         Sends pause command
         """
 
-        self.return_code = self.topnode.send_command(None, 'pause',
-                                                     'RUNNING', 'RUNNING',
-                                                     raise_on_fail=True,
-                                                     timeout=self.timeout)
+        self.return_code = self.topnode.pause(None, raise_on_fail=True, timeout=self.timeout)
 
 
     def resume(self, trigger_interval_ticks: Union[int, None]) -> NoReturn:
@@ -171,12 +161,11 @@ class NanoRC:
                                    overwrite_data=runtime_resume_data,
                                    cfg_method="runtime_resume")
 
-        self.return_code = self.topnode.send_command(None, 'resume',
-                                                     'RUNNING', 'RUNNING',
-                                                     raise_on_fail=True,
-                                                     cfg_method="runtime_resume",
-                                                     overwrite_data=runtime_resume_data,
-                                                     timeout=self.timeout)
+        self.return_code = self.topnode.resume(None,
+                                               raise_on_fail=True,
+                                               cfg_method="runtime_resume",
+                                               overwrite_data=runtime_resume_data,
+                                               timeout=self.timeout)
 
 
     def scrap(self, path) -> NoReturn:
@@ -184,7 +173,4 @@ class NanoRC:
         Send scrap command
         """
 
-        self.return_code = self.topnode.send_command(path, 'scrap',
-                                                     'CONFIGURED', 'INITIAL',
-                                                     raise_on_fail=True,
-                                                     timeout=self.timeout)
+        self.return_code = self.topnode.scrap(path, raise_on_fail=True, timeout=self.timeout)
