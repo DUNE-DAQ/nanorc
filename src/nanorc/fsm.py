@@ -4,38 +4,46 @@ class FSMMachine(Machine):
     def __init__(self, cfg):
         self.states_cfg = cfg["states"]
         self.transitions_cfg= cfg["transitions"]
+        self.acting_transitions = []
+        self.finalisor_transitions = []
         
-        long_transition_to_add = []
         transition_state_to_add = []
-        states_after_long_transition = []
-        long_transition_to_remove = []
+        transition_to_remove = []
         # we need to loop over transitions, because if they are long, new states are added
         for transition in self.transitions_cfg:
             name = transition["trigger"]+"_ing"
-        
-            transition_state_to_add.append(name)
+            transition_state_to_add += [name]
+            
             # add these new states
-            long_transition_to_add.append({
+            self.acting_transitions.append({
                 "trigger":transition["trigger"],
                 "source": transition["source"],
                 "dest": name
             })
 
-            long_transition_to_add.append({
+            self.finalisor_transitions.append({
                 "trigger":"end_"+transition["trigger"],
                 "source": name,
                 "dest": transition["dest"]
             })
             
-            states_after_long_transition.append(transition["dest"])
             # remove the old direct transitions
-            long_transition_to_remove.append(transition)
+            transition_to_remove.append(transition)
 
         states = self.states_cfg + transition_state_to_add + ["error"]
-        super().__init__(states=states, initial=states[0])
+        super().__init__(states=states, initial=states[0], send_event=True)
         
-        transition_to_include = self.transitions_cfg+long_transition_to_add
-        for transition in transition_to_include:
-            if transition in long_transition_to_remove:
-                continue
+        for transition in self.acting_transitions+self.finalisor_transitions:
             self.add_transition(transition["trigger"], transition["source"], transition["dest"])
+
+
+    def add_node(self, model):
+        for tr in self.acting_transitions:
+            function_name = 'on_enter_'+tr["dest"]
+            if not getattr(model, function_name, None):
+                setattr(model, function_name, model._on_enter_callback.__get__(model))
+            function_name = 'on_exit_'+tr["dest"]
+            if not getattr(model, function_name, None):
+                setattr(model, function_name, model._on_exit_callback.__get__(model))
+        
+        super().add_model(model)
