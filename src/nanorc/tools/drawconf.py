@@ -25,6 +25,7 @@ def cli(output_file, json_dir):
     netrecvrs = []
     nwconnections = {}
     nwconnectionnames = []
+    nwtopicnames = []
     procname_to_host = {}
     j = {}
     filename = os.path.join(json_dir, "boot.json")
@@ -58,8 +59,11 @@ def cli(output_file, json_dir):
                     target = re.search(r"host_[^}]*", nwconn["address"]).group()
                     is_subscriber = len(nwconn["topics"]) != 0
                     print(f"Adding NetworkManager connection with name {name}, target host {target}, and is_subscriber {is_subscriber}")
-                    nwconnections[name] = {"target": target, "is_subscriber": is_subscriber}
+                    nwconnections[name] = {"target": target, "is_subscriber": is_subscriber, "topics": nwconn["topics"]}
                     nwconnectionnames.append(name)
+                    if len(nwconn["topics"]) != 0:
+                        nwtopicnames.extend(nwconn["topics"])
+                    
                     conf.node(name)
 
             # print("Parsing module configuration")
@@ -130,39 +134,42 @@ def cli(output_file, json_dir):
                 print(f"Setting src of network edge {netedge} to {procname}_{modname}")
                 netedges[netedge] = {"sink": conn_name, "src":  f"{procname}_{modname}", "label": f"{modname}\n{modcfg['data']['msg_module_name']}", "color":"green"}
             else:
+                def add_nwedge(conn_name):
+                    netedge = f"{procname}_{modname}_{conn_name}"
+                    is_receiver = (nwconnections[conn_name]["target"] == procname_to_host[procname] and not nwconnections[conn_name]["is_subscriber"]) or \
+                                  (nwconnections[conn_name]["is_subscriber"] and nwconnections[conn_name]["target"] != procname_to_host[procname])
+
+                    print(f"Found NetworkManager connection {conn_name} in {procname}_{modname}, is_receiver: {is_receiver}")
+                    if is_receiver:
+                        netedges[netedge] = {"src": conn_name, "sink": f"{procname}_{modname}", "color": "blue", "label":f"{modname}"}
+                    else:
+                        netedges[netedge] = {"src": f"{procname}_{modname}", "sink": conn_name, "color": "blue", "label":f"{modname}"}
+
                 # We need to search for NetworkManager connections now
                 def search_nwconnection(obj_to_search):
                     if type(obj_to_search) == type(dict()):
                         for key in obj_to_search.keys():
                             if type(obj_to_search[key]) == type(""):
                                 if obj_to_search[key] in nwconnectionnames and not "reply_connection_name" in key:
-                                    conn_name = obj_to_search[key]
-                                    netedge = f"{procname}_{modname}_{conn_name}"
-                                    is_receiver = (nwconnections[conn_name]["target"] == procname_to_host[procname] and not nwconnections[conn_name]["is_subscriber"]) or \
-                                                  (nwconnections[conn_name]["is_subscriber"] and nwconnections[conn_name]["target"] != procname_to_host[procname])
-
-                                    print(f"Found NetworkManager connection {conn_name} in {procname}_{modname}, is_receiver: {is_receiver}")
-                                    if is_receiver:
-                                        netedges[netedge] = {"src": conn_name, "sink": f"{procname}_{modname}", "color": "blue", "label":f"{modname}"}
-                                    else:
-                                        netedges[netedge] = {"src": f"{procname}_{modname}", "sink": conn_name, "color": "blue", "label":f"{modname}"}
+                                    add_nwedge(obj_to_search[key])
+                                elif obj_to_search[key] in nwtopicnames and not "timesync_connection_name" in obj_to_search.keys():
+                                    topic_name = obj_to_search[key]
+                                    for nwconn in nwconnections:
+                                        if topic_name in nwconnections[nwconn]["topics"]:
+                                            add_nwedge(nwconn)
+                                    
                             else:
                                 search_nwconnection(obj_to_search[key])
                     elif type(obj_to_search) == type([]):
                         for key in obj_to_search:
                             if type(key) == type(""):
                                 if key in nwconnectionnames:
-                                    conn_name = key
-                                    netedge = f"{procname}_{modname}_{conn_name}"
-                                
-                                    is_receiver = (nwconnections[conn_name]["target"] == procname_to_host[procname] and not nwconnections[conn_name]["is_subscriber"]) or \
-                                                  (nwconnections[conn_name]["is_subscriber"] and nwconnections[conn_name]["target"] != procname_to_host[procname])
-
-                                    print(f"Found NetworkManager connection {conn_name} in {procname}_{modname}, is_receiver: {is_receiver}")
-                                    if is_receiver:
-                                        netedges[netedge] = {"src": conn_name, "sink": f"{procname}_{modname}", "color": "blue", "label":f"{modname}"}
-                                    else:
-                                        netedges[netedge] = {"src": f"{procname}_{modname}", "sink": conn_name, "color": "blue", "label":f"{modname}"}
+                                    add_nwedge(key)
+                                elif key in nwtopicnames:
+                                    topic_name = key
+                                    for nwconn in nwconnections:
+                                        if topic_name in nwconnections[nwconn]["topics"]:
+                                            add_nwedge(nwconn)
                             else:
                                 search_nwconnection(key)
                 search_nwconnection(modcfg["data"])            
