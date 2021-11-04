@@ -2,6 +2,7 @@
 
 
 import json
+import re
 import click
 import os
 
@@ -22,6 +23,20 @@ def cli(output_file, json_dir):
 
     netsenders = []
     netrecvrs = []
+    nwconnections = {}
+    nwconnectionnames = []
+    procname_to_host = {}
+    j = {}
+    filename = os.path.join(json_dir, "boot.json")
+    with open(filename, "r") as jf:
+        try:
+            j = json.load(jf)
+        except json.decoder.JSONDecodeError as e:
+            raise RuntimeError(f"ERROR: failed to load {filename}") from e
+
+        for app in j["apps"].keys():
+            procname_to_host[app] = j["apps"][app]["host"]
+
 
     for file in files:
         procname = file[:-10]
@@ -35,6 +50,16 @@ def cli(output_file, json_dir):
                     j = json.load(jf)
                 except json.decoder.JSONDecodeError as e:
                     raise RuntimeError(f"ERROR: failed to load {filename}") from e
+
+            # NetworkManager connections should be the same for all processes
+            if len(nwconnections) == 0:
+                for nwconn in j["nwconnections"]:
+                    name = nwconn["name"]
+                    target = re.search(r"host_[^}]*", nwconn["address"]).group()
+                    is_subscriber = len(nwconn["topics"]) != 0
+                    print(f"Adding NetworkManager connection with name {name}, target host {target}, and is_subscriber {is_subscriber}")
+                    nwconnections[name] = {"target": target, "is_subscriber": is_subscriber}
+                    nwconnectionnames.append(name)
 
             # print("Parsing module configuration")
             qmap = {}
@@ -90,28 +115,83 @@ def cli(output_file, json_dir):
         for modcfg in j["modules"]:    
             modname = modcfg["match"]
             if modname in netrecvrs:
-                # print(f"{modname} is a NetworkToQueue instance!")
-                netedge = modcfg["data"]["receiver_config"]["address"]
+                print(f"{modname} is a NetworkToQueue instance!")
+                netedge = modcfg["data"]["receiver_config"]["name"]
                 if not netedge in netedges:
-                    netedges[netedge] = { "src": "", "sink": "", "label": "" }
+                    netedges[netedge] = { "src": "", "sink": "", "label": "", "srccolor": "red", "sinkcolor": "green" }
 
-                # print(f"Setting sink of network edge {netedge} to {procname}_{modname}")
+                print(f"Setting sink of network edge {netedge} to {procname}_{modname}")
                 netedges[netedge]["sink"] = f"{procname}_{modname}"
                 netedges[netedge]["label"] = modcfg["data"]["msg_module_name"]
-            if modname in netsenders:
-                # print(f"{modname} is a QueueToNetwork instance!")
-                netedge = modcfg["data"]["sender_config"]["address"]
+                netedges[netedge]["sinkcolor"] = "green" # Green for NtoQ
+            elif modname in netsenders:
+                print(f"{modname} is a QueueToNetwork instance!")
+                netedge = modcfg["data"]["sender_config"]["name"]
                 if not netedge in netedges:
-                    netedges[netedge] = { "src": "", "sink": "" }
-                # print(f"Setting src of network edge {netedge} to {procname}_{modname}")
+                    netedges[netedge] = { "src": "", "sink": "", "label": "", "srccolor": "green", "sinkcolor": "red" }
+                print(f"Setting src of network edge {netedge} to {procname}_{modname}")
                 netedges[netedge]["src"] = f"{procname}_{modname}"
+                netedges[netedge]["label"] = modcfg["data"]["msg_module_name"]
+                netedges[netedge]["srccolor"] = "green"
+            else:
+                # We need to search for NetworkManager connections now
+                def search_nwconnection(obj_to_search):
+                    if type(obj_to_search) == type(dict()):
+                        for key in obj_to_search.keys():
+                            if type(obj_to_search[key]) == type(""):
+                                if obj_to_search[key] in nwconnectionnames:
+                                    netedge = obj_to_search[key]
+                                    if not netedge in netedges:
+                                        netedges[netedge] = { "src": "", "sink": "", "label": "", "srccolor": "red", "sinkcolor": "red" }
+                                
+                                    is_receiver = (nwconnections[obj_to_search[key]]["target"] == procname_to_host[procname] and not nwconnections[obj_to_search[key]]["is_subscriber"]) or \
+                                                  (nwconnections[obj_to_search[key]]["is_subscriber"] and nwconnections[obj_to_search[key]]["target"] != procname_to_host[procname])
+
+                                    print(f"Found NetworkManager connection {netedge} in {procname}_{modname}, is_receiver: {is_receiver}")
+                                    if is_receiver:
+                                        netedges[netedge]["sink"] = f"{procname}_{modname}"
+                                        netedges[netedge]["label"] = modname
+                                        netedges[netedge]["sinkcolor"] = "blue"
+                                    else:
+                                        netedges[netedge]["src"] = f"{procname}_{modname}"
+                                        netedges[netedge]["label"] = modname
+                                        netedges[netedge]["srccolor"] = "blue"
+                            else:
+                                search_nwconnection(obj_to_search[key])
+                    elif type(obj_to_search) == type([]):
+                        for key in obj_to_search:
+                            if type(key) == type(""):
+                                if key in nwconnectionnames:
+                                    netedge = key
+                                    if not netedge in netedges:
+                                        netedges[netedge] = { "src": "", "sink": "", "label": "", "srccolor": "red", "sinkcolor": "red" }
+                                
+                                    is_receiver = (nwconnections[obj_to_search[key]]["target"] == procname_to_host[procname] and not nwconnections[obj_to_search[key]]["is_subscriber"]) or \
+                                                  (nwconnections[obj_to_search[key]]["is_subscriber"] and nwconnections[obj_to_search[key]]["target"] != procname_to_host[procname])
+
+                                    print(f"Found NetworkManager connection {netedge} in {procname}_{modname}, is_receiver: {is_receiver}")
+                                    if is_receiver:
+                                        netedges[netedge]["sink"] = f"{procname}_{modname}"
+                                        netedges[netedge]["label"] = modname
+                                        netedges[netedge]["sinkcolor"] = "blue"
+                                    else:
+                                        netedges[netedge]["src"] = f"{procname}_{modname}"
+                                        netedges[netedge]["label"] = modname
+                                        netedges[netedge]["srccolor"] = "blue"
+                            else:
+                                search_nwconnection(key)
+                search_nwconnection(modcfg["data"])            
     
     for netedge in netedges:
         src = netedges[netedge]["src"]
         sink = netedges[netedge]["sink"]
         label = netedges[netedge]["label"]
-        # print(f"Setting up {netedge} to connect {src} to {sink}")
+        srccolor = netedges[netedge]["srccolor"]
+        sinkcolor = netedges[netedge]["sinkcolor"]
+        color = f"{srccolor};0.5:{sinkcolor}"
+        print(f"Setting up {netedge} to connect {src} to {sink}")
         
+        conf.attr('edge', color=color)
         conf.edge(src, sink, label=f"{label}\n{netedge}")
 
     print("Writing output dot")
