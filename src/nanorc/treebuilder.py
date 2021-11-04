@@ -23,14 +23,14 @@ class TreeBuilder:
                 child = GroupNode(name=n,
                                   parent=mother,
                                   console=self.console)
-                FSM.add_model(child)
+                FSM.add_node(child)
                 self.extract_json_to_nodes(d, child, FSM)
             elif isinstance(d, str):
                 child = SubsystemNode(name=n,
                                       cfgmgr=ConfigManager(d),
                                       console=self.console,
                                       parent=mother)
-                FSM.add_model(child)
+                FSM.add_node(child)
             else:
                 raise RuntimeError(f"ERROR processing the tree {n}: {d} I don't know what that's supposed to mean?")
 
@@ -61,7 +61,7 @@ class TreeBuilder:
         del self.top_cfg['fsm']
 
         self.topnode = GroupNode(self.apparatus_id, console=self.console)
-        FSM.add_model(self.topnode)
+        FSM.add_node(self.topnode)
 
         self.extract_json_to_nodes(self.top_cfg, self.topnode, FSM)
 
