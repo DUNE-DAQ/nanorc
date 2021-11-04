@@ -29,7 +29,8 @@ class TreeBuilder:
                 child = SubsystemNode(name=n,
                                       cfgmgr=ConfigManager(d),
                                       console=self.console,
-                                      parent=mother)
+                                      parent=mother,
+                                      fsm=FSM) # UGLY
                 FSM.add_node(child)
             else:
                 raise RuntimeError(f"ERROR processing the tree {n}: {d} I don't know what that's supposed to mean?")

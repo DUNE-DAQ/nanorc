@@ -13,8 +13,17 @@ from .sshpm import SSHProcessManager
 from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
 from typing import Union, NoReturn
 
+log = logging.getLogger("transitions.core")
+log.setLevel(logging.ERROR)
+log = logging.getLogger("transitions")
+log.setLevel(logging.ERROR)
+
+
 class GroupNode(NodeMixin):
     def __init__(self, name:str, console, parent=None, children=None):
+        # loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+        # print(loggers)
+        # exit(1)
         self.console = console
         self.name = name
         self.parent = parent
@@ -41,7 +50,7 @@ class GroupNode(NodeMixin):
                 ping  = sup.commander.ping()
                 last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
                 table.add_row(
-                    pre+node.name,#+f" ({node.state})",
+                    pre+node.name+f" ({node.state})",
                     sup.desc.host,
                     str(alive),
                     str(ping),
@@ -86,30 +95,34 @@ class GroupNode(NodeMixin):
         return 0
 
     def on_enter_error(self, event):
-        error_ev = event.kwargs["event"]
-        self.log.error(f"Upon trying to {error_ev.event.event.name} on {self.name}, an excption was thrown: {event.kwargs['exception']}")
-        
+        kwargs = event.kwargs
+        excp = kwargs.get("exception")
+        print(kwargs)
+        if excp:
+            self.log.error(f"Upon trying to  on {self.name}, an excption was thrown: {str(excp)}")
+
+    def send_to_process(self, *args, **kwargs):
+        pass
+
     def _on_enter_callback(self, event):
         trigger = event.event.name
-
-        self.log.info(f"Triggered {trigger} on {self.name}")
+        
+        raise_on_fail = event.kwargs['raise_on_fail']
+        del event.kwargs['raise_on_fail']
         try:
-            self.send_command(trigger, *event.args, **event.kwargs)
+            self.send_to_process(trigger, *event.args, **event.kwargs)
         except Exception as e:
-            self.to_error(exception=e, event=event)
-            return
+            self.log.error(e)
+            self.to_error(raise_on_fail, exception=e, event=event)
         
         finalisor = getattr(self, "end_"+trigger)
         finalisor()
         
     def _on_exit_callback(self, event):
         trigger = event.event.name
-        self.log.info(f"Finished to {trigger} on {self.name}")
+        # self.log.info(f"Finished to {trigger} on {self.name}")
         
-    def send_command(self, cmd:str, path:[str], 
-                     cfg_method:str=None, overwrite_data:dict={},
-                     raise_on_fail:bool=True,
-                     timeout:int=None) -> int:
+    def send_cmd(self, cmd:str, path:[str]=None, raise_on_fail:bool=True, *args, **kwargs) -> int:
         
         if path:
             r = Resolver('name')
@@ -120,81 +133,71 @@ class GroupNode(NodeMixin):
 
         self.log.debug(f"Sending {cmd} to {node.name}")
 
-        if not node: return
+        if not node:
+            ## Probably overkill
+            raise RuntimeError(f"The node {'/'.join(path)} doesn't exist!")
+
+        trigger = getattr(node, cmd, None)
+        if not trigger:
+            raise RuntimeError(f"{node.name} doesn't know how to execute {cmd}")
+
+        # we need to save the children _before_ the trigger, because boot and terminate spawn application children on subsystems!
+        children = self.children
         
-        ok, failed = node._propagate_command(cmd=cmd,
-                                             cfg_method=cfg_method, overwrite_data=overwrite_data,
-                                             timeout=timeout)
+        try:
+            trigger(raise_on_fail=raise_on_fail, *args, **kwargs)
+        except Exception as e:
+            raise RuntimeError(f"Execution of {cmd} failed on {node.name}") from e
 
-        if raise_on_fail and len(failed)>0:
-            self.log.error(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
-            self.return_code = 13
-            for a,r in failed.items():
-                self.log.error(f"{a}: {r}")
-            raise RuntimeError(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
+        for child in children:
+            child.send_cmd(cmd=cmd, path=None, *args, **kwargs)
 
         return 0
 
 
-    def _propagate_command(self, cmd:str,
-                          cfg_method:str=None, overwrite_data:dict={},
-                          timeout:int=None) -> tuple:
+    # def _propagate_command(self, cmd:str,
+    #                       cfg_method:str=None, overwrite_data:dict={},
+    #                       timeout:int=None) -> tuple:
 
-        ok, failed = {}, {}
+    #     ok, failed = {}, {}
 
-        for child in self.children:
-            o, f = child._propagate_command(cmd=cmd,
-                                            cfg_method = cfg_method, overwrite_data = overwrite_data,
-                                            timeout = timeout)
-            ok.update(o)
-            failed.update(f)
+    #     for child in self.children:
+    #         o, f = child._propagate_command(cmd=cmd,
+    #                                         cfg_method = cfg_method, overwrite_data = overwrite_data,
+    #                                         timeout = timeout)
+    #         ok.update(o)
+    #         failed.update(f)
 
-        return (ok, failed)
-
-    def on_enter_terminate_ing(self, _) -> int:
-        self.log.debug(f"Sending terminate to {self.name}")
-        if not self.children:
-            return
-
-        for child in self.children:
-            child.terminate()
-        self.end_terminate()
-
-    def on_enter_boot_ing(self, _) -> int:
-        self.log.info(f"Sending boot to {self.name}")
-
-        if not self.children:
-            return
-
-        for child in self.children:
-            child.boot()
-        self.end_boot()
-        return 0
+    #     return (ok, failed)
 
 
 # Now on to useful stuff
 class ApplicationNode(GroupNode):
     def __init__(self, name, sup, console, parent=None):
-        # Absolutely no children for applicationnode
+        # Absolutely no children for ApplicationNode
         super().__init__(name=name, console=console, parent=parent, children=None)
         self.sup = sup
 
-    def _propagate_command(self, *args, **kwargs):
-        raise RuntimeError("ERROR: You can't send a command directly to an application! Send it to the parent subsystem!")
+    # def _propagate_command(self, *args, **kwargs):
+    #     raise RuntimeError("ERROR: You can't send a command directly to an application! Send it to the parent subsystem!")
 
-    def send_command(self, *args, **kwargs):
-        raise RuntimeError("ERROR: You can't send a command directly to an application! Send it to the parent subsystem!")
+    # def send_command(self, *args, **kwargs):
+    #     raise RuntimeError("ERROR: You can't send a command directly to an application! Send it to the parent subsystem!")
 
 
 class SubsystemNode(GroupNode):
-    def __init__(self, name:str, cfgmgr, console, parent=None, children=None):
+    def __init__(self, name:str, cfgmgr, console, parent=None, children=None, fsm=None):
         super().__init__(name=name, console=console, parent=parent, children=children)
         self.cfgmgr = cfgmgr
         self.pm = None
         self.listener = None
+        self.fsm = fsm
 
-    def on_enter_boot_ing(self, _) -> NoReturn:
-        self.log.debug(f"Sending boot to {self.name}")
+    def send_to_process(self, *args, **kwargs):
+        pass
+
+        
+    def on_enter_boot_ing(self, event) -> NoReturn:
         try:
             self.pm = SSHProcessManager(self.console)
             self.pm.boot(self.cfgmgr.boot)
@@ -204,13 +207,27 @@ class SubsystemNode(GroupNode):
             return
 
         self.listener = ResponseListener(self.cfgmgr.boot["response_listener"]["port"])
-        children = [ ApplicationNode(name=n,
-                                     console=self.console,
-                                     sup=AppSupervisor(self.console, d, self.listener),
-                                     parent=self)
-                     for n,d in self.pm.apps.items() ]
+        children = []
+        failed = []
+        for n,d in self.pm.apps.items():
+            child = ApplicationNode(name=n,
+                                    console=self.console,
+                                    sup=AppSupervisor(self.console, d, self.listener),
+                                    parent=self)
+            self.fsm.add_node(child)
+            if child.sup.desc.proc.is_alive() and child.sup.commander.ping():
+                child.to_booted()
+            else:
+                failed.append(n)
+                child.to_error(event, name)
+            children.append(child)
         self.children = children
-        self.end_boot()
+        
+        if not failed:
+            self.end_boot()
+        else:
+            self.to_error(event, failed)
+
 
     def on_enter_terminate_ing(self, _) -> NoReturn:
         if self.children:
@@ -225,13 +242,11 @@ class SubsystemNode(GroupNode):
         if self.pm:
             self.pm.terminate()
         self.end_terminate()
-        
-    def send_command(self, *args, **kwargs):
-        self._propagate_command(args, kwargs)
-        
-    def _propagate_command(self, cmd:str,
-                          cfg_method:str=None, overwrite_data:dict={},
-                          timeout:int=None) -> tuple:
+
+
+    def send_to_process(self, cmd:str,
+                        cfg_method:str=None, overwrite_data:dict={},
+                        timeout:int=None) -> tuple:
         self.log.debug(f"Sending {cmd} to {self.name}")
 
         sequence = getattr(self.cfgmgr, cmd+'_order', None)

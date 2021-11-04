@@ -6,10 +6,8 @@ from rich.console import Console
 from rich.style import Style
 from rich.pretty import Pretty
 from .node import GroupNode
-# from .sshpm import SSHProcessManager
 from .treebuilder import TreeBuilder
 from .cfgsvr import FileConfigSaver, DBConfigSaver
-# from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
 from .credmgr import credentials
 
 from rich.traceback import Traceback
@@ -25,7 +23,6 @@ class NanoRC:
         super(NanoRC, self).__init__()     
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
-
 
         self.cfg = TreeBuilder(top_cfg, self.console)
         self.apparatus_id = self.cfg.apparatus_id
@@ -62,7 +59,7 @@ class NanoRC:
         Boots applications
         """
 
-        self.return_code = self.topnode.boot()
+        self.return_code = self.topnode.send_cmd("boot")
 
 
     def terminate(self) -> NoReturn:
@@ -70,7 +67,7 @@ class NanoRC:
         Terminates applications (but keep all the subsystems structure)
         """
         if not self.topnode.is_none():
-            self.return_code = self.topnode.terminate()
+            self.return_code = self.topnode.send_cmd("terminate")
 
 
     def ls(self, leg:bool=True) -> NoReturn:
@@ -86,7 +83,7 @@ class NanoRC:
         Initializes the applications.
         """
 
-        self.return_code = self.topnode.init(path=path, raise_on_fail=True, timeout=self.timeout)
+        self.return_code = self.topnode.send_cmd("init", path=path, raise_on_fail=True, timeout=self.timeout)
 
 
     def conf(self, path) -> NoReturn:
@@ -94,7 +91,7 @@ class NanoRC:
         Sends configure command to the applications.
         """
 
-        self.return_code = self.topnode.conf(path, raise_on_fail=True, timeout=self.timeout)
+        self.return_code = self.topnode.send_cmd("conf", path, raise_on_fail=True, timeout=self.timeout)
 
 
     def start(self, disable_data_storage: bool, run_type:str) -> NoReturn:
@@ -117,11 +114,11 @@ class NanoRC:
                                                  overwrite_data=runtime_start_data,
                                                  cfg_method="runtime_start")
 
-        self.return_code = self.topnode.start(None,
-                                              raise_on_fail=True,
-                                              cfg_method="runtime_start",
-                                              overwrite_data=runtime_start_data,
-                                              timeout=self.timeout)
+        self.return_code = self.topnode.send_cmd("start", None,
+                                                 raise_on_fail=True,
+                                                 cfg_method="runtime_start",
+                                                 overwrite_data=runtime_start_data,
+                                                 timeout=self.timeout)
 
         self.console.log(f"[bold magenta]Started run #{self.run}, saving run data in {cfg_save_dir}[/bold magenta]")
 
@@ -131,7 +128,7 @@ class NanoRC:
         Sends stop command
         """
 
-        self.return_code = self.topnode.stop(None, raise_on_fail=True, timeout=self.timeout)
+        self.return_code = self.topnode.send_cmd("stop", None, raise_on_fail=True, timeout=self.timeout)
         self.cfgsvr.save_on_stop(self.run)
         self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
 
@@ -141,7 +138,7 @@ class NanoRC:
         Sends pause command
         """
 
-        self.return_code = self.topnode.pause(None, raise_on_fail=True, timeout=self.timeout)
+        self.return_code = self.topnode.send_cmd("pause", None, raise_on_fail=True, timeout=self.timeout)
 
 
     def resume(self, trigger_interval_ticks: Union[int, None]) -> NoReturn:
@@ -161,11 +158,11 @@ class NanoRC:
                                    overwrite_data=runtime_resume_data,
                                    cfg_method="runtime_resume")
 
-        self.return_code = self.topnode.resume(None,
-                                               raise_on_fail=True,
-                                               cfg_method="runtime_resume",
-                                               overwrite_data=runtime_resume_data,
-                                               timeout=self.timeout)
+        self.return_code = self.topnode.send_cmd("resume", None,
+                                                 raise_on_fail=True,
+                                                 cfg_method="runtime_resume",
+                                                 overwrite_data=runtime_resume_data,
+                                                 timeout=self.timeout)
 
 
     def scrap(self, path) -> NoReturn:
@@ -173,4 +170,4 @@ class NanoRC:
         Send scrap command
         """
 
-        self.return_code = self.topnode.scrap(path, raise_on_fail=True, timeout=self.timeout)
+        self.return_code = self.topnode.send_cmd("scrap", None, raise_on_fail=True, timeout=self.timeout)
