@@ -24,13 +24,22 @@ Generate a configuration:
 python -m minidaqapp.nanorc.mdapp_multiru_gen mdapp_fake
 ```
 
+Next (if you want to), you can create a file called `top_level.json` which contains:
+
+```json
+{
+  "apparatus_id": "fake_daq",
+  "minidaq": "mdapp_fake"
+}
+```
+
 Now you're ready to run.
 
 ### Running the NanoRC
 
 To see a list of options you can pass nanorc in order to control things such as the amount of information it prints and the timeouts for transitions, run `nanorc -h`. We'll skip those for now in the following demo:
 ```
-nanorc mdapp_fake
+nanorc top_level.json # or "nanorc mdapp_fake" if you didn't create the top_level.json
 
 ╭──────────────────────────────────────────────────────────────────────────╮
 │                              Shonky NanoRC                               │

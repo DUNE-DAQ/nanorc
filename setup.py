@@ -10,7 +10,7 @@ setup(
         "rich",
         "sh",
         "graphviz",
-
+        "anytree",
     ],
     extras_require={"develop": [
         "ipdb",
