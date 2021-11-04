@@ -1,5 +1,6 @@
 from .node import GroupNode, SubsystemNode
 from .cfgmgr import ConfigManager
+from .fsm import FSMMachine
 import os
 import json
 from collections import OrderedDict
@@ -16,16 +17,20 @@ def dict_raise_on_duplicates(ordered_pairs):
     return d
 
 class TreeBuilder:
-    def extract_json_to_nodes(self, js, mother) -> GroupNode:
+    def extract_json_to_nodes(self, js, mother, FSM) -> GroupNode:
         for n,d in js.items():
             if isinstance(d, dict):
-                child = GroupNode(name=n, parent=mother, console=self.console)
-                self.extract_json_to_nodes(d, child)
+                child = GroupNode(name=n,
+                                  parent=mother,
+                                  console=self.console)
+                FSM.add_model(child)
+                self.extract_json_to_nodes(d, child, FSM)
             elif isinstance(d, str):
-                node = SubsystemNode(name=n,
-                                     cfgmgr=ConfigManager(d),
-                                     console=self.console,
-                                     parent=mother)
+                child = SubsystemNode(name=n,
+                                      cfgmgr=ConfigManager(d),
+                                      console=self.console,
+                                      parent=mother)
+                FSM.add_model(child)
             else:
                 raise RuntimeError(f"ERROR processing the tree {n}: {d} I don't know what that's supposed to mean?")
 
@@ -50,11 +55,17 @@ class TreeBuilder:
         except Exception as e:
             raise RuntimeError("Failed to parse your top level json, please check it again") from e
         self.apparatus_id = self.top_cfg["apparatus_id"]
-        del self.top_cfg["apparatus_id"]
-        self.root = GroupNode(self.apparatus_id, console=self.console)
-        self.extract_json_to_nodes(self.top_cfg, self.root)
+        del self.top_cfg['apparatus_id']
+
+        FSM = FSMMachine(json.load(open(top_cfg))['fsm'])
+        del self.top_cfg['fsm']
+
+        self.topnode = GroupNode(self.apparatus_id, console=self.console)
+        FSM.add_model(self.topnode)
+
+        self.extract_json_to_nodes(self.top_cfg, self.topnode, FSM)
 
     # This should get changed so that it copies the node, and strips the config
     def get_tree_structure(self):
-        return self.root
+        return self.topnode
         

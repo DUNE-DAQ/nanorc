@@ -1,5 +1,6 @@
 from anytree import NodeMixin, RenderTree, PreOrderIter
 from anytree.resolver import Resolver
+from transitions import Machine
 import time
 from datetime import datetime
 from rich.console import Console
@@ -21,7 +22,6 @@ class GroupNode(NodeMixin):
         if children:
             self.children = children
 
-
     def print_status(self, apparatus_id:str=None) -> int:
         if apparatus_id:
             table = Table(title=f"{apparatus_id} apps")
@@ -41,7 +41,7 @@ class GroupNode(NodeMixin):
                 ping  = sup.commander.ping()
                 last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
                 table.add_row(
-                    pre+node.name,
+                    pre+node.name,#+f" ({node.state})",
                     sup.desc.host,
                     str(alive),
                     str(ping),
@@ -50,7 +50,7 @@ class GroupNode(NodeMixin):
                 )
 
             else:
-                table.add_row(pre+node.name)
+                table.add_row(pre+node.name+f" ({node.state})",)
 
         self.console.print(table)
 
@@ -132,23 +132,24 @@ class GroupNode(NodeMixin):
 
         return (ok, failed)
 
-    def terminate(self) -> int:
+    def on_enter_terminate_ing(self) -> int:
         self.log.debug(f"Sending terminate to {self.name}")
         if not self.children:
             return
 
         for child in self.children:
             child.terminate()
-        return 0
+        self.end_terminate()
 
-    def boot(self) -> int:
-        self.log.debug(f"Sending boot to {self.name}")
+    def on_enter_boot_ing(self) -> int:
+        self.log.info(f"Sending boot to {self.name}")
 
         if not self.children:
             return
 
         for child in self.children:
             child.boot()
+        self.end_boot()
         return 0
 
 
@@ -174,7 +175,7 @@ class SubsystemNode(GroupNode):
         self.listener = None
         self.log = logging.getLogger(self.__class__.__name__+"_"+self.name)
 
-    def boot(self) -> NoReturn:
+    def on_enter_boot_ing(self) -> NoReturn:
         self.log.debug(f"Sending boot to {self.name}")
         try:
             self.pm = SSHProcessManager(self.console)
@@ -191,8 +192,9 @@ class SubsystemNode(GroupNode):
                                      parent=self)
                      for n,d in self.pm.apps.items() ]
         self.children = children
+        self.end_boot()
 
-    def terminate(self) -> NoReturn:
+    def on_enter_terminate_ing(self) -> NoReturn:
         if self.children:
             for child in self.children:
                 child.sup.terminate()
@@ -204,7 +206,8 @@ class SubsystemNode(GroupNode):
             self.listener.terminate()
         if self.pm:
             self.pm.terminate()
-
+        self.end_terminate()
+        
     def send_command(self, *args, **kwargs):
         self._propagate_command(args, kwargs)
         

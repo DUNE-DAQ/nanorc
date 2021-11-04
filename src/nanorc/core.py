@@ -25,6 +25,8 @@ class NanoRC:
         super(NanoRC, self).__init__()     
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
+
+
         self.cfg = TreeBuilder(top_cfg, self.console)
         self.apparatus_id = self.cfg.apparatus_id
 
@@ -67,8 +69,8 @@ class NanoRC:
         """
         Terminates applications (but keep all the subsystems structure)
         """
-
-        self.return_code = self.topnode.terminate()
+        if not self.topnode.is_none():
+            self.return_code = self.topnode.terminate()
 
 
     def ls(self, leg:bool=True) -> NoReturn:
