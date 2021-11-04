@@ -86,10 +86,7 @@ class NanoRC:
         Initializes the applications.
         """
 
-        self.return_code = self.topnode.send_command(path, 'init',
-                                                     'NONE', 'INITIAL',
-                                                     raise_on_fail=True,
-                                                     timeout=self.timeout)
+        self.return_code = self.topnode.init(path=path, raise_on_fail=True, timeout=self.timeout)
 
 
     def conf(self, path) -> NoReturn:

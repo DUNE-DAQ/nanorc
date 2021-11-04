@@ -85,8 +85,28 @@ class GroupNode(NodeMixin):
             raise RuntimeError(f"Tree is corrupted")
         return 0
 
-    def send_command(self, path:[str], cmd:str,
-                     state_entry:str, state_exit:str,
+    def on_enter_error(self, event):
+        error_ev = event.kwargs["event"]
+        self.log.error(f"Upon trying to {error_ev.event.event.name} on {self.name}, an excption was thrown: {event.kwargs['exception']}")
+        
+    def _on_enter_callback(self, event):
+        trigger = event.event.name
+
+        self.log.info(f"Triggered {trigger} on {self.name}")
+        try:
+            self.send_command(trigger, *event.args, **event.kwargs)
+        except Exception as e:
+            self.to_error(exception=e, event=event)
+            return
+        
+        finalisor = getattr(self, "end_"+trigger)
+        finalisor()
+        
+    def _on_exit_callback(self, event):
+        trigger = event.event.name
+        self.log.info(f"Finished to {trigger} on {self.name}")
+        
+    def send_command(self, cmd:str, path:[str], 
                      cfg_method:str=None, overwrite_data:dict={},
                      raise_on_fail:bool=True,
                      timeout:int=None) -> int:
@@ -101,8 +121,8 @@ class GroupNode(NodeMixin):
         self.log.debug(f"Sending {cmd} to {node.name}")
 
         if not node: return
-
-        ok, failed = node._propagate_command(cmd=cmd, state_entry=state_entry, state_exit=state_exit,
+        
+        ok, failed = node._propagate_command(cmd=cmd,
                                              cfg_method=cfg_method, overwrite_data=overwrite_data,
                                              timeout=timeout)
 
@@ -116,7 +136,7 @@ class GroupNode(NodeMixin):
         return 0
 
 
-    def _propagate_command(self, cmd:str, state_entry:str, state_exit:str,
+    def _propagate_command(self, cmd:str,
                           cfg_method:str=None, overwrite_data:dict={},
                           timeout:int=None) -> tuple:
 
@@ -124,15 +144,14 @@ class GroupNode(NodeMixin):
 
         for child in self.children:
             o, f = child._propagate_command(cmd=cmd,
-                                           state_entry = state_entry, state_exit = state_exit,
-                                           cfg_method = cfg_method, overwrite_data = overwrite_data,
-                                           timeout = timeout)
+                                            cfg_method = cfg_method, overwrite_data = overwrite_data,
+                                            timeout = timeout)
             ok.update(o)
             failed.update(f)
 
         return (ok, failed)
 
-    def on_enter_terminate_ing(self) -> int:
+    def on_enter_terminate_ing(self, _) -> int:
         self.log.debug(f"Sending terminate to {self.name}")
         if not self.children:
             return
@@ -141,7 +160,7 @@ class GroupNode(NodeMixin):
             child.terminate()
         self.end_terminate()
 
-    def on_enter_boot_ing(self) -> int:
+    def on_enter_boot_ing(self, _) -> int:
         self.log.info(f"Sending boot to {self.name}")
 
         if not self.children:
@@ -173,9 +192,8 @@ class SubsystemNode(GroupNode):
         self.cfgmgr = cfgmgr
         self.pm = None
         self.listener = None
-        self.log = logging.getLogger(self.__class__.__name__+"_"+self.name)
 
-    def on_enter_boot_ing(self) -> NoReturn:
+    def on_enter_boot_ing(self, _) -> NoReturn:
         self.log.debug(f"Sending boot to {self.name}")
         try:
             self.pm = SSHProcessManager(self.console)
@@ -194,7 +212,7 @@ class SubsystemNode(GroupNode):
         self.children = children
         self.end_boot()
 
-    def on_enter_terminate_ing(self) -> NoReturn:
+    def on_enter_terminate_ing(self, _) -> NoReturn:
         if self.children:
             for child in self.children:
                 child.sup.terminate()
@@ -212,7 +230,6 @@ class SubsystemNode(GroupNode):
         self._propagate_command(args, kwargs)
         
     def _propagate_command(self, cmd:str,
-                          state_entry:str, state_exit:str,
                           cfg_method:str=None, overwrite_data:dict={},
                           timeout:int=None) -> tuple:
         self.log.debug(f"Sending {cmd} to {self.name}")
@@ -234,7 +251,7 @@ class SubsystemNode(GroupNode):
                 else:
                     data = getattr(self.cfgmgr, cmd)
 
-                n.sup.send_command(cmd, data[n.name] if data else {}, state_entry, state_exit)
+                n.sup.send_command(cmd, data[n.name] if data else {})#, self.state, state_exit)
 
             start = datetime.now()
 
@@ -272,8 +289,7 @@ class SubsystemNode(GroupNode):
                             data = f(overwrite_data)
                         else:
                             data = getattr(self.cfgmgr, cmd)
-                        r = child_node.sup.send_command_and_wait(cmd, data[n] if data else {},
-                                                                 state_entry, state_exit, timeout)
+                        r = child_node.sup.send_command_and_wait(cmd, data[n] if data else {}) #,self.state, state_exit, timeout)
                         (ok if r['success'] else failed)[n] = r
 
 

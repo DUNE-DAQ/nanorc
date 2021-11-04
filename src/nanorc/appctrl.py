@@ -164,15 +164,15 @@ class AppCommander:
         self,
         cmd_id: str,
         cmd_data: dict,
-        entry_state: str = "ANY",
-        exit_state: str = "ANY",
+        # entry_state: str = "ANY",
+        # exit_state: str = "ANY",
     ):
         # Use moo schema here?
         cmd = {
             "id": cmd_id,
             "data": cmd_data,
-            "entry_state": entry_state,
-            "exit_state": exit_state,
+            # "entry_state": entry_state,
+            # "exit_state": exit_state,
         }
         self.log.info(f"Sending {cmd_id} to {self.app} ({self.app_url})")
         self.log.debug(json.dumps(cmd, sort_keys=True, indent=2))
@@ -241,12 +241,12 @@ class AppSupervisor:
             self,
             cmd_id: str,
             cmd_data: dict,
-            entry_state: str = "ANY",
-            exit_state: str = "ANY",
+            # entry_state: str = "ANY",
+            # exit_state: str = "ANY",
             ):
         self.last_sent_command = cmd_id
         self.commander.send_command(
-            cmd_id, cmd_data, entry_state, exit_state
+            cmd_id, cmd_data, #entry_state, exit_state
         )
 
     def check_response(
@@ -266,11 +266,11 @@ class AppSupervisor:
             self,
             cmd_id: str,
             cmd_data: dict,
-            entry_state: str = "ANY",
-            exit_state: str = "ANY",
+            # entry_state: str = "ANY",
+            # exit_state: str = "ANY",
             timeout: int = 10,
         ):
-        self.send_command(cmd_id, cmd_data, entry_state, exit_state)
+        self.send_command(cmd_id, cmd_data)#, entry_state, exit_state)
         return self.check_response(timeout)
 
     def terminate(self):
