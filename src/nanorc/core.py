@@ -59,7 +59,7 @@ class NanoRC:
         Boots applications
         """
 
-        self.return_code = self.topnode.send_cmd("boot", timeout=self.timeout)
+        self.return_code = self.topnode.send_cmd("boot")
 
 
     def terminate(self) -> NoReturn:
@@ -102,7 +102,10 @@ class NanoRC:
             disable_data_storage (bool): Description
             run_type (str): Description
         """
-
+        # self.return_code = self.topnode.allowed("start", None)
+        if not self.topnode.can_start():
+            self.console.log(f"I cannot start now! {self.topnode.name} is {self.topnode.state}!")
+            return 1
         self.run = self.run_num_mgr.get_run_number()
 
         runtime_start_data = {
