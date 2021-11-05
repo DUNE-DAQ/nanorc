@@ -1,4 +1,5 @@
 from transitions import Machine
+from functools import partial
 
 class FSMMachine(Machine):
     def __init__(self, cfg):
@@ -36,6 +37,21 @@ class FSMMachine(Machine):
         for transition in self.acting_transitions+self.finalisor_transitions:
             self.add_transition(transition["trigger"], transition["source"], transition["dest"])
 
+    def _can_(self, transition, cls):
+        if transition in self.finalisor_transitions:
+            return False
+
+        for t in self.acting_transitions:
+            if t["trigger"] != transition:
+                continue
+            if cls.state == t["source"]:
+                return True
+
+        return False
+
+    def _checked_assignment(self, model, name, func):
+        if not hasattr(model, name):
+            setattr(model, name, func)
 
     def add_node(self, model):
         for tr in self.acting_transitions:
@@ -45,5 +61,10 @@ class FSMMachine(Machine):
             function_name = 'on_exit_'+tr["dest"]
             if not getattr(model, function_name, None):
                 setattr(model, function_name, model._on_exit_callback.__get__(model))
-        
+
+        for tr in self.acting_transitions+self.finalisor_transitions:
+            new_method = partial(self._can_, tr["trigger"], model)
+            function_name = "can_"+tr["trigger"]
+            self._checked_assignment(model, function_name, new_method)
+
         super().add_model(model)
