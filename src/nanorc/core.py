@@ -66,8 +66,7 @@ class NanoRC:
         """
         Terminates applications (but keep all the subsystems structure)
         """
-        if not self.topnode.is_none():
-            self.return_code = self.topnode.send_cmd("terminate")
+        self.return_code = self.topnode.send_cmd("terminate")
 
 
     def ls(self, leg:bool=True) -> NoReturn:
