@@ -104,7 +104,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, top_cfg):
 
     grid = Table(title='Shonky NanoRC', show_header=False, show_edge=False)
     grid.add_column()
-    grid.add_row("This is an admittedly shonky nanp RC to control DUNE-DAQ applications.")
+    grid.add_row("This is an admittedly shonky nano RC to control DUNE-DAQ applications.")
     grid.add_row("  Give it a command and it will do your biddings,")
     grid.add_row("  but trust it and it will betray you!")
     grid.add_row("Use it with care!")
@@ -124,7 +124,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, top_cfg):
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()
-        
+
     def cleanup_rc():
         logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
         rc.terminate()
@@ -135,7 +135,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, top_cfg):
     obj.rc = rc
     rc.ls(False)
 
-    
+
 
 @cli.command('status')
 @click.pass_obj
