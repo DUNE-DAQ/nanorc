@@ -129,8 +129,9 @@ class NanoRC:
         """
 
         self.return_code = self.topnode.send_cmd("stop", None, raise_on_fail=True, timeout=self.timeout)
-        self.cfgsvr.save_on_stop(self.run)
-        self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
+        if self.return_code != 0:
+            self.cfgsvr.save_on_stop(self.run)
+            self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
 
 
     def pause(self) -> NoReturn:
