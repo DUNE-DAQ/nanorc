@@ -3,34 +3,78 @@ from anytree.resolver import Resolver
 from transitions import Machine
 from transitions.core import MachineError
 import time
+import threading
+from queue import Queue
 from datetime import datetime
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 from rich.panel import Panel
-
 import logging
 from .sshpm import SSHProcessManager
 from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
 from typing import Union, NoReturn
+from enum import Enum
 
 log = logging.getLogger("transitions.core")
 log.setLevel(logging.ERROR)
 log = logging.getLogger("transitions")
 log.setLevel(logging.ERROR)
 
+class ErrorCode(Enum):
+    Success=0
+    Timeout=10
+    Failed=20
+
+class CommandSender(threading.Thread):
+    '''
+    A class to send command to the node
+    '''
+    STOP="COMMAND_QUEUE_STOP"
+
+    def __init__(self, node):
+        threading.Thread.__init__(self, name=f"command_sender_{node.name}")
+        self.node = node
+        self.queue = Queue()
+
+
+    def add_command(self, cmd):
+        self.queue.put(cmd)
+
+
+    def run(self):
+        while True:
+            command = self.queue.get()
+            if command == self.STOP:
+                break
+            if command:
+                cmd = getattr(self.node, command, None)
+                if not cmd:
+                    raise RuntimeError(f"ERROR: {self.node.name}: I don't know of '{command}'")
+                self.node.console.log(f"{self.node.name} Ack: executing '{command}'")
+                cmd()
+                self.node.console.log(f"{self.node.name} Finished '{command}'")
+
+
+    def stop(self):
+        self.queue.put_nowait(self.STOP)
+        self.join()
 
 class GroupNode(NodeMixin):
     def __init__(self, name:str, console, parent=None, children=None):
-        # loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
-        # print(loggers)
-        # exit(1)
         self.console = console
         self.name = name
         self.parent = parent
         self.log = logging.getLogger(self.__class__.__name__+"_"+self.name)
         if children:
             self.children = children
+        self.command_sender = CommandSender(self)
+        self.command_sender.start()
+        self.status_receiver_queue = Queue()
+
+    def send_command(self, command):
+        ## Use the command_sender to send commands
+        self.command_sender.add_command(command)
 
     def print_status(self, apparatus_id:str=None) -> int:
         if apparatus_id:
@@ -105,42 +149,99 @@ class GroupNode(NodeMixin):
         original_event = kwargs.get('event')
         trigger = ""
         etext = ""
-        ssh_exit_code = kwargs.get("ssh_exit_code")
+        ssh_exit_code = ""
         if original_event: trigger = original_event.event.name
-        
+
         if trigger != "unknown_command" and kwargs.get('command'):
             trigger = kwargs.get('command') 
 
         if excp: etext = f", an exception was thrown: {str(excp)},\ntrace: {trace}"
-        
-        if ssh_exit_code: ssh_exit_code = f", the following error code was sent from ssh: {ssh_exit_code}"
-        
+
+        if event.kwargs.get("ssh_exit_code"): ssh_exit_code = f", the following error code was sent from ssh: {event.kwargs['ssh_exit_code']}"
+
         self.log.error(f"while trying to \"{trigger}\" \"{self.name}\""+etext+ssh_exit_code)
-            
+
     def send_to_process(self, *args, **kwargs):
         pass
 
     def _on_enter_callback(self, event):
         trigger = event.event.name
-        
-        raise_on_fail = event.kwargs['raise_on_fail']
-        del event.kwargs['raise_on_fail']
-        try:
-            self.send_to_process(trigger, *event.args, **event.kwargs)
-        except Exception as e:
-            self.log.error(e)
-            self.to_error(exception=e, event=event)
-            return
-        
-        finalisor = getattr(self, "end_"+trigger)
-        finalisor()
-        
+        print(trigger, self.name, self.state)
+
+        still_to_exec = []
+        for child in self.children:
+            self.console.log(f"{self.name} is sending '{trigger}' to {child.name}")
+
+            still_to_exec.append(child) # a record of which children still need to finish their task
+            child.send_cmd(trigger) # send the commands
+
+        failed_resp = []
+        print(event.kwargs)
+        for _ in range(event.kwargs["timeout"]):
+            if not self.status_receiver_queue.empty():
+                response = self.status_receiver_queue.get()
+
+            for child in self.children:
+                if response["node"] == child.name:
+                    still_to_exec.remove(child)
+
+                    if response["status_code"] != ErrorCode.Success:
+                        failed_resp.append(response)
+                    break
+
+            if len(still_to_exec) == 0 or len(failed_resp)>0: # if all done, continue
+                break
+            time.sleep(1)
+
+        timeout = []
+        if len(still_to_exec) > 0:
+            self.console.log(f"Sh*t the f*n... {self.name} can't {trigger} {[child.name for child in still_to_exec]}")
+        timeout = still_to_exec
+
+        for node in timeout:
+            response = {
+                "state": self.state,
+                "command": event.event.name,
+                "node": node.name,
+                "failed": "",
+                "error": "Timed out after waiting for too long, or because a sibling went on error",
+            }
+            node.to_error(response)
+
+        for fail in failed_resp:
+            self.console.log(f"Sh*t the f*n... {fail['node']} threw an error {fail['command']}")
+
+        status = ErrorCode.Success
+        if len(timeout)>0:
+            status = ErrorCode.Timeout
+        if len(failed_resp)>0:
+            status = ErrorCode.Failed
+
+        response = {
+            "status_code" : status,
+            "state": self.state,
+            "command": event.event.name,
+            "node": self.name,
+            "failed": [n['node'] for n in failed_resp],
+            "timeout": [n.name for n in timeout],
+            "error": [n['error'] for n in failed_resp]
+        }
+
+        if response['status_code'] != ErrorCode.Success:
+            self.to_error(response=response)
+        else:
+            # Initiate the transition on this node to say that we have finished
+            finalisor = getattr(self, "end_"+event.event.name, None)
+            finalisor(response=response)
+
+
     def _on_exit_callback(self, event):
-        trigger = event.event.name
-        # self.log.info(f"Finished to {trigger} on {self.name}")
-        
-    def send_cmd(self, cmd:str, path:[str]=None, raise_on_fail:bool=True, *args, **kwargs) -> int:
-        
+        response = event.kwargs.get("response")
+        if self.parent:
+            self.parent.status_receiver_queue.put(response)
+
+    def send_cmd(self, cmd:str, path:[str]=None, raise_on_fail:bool=True, timeout=30, *args, **kwargs) -> int:
+
         if path:
             r = Resolver('name')
             prompted_path = "/".join(path)
@@ -158,39 +259,20 @@ class GroupNode(NodeMixin):
         if not trigger:
             raise RuntimeError(f"{node.name} doesn't know how to execute {cmd}")
 
-        # we need to save the children _before_ the trigger, because boot and terminate spawn application children on subsystems!
-        children = self.children
-        
         try:
-            trigger(raise_on_fail=raise_on_fail, *args, **kwargs)
+            trigger(raise_on_fail=raise_on_fail, timeout=timeout, *args, **kwargs)
         except MachineError as e:
             self.log.error(f"FSM Error: You are not allowed to send \"{cmd}\" to {node.name} as it is in \"{node.state}\" state. Error:\n{str(e)}")
             return 1
         except Exception as e:
-            raise RuntimeError(f"Execution of {cmd} failed on {node.name}") from e
+            if raise_on_fail:
+                self.return_code = ErrorCode.Failed
+                raise RuntimeError(f"Execution of {cmd} failed on {node.name}") from e
+            else:
+                self.return_code = 10
+                return self.return_code
 
-        for child in children:
-            child.send_cmd(cmd=cmd, path=None, *args, **kwargs)
-            if child.is_error():
-                self.to_error(command=cmd)
         return 0
-
-
-    # def _propagate_command(self, cmd:str,
-    #                       cfg_method:str=None, overwrite_data:dict={},
-    #                       timeout:int=None) -> tuple:
-
-    #     ok, failed = {}, {}
-
-    #     for child in self.children:
-    #         o, f = child._propagate_command(cmd=cmd,
-    #                                         cfg_method = cfg_method, overwrite_data = overwrite_data,
-    #                                         timeout = timeout)
-    #         ok.update(o)
-    #         failed.update(f)
-
-    #     return (ok, failed)
-
 
 # Now on to useful stuff
 class ApplicationNode(GroupNode):
@@ -198,13 +280,6 @@ class ApplicationNode(GroupNode):
         # Absolutely no children for ApplicationNode
         super().__init__(name=name, console=console, parent=parent, children=None)
         self.sup = sup
-
-    # def _propagate_command(self, *args, **kwargs):
-    #     raise RuntimeError("ERROR: You can't send a command directly to an application! Send it to the parent subsystem!")
-
-    # def send_command(self, *args, **kwargs):
-    #     raise RuntimeError("ERROR: You can't send a command directly to an application! Send it to the parent subsystem!")
-
 
 class SubsystemNode(GroupNode):
     def __init__(self, name:str, cfgmgr, console, parent=None, children=None, fsm=None):
@@ -236,18 +311,35 @@ class SubsystemNode(GroupNode):
                                     sup=AppSupervisor(self.console, d, self.listener),
                                     parent=self)
             self.fsm.add_node(child)
+
             if child.sup.desc.proc.is_alive() and child.sup.commander.ping():
                 child.to_booted()
             else:
-                failed.append(n)
+                failed.append({
+                    "node": child.name,
+                    "status_code": 1,## I don't know
+                    "command": "boot",
+                    "error": "Not bootable",
+                })
                 child.to_error(event=event, command='boot')
+
             children.append(child)
         self.children = children
-        
-        if not failed:
-            self.end_boot()
+        status_code = ErrorCode.Success
+        if failed:
+           status_code = ErrorCode.Failed
+
+        response = {
+            "node": self.name,
+            "status_code": status_code,
+            "command": "boot",
+            "failed": [f['node'] for f in failed],
+            "error": failed,
+        }
+        if response['status_code'] != ErrorCode.Success:
+            self.to_error(response=response)
         else:
-            self.to_error(event=event, command='boot')
+            self.end_boot(response=response)
 
 
     def on_enter_terminate_ing(self, _) -> NoReturn:
@@ -330,4 +422,3 @@ class SubsystemNode(GroupNode):
 
 
         return (ok, failed)
-
