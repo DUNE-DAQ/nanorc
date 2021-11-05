@@ -1,6 +1,7 @@
 from anytree import NodeMixin, RenderTree, PreOrderIter
 from anytree.resolver import Resolver
 from transitions import Machine
+from transitions.core import MachineError
 import time
 from datetime import datetime
 from rich.console import Console
@@ -37,6 +38,7 @@ class GroupNode(NodeMixin):
         else:
             table = Table(title=f"{apparatus_id} apps")
         table.add_column("name", style="blue")
+        table.add_column("state", style="blue")
         table.add_column("host", style="magenta")
         table.add_column("alive", style="magenta")
         table.add_column("pings", style="magenta")
@@ -50,7 +52,8 @@ class GroupNode(NodeMixin):
                 ping  = sup.commander.ping()
                 last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
                 table.add_row(
-                    Text(pre)+Text(node.name+f" ({node.state})", style=('bold red' if node.is_error() else "")),
+                    Text(pre)+Text(node.name),
+                    Text(f"{node.state}", style=('bold red' if node.is_error() else "")),
                     sup.desc.host,
                     str(alive),
                     str(ping),
@@ -59,7 +62,8 @@ class GroupNode(NodeMixin):
                 )
 
             else:
-                table.add_row(Text(pre)+Text(node.name+f" ({node.state})", style=('bold red' if node.is_error() else "")))
+                table.add_row(Text(pre)+Text(node.name),
+                              Text(f"{node.state}", style=('bold red' if node.is_error() else "")))
 
         self.console.print(table)
 
@@ -100,16 +104,18 @@ class GroupNode(NodeMixin):
         trace = kwargs.get('trace')
         original_event = kwargs.get('event')
         trigger = ""
-        etext=""
-
+        etext = ""
+        ssh_exit_code = kwargs.get("ssh_exit_code")
         if original_event: trigger = original_event.event.name
         
         if trigger != "unknown_command" and kwargs.get('command'):
             trigger = kwargs.get('command') 
 
-        if excp: etext = ", an exception was thrown: {str(excp)},\ntrace: {trace}"
+        if excp: etext = f", an exception was thrown: {str(excp)},\ntrace: {trace}"
         
-        self.log.error(f"while trying to \"{trigger}\" \"{self.name}\""+etext)
+        if ssh_exit_code: ssh_exit_code = f", the following error code was sent from ssh: {ssh_exit_code}"
+        
+        self.log.error(f"while trying to \"{trigger}\" \"{self.name}\""+etext+ssh_exit_code)
             
     def send_to_process(self, *args, **kwargs):
         pass
@@ -157,6 +163,9 @@ class GroupNode(NodeMixin):
         
         try:
             trigger(raise_on_fail=raise_on_fail, *args, **kwargs)
+        except MachineError as e:
+            self.log.error(f"FSM Error: You are not allowed to send \"{cmd}\" to {node.name} as it is in \"{node.state}\" state. Error:\n{str(e)}")
+            return 1
         except Exception as e:
             raise RuntimeError(f"Execution of {cmd} failed on {node.name}") from e
 
