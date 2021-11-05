@@ -59,7 +59,7 @@ class NanoRC:
         Boots applications
         """
 
-        self.return_code = self.topnode.send_cmd("boot")
+        self.return_code = self.topnode.send_cmd("boot", timeout=self.timeout)
 
 
     def terminate(self) -> NoReturn:
