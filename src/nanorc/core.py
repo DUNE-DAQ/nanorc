@@ -136,11 +136,11 @@ class NanoRC:
         Sends stop command
         """
 
+        self.cfgsvr.save_on_stop(self.run)
         self.return_code = self.topnode.send_command(None, 'stop',
                                                      'RUNNING', 'CONFIGURED',
                                                      raise_on_fail=True,
                                                      timeout=self.timeout)
-        self.cfgsvr.save_on_stop(self.run)
         self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
 
 
