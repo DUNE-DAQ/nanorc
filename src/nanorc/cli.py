@@ -194,12 +194,13 @@ def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_
 
 @cli.command('stop')
 @click.option('--stop-wait', type=int, default=0, help='Seconds to wait between Pause and Stop commands')
+@click.option('--force', default=False, is_flag=True)
 @click.pass_obj
-def stop(obj, stop_wait:int):
-    obj.rc.pause()
+def stop(obj, stop_wait:int, force:bool):
+    obj.rc.pause(force)
     obj.rc.status()
     time.sleep(stop_wait)
-    obj.rc.stop()
+    obj.rc.stop(force)
     obj.rc.status()
 
 @cli.command('pause')
@@ -223,9 +224,10 @@ def resume(obj:NanoContext, trigger_interval_ticks:int):
 
 @cli.command('scrap')
 @click.option('--path', type=str, default=None, callback=validatePath)
+@click.option('--force', default=False, is_flag=True)
 @click.pass_obj
-def scrap(obj, path):
-    obj.rc.scrap(path)
+def scrap(obj, path, force):
+    obj.rc.scrap(path, force)
     obj.rc.status()
 
 @cli.command('terminate')

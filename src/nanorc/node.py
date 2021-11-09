@@ -1,5 +1,6 @@
 from anytree import NodeMixin, RenderTree, PreOrderIter
 from anytree.resolver import Resolver
+import requests
 import time
 from datetime import datetime
 from rich.console import Console
@@ -88,12 +89,8 @@ class GroupNode(NodeMixin):
             raise RuntimeError(f"Tree is corrupted")
         return 0
 
-    def send_command(self, path:[str], cmd:str,
-                     state_entry:str, state_exit:str,
-                     cfg_method:str=None, overwrite_data:dict={},
-                     raise_on_fail:bool=True,
-                     timeout:int=None) -> int:
-        
+    def send_command(self, path:[str], cmd:str, state_entry:str, state_exit:str, cfg_method:str=None, overwrite_data:dict={}, raise_on_fail:bool=True, timeout:int=None, force:bool=False) -> int:
+
         if path:
             r = Resolver('name')
             prompted_path = "/".join(path)
@@ -106,9 +103,7 @@ class GroupNode(NodeMixin):
 
         if not node: return
 
-        ok, failed = node._propagate_command(cmd=cmd, state_entry=state_entry, state_exit=state_exit,
-                                             cfg_method=cfg_method, overwrite_data=overwrite_data,
-                                             timeout=timeout)
+        ok, failed = node._propagate_command(cmd=cmd, state_entry=state_entry, state_exit=state_exit, cfg_method=cfg_method, overwrite_data=overwrite_data, timeout=timeout, force=force)
 
         if raise_on_fail and len(failed)>0:
             self.log.error(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
@@ -120,17 +115,15 @@ class GroupNode(NodeMixin):
         return 0
 
 
-    def _propagate_command(self, cmd:str, state_entry:str, state_exit:str,
-                          cfg_method:str=None, overwrite_data:dict={},
-                          timeout:int=None) -> tuple:
+    def _propagate_command(self, cmd:str, state_entry:str, state_exit:str, cfg_method:str=None, overwrite_data:dict={}, timeout:int=None, force:bool=False) -> tuple:
 
         ok, failed = {}, {}
 
         for child in self.children:
             o, f = child._propagate_command(cmd=cmd,
-                                           state_entry = state_entry, state_exit = state_exit,
-                                           cfg_method = cfg_method, overwrite_data = overwrite_data,
-                                           timeout = timeout)
+                                            state_entry = state_entry, state_exit = state_exit,
+                                            cfg_method = cfg_method, overwrite_data = overwrite_data,
+                                            timeout = timeout, force=force)
             ok.update(o)
             failed.update(f)
 
@@ -214,16 +207,22 @@ class SubsystemNode(NodeMixin):
             self.pm.terminate()
 
 
-    def _propagate_command(self, cmd:str,
-                          state_entry:str, state_exit:str,
-                          cfg_method:str=None, overwrite_data:dict={},
-                          timeout:int=None) -> tuple:
+    def _propagate_command(self, cmd:str, state_entry:str, state_exit:str, cfg_method:str=None, overwrite_data:dict={}, timeout:int=None, force:bool=False) -> tuple:
         self.log.debug(f"Sending {cmd} to {self.name}")
 
         sequence = getattr(self.cfgmgr, cmd+'_order', None)
 
         appset = list(self.children)
         ok, failed = {}, {}
+
+        for n in appset:
+            if not n.sup.desc.proc.is_alive() or not n.sup.commander.ping():
+                text = f"'{n.name}' seems to be dead. So I cannot initiate transition '{state_entry}' -> '{state_exit}'."
+                if force:
+                    self.log.error(text+f"\nBut! '--force' was specified, so I'll ignore '{n.name}'!")
+                    appset.remove(n)
+                else:
+                    raise RuntimeError(text+"\nYou may be able to use '--force' if you want to 'stop' or 'scrap' the run.")
 
         if not sequence:
             # Loop over data keys if no sequence is specified or all apps, if data is empty
@@ -238,6 +237,7 @@ class SubsystemNode(NodeMixin):
                     data = getattr(self.cfgmgr, cmd)
 
                 n.sup.send_command(cmd, data[n.name] if data else {}, state_entry, state_exit)
+
 
             start = datetime.now()
 
@@ -275,10 +275,10 @@ class SubsystemNode(NodeMixin):
                             data = f(overwrite_data)
                         else:
                             data = getattr(self.cfgmgr, cmd)
+
                         r = child_node.sup.send_command_and_wait(cmd, data[n] if data else {},
                                                                  state_entry, state_exit, timeout)
                         (ok if r['success'] else failed)[n] = r
 
 
         return (ok, failed)
-
