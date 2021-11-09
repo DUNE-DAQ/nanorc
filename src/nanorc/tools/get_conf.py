@@ -2,6 +2,7 @@ import os
 import io
 import tempfile
 import tarfile
+import socket
 import sh
 from flask import Flask
 import sys
@@ -13,19 +14,19 @@ import os.path
 import logging
 import requests
 from rich.table import Table
+from rich.text import Text
+from rich.json import JSON
 from rich.panel import Panel
 from rich.console import Console
 from rich.traceback import Traceback
 from rich.progress import *
 
 from nanorc.credmgr import credentials
-html_text = ""
-app = Flask("conf_viewer")
 
 def query(socket:str, query:str, user:str, password:str, log) -> dict:
     try:
         print(socket+query)
-        r = requests.get(socket+query,
+        r = requests.get(socket+"/"+query,
                          auth=(user,password),
                          timeout=2)
         
@@ -79,8 +80,11 @@ def print_run_config(obj, run_number, get_config, dotnanorc):
     end_timestamp   = data[2]
     apparatus_id    = data[3]
     run_type        = data[4]
+    
+    obj.console.export_html()
+    
     text=f"Considering run number {run_number}"
-    grid = Table(title=f'Run #{run_number}', show_header=False, show_edge=False)
+    grid = Table(title=f'Run #{run_number}', show_header=False, show_edge=True)
     grid.add_column()
     grid.add_column()
     grid.add_row("Run type"  , run_type       )
@@ -90,7 +94,13 @@ def print_run_config(obj, run_number, get_config, dotnanorc):
     obj.console.print(grid)
 
     if not get_config: return
-    
+    obj.console.print()
+    obj.console.print()
+    obj.console.print()
+    obj.console.print(Text("Configuration following..."))
+    obj.console.print()
+    obj.console.print()
+    obj.console.print()
     metadata_query = "runregistry/getRunBlob/"+str(run_number)
     data = query(dotnanorc["runregistrydb"]["socket"], metadata_query,
                  dotnanorc["runregistrydb"]["user"],
@@ -99,34 +109,48 @@ def print_run_config(obj, run_number, get_config, dotnanorc):
     f = tempfile.NamedTemporaryFile(mode="w+b",suffix='.tar.gz', delete=False)
     f.write(data.content)
     fname = f.name
-    f = open(fname)
+    f.close()
+    # f = open(fname)
+    
     with tempfile.TemporaryDirectory() as temp_name:
         tar = tarfile.open(fname, "r:gz")
         tar.extractall(temp_name)
         tar.close()
         for rootn, dirn, filen in os.walk(temp_name):
-            for f in filen:
-                name = rootn+"/"+f
-                name = "/".join(name.split("/")[4:])
-                print(name)
-                
-                fi = open(name, "r")
-                obj.console.print(fi.read())
-                
-    os.remove(fname)
-    
-    html_text = obj.console.export_html()
-    @app.route('/')
-    @app.route('/index')
-    def index():
-        global html_text
-        return html_text
-    
-    app.run(host='0.0.0.0', port=5001, debug=True)
-        
+            for d in dirn:
+                for f in filen:
+                    name = os.path.join(rootn,f)
+                    try: # such a sloppy way of doing things. Get a grip man!
+                        file_name = name.split(temp_name)[1]
+                        file_name = "/".join(file_name.split("/")[2:])
+                    except:
+                        file_name = name
+                    fi = open(name, "r")
 
-    
-    
+                    grid = Table(title=f"File: {file_name}", show_header=False)
+                    grid.add_row(JSON(fi.read()))
+                    obj.console.print(grid)
+
+    html_text = obj.console.export_html()
+    class Server:
+        def __init__(self, html_text):
+            self.html_text = html_text
+
+        def run(self):
+            app = Flask(__name__)
+
+            def index():
+                return self.html_text
+
+            app.add_url_rule("/", "index", index, methods=["GET"])
+            app.run(host='0.0.0.0', port=5001, debug=True)
+
+    serv = Server(html_text)
+    obj.console.print(f"\n\n\n\n\nYou can now navigate to:\nhttp:{socket.gethostname()}:5001\nCtrl-C when you are done!\n\n\n\n\n")
+    serv.run()
+
+
+
 class minimal_context:
     def __init__(self, console):
         self.console = console
