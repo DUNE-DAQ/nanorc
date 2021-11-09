@@ -117,19 +117,19 @@ def print_run_config(obj, run_number, get_config, dotnanorc):
         tar.extractall(temp_name)
         tar.close()
         for rootn, dirn, filen in os.walk(temp_name):
-            for d in dirn:
-                for f in filen:
-                    name = os.path.join(rootn,f)
-                    try: # such a sloppy way of doing things. Get a grip man!
-                        file_name = name.split(temp_name)[1]
-                        file_name = "/".join(file_name.split("/")[2:])
-                    except:
-                        file_name = name
-                    fi = open(name, "r")
+            for f in filen:
+                name = os.path.join(rootn,f)
+                print(name)
+                try: # such a sloppy way of doing things. Get a grip man!
+                    file_name = name.split(temp_name)[1]
+                    file_name = "/".join(file_name.split("/")[2:])
+                except:
+                    file_name = name
+                fi = open(name, "r")
 
-                    grid = Table(title=f"File: {file_name}", show_header=False)
-                    grid.add_row(JSON(fi.read()))
-                    obj.console.print(grid)
+                grid = Table(title=f"File: {file_name}", show_header=False)
+                grid.add_row(JSON(fi.read()))
+                obj.console.print(grid)
 
     html_text = obj.console.export_html()
     class Server:
