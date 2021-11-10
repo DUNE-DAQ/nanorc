@@ -1,182 +1,156 @@
 import logging
+import time
+import json
+import os
 from rich.console import Console
 from rich.style import Style
 from rich.pretty import Pretty
-from rich.table import Table
-from rich.text import Text
-from .sshpm import SSHProcessManager
-from .cfgmgr import ConfigManager
-from .appctrl import AppSupervisor, ResponseListener
+from .node import GroupNode
+# from .sshpm import SSHProcessManager
+from .treebuilder import TreeBuilder
+from .cfgsvr import FileConfigSaver, DBConfigSaver
+# from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
+from .credmgr import credentials
+
 from rich.traceback import Traceback
+
+from datetime import datetime
 
 from typing import Union, NoReturn
 
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
-    def __init__(self, console: Console, cfg_dir: str):
+    def __init__(self, console: Console, top_cfg: str, run_num_mgr: str, run_registry: str, timeout: int):
         super(NanoRC, self).__init__()     
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
-        self.cfg = ConfigManager(cfg_dir)
+        self.cfg = TreeBuilder(top_cfg, self.console)
+        self.apparatus_id = self.cfg.apparatus_id
 
-        self.pm = SSHProcessManager(console)
-        self.apps = None
+        self.run_num_mgr = run_num_mgr
+        self.cfgsvr = run_registry
+        self.cfgsvr.cfgmgr = self.cfg
+        self.cfgsvr.apparatus_id = self.apparatus_id
+        self.timeout = timeout
+        self.return_code = None
+
+        self.topnode = self.cfg.get_tree_structure()
+        self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
+
         self.listener = None
+
 
     def status(self) -> NoReturn:
         """
         Displays the status of the applications
-        
+
         :returns:   Nothing
         :rtype:     None
         """
 
-        if not self.apps:
+        if not self.topnode:
             return
 
-        table = Table(title="Apps")
-        table.add_column("name", style="blue")
-        table.add_column("host", style="magenta")
-        table.add_column("alive", style="magenta")
-        table.add_column("pings", style="magenta")
-        table.add_column("last cmd")
-        table.add_column("last succ. cmd", style="green")
-
-        for app, sup in self.apps.items():
-            alive = sup.desc.proc.is_alive()
-            ping = sup.commander.ping()
-            last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
-            table.add_row(
-                app, 
-                sup.desc.host,
-                str(alive),
-                str(ping),
-                Text(str(sup.last_sent_command), style=('bold red' if last_cmd_failed else '')),
-                str(sup.last_ok_command)
-            )
-        self.console.print(table)
-
-
-    def send_many(self, cmd: str, data: dict, state_entry: str, state_exit: str, sequence: list = None, raise_on_fail: bool=False):
-        """
-        Sends many commands to all applications
-        
-        :param      cmd:            The command
-        :type       cmd:            str
-        :param      data:           The data
-        :type       data:           dict
-        :param      state_entry:    The state entry
-        :type       state_entry:    str
-        :param      state_exit:     The state exit
-        :type       state_exit:     str
-        :param      sequence:       The sequence
-        :type       sequence:       list
-        :param      raise_on_fail:  Raise an exception if any application fails
-        :type       raise_on_fail:  bool
-        """
-
-        ok, failed = {}, {}
-        if not self.apps:
-            self.log.warning(f"No applications defined to send '{cmd}' to. Has 'boot' been executed?")
-            return ok, failed
-
-        # Loop over data keys if no sequence is specified or all apps, if data is empty
-        if not sequence:
-            sequence = data.keys() if data else self.apps.keys()
-        for n in sequence:
-            r = self.apps[n].send_command(cmd, data[n] if data else {}, state_entry, state_exit)
-            (ok if r['success'] else failed)[n] = r
-        if raise_on_fail and failed:
-            self.log.error(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
-            for a,r in failed.items():
-                self.log.error(f"{a}: {r}")
-            raise RuntimeError(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
-        return ok, failed
+        self.topnode.print_status(self.apparatus_id, self.console)
 
 
     def boot(self) -> NoReturn:
         """
         Boots applications
         """
-        
-        self.log.debug(str(self.cfg.boot))
 
-        try:
-            self.pm.boot(self.cfg.boot)
-        except Exception as e:
-            self.console.print_exception()
-            return
+        self.return_code = self.topnode.boot()
 
-        self.listener = ResponseListener(self.cfg.boot["response_listener"]["port"])
-        self.apps = { n:AppSupervisor(self.console, d, self.listener) for n,d in self.pm.apps.items() }
 
     def terminate(self) -> NoReturn:
-        if self.apps:
-            for n,s in self.apps.items():
-                s.terminate()
-                if self.listener:
-                    self.listener.unregister(n)
-            self.apps = None
-        if self.listener:
-            self.listener.terminate()
+        """
+        Terminates applications (but keep all the subsystems structure)
+        """
 
-        self.log.warning("Terminating")
-        self.pm.terminate()
-    
+        self.return_code = self.topnode.terminate()
 
 
-    def init(self) -> NoReturn:
+    def ls(self, leg:bool=True) -> NoReturn:
+        """
+        Print the nodes
+        """
+
+        self.return_code = self.topnode.print(leg, self.console)
+
+
+    def init(self, path) -> NoReturn:
         """
         Initializes the applications.
         """
-        ok, failed = self.send_many('init', self.cfg.init, 'NONE', 'INITIAL', raise_on_fail=True)
 
-    def conf(self) -> NoReturn:
+        self.return_code = self.topnode.send_command(path, 'init',
+                                                     'NONE', 'INITIAL',
+                                                     raise_on_fail=True,
+                                                     timeout=self.timeout)
+
+
+    def conf(self, path) -> NoReturn:
         """
         Sends configure command to the applications.
         """
-        ok, failed = self.send_many('conf', self.cfg.conf, 'INITIAL', 'CONFIGURED', raise_on_fail=True)
 
-    def start(self, run: int, disable_data_storage: bool, trigger_interval_ticks: Union[int, None]) -> NoReturn:
+        self.return_code = self.topnode.send_command(path, 'conf',
+                                                     'INITIAL', 'CONFIGURED',
+                                                     raise_on_fail=True,
+                                                     timeout=self.timeout)
+
+
+    def start(self, disable_data_storage: bool, run_type:str) -> NoReturn:
         """
         Sends start command to the applications
-        
-        :param      run:                     The run
-        :type       run:                     int
-        :param      disable_data_storage:    The disable data storage
-        :type       disable_data_storage:    bool
-        :param      trigger_interval_ticks:  The trigger interval ticks
-        :type       trigger_interval_ticks:  int
+
+        Args:
+            disable_data_storage (bool): Description
+            run_type (str): Description
         """
+
+        self.run = self.run_num_mgr.get_run_number()
+
         runtime_start_data = {
-                "disable_data_storage": disable_data_storage,
-                "run": run,
-            }
+            "disable_data_storage": disable_data_storage,
+            "run": self.run,
+        }
 
-        if not trigger_interval_ticks is None:
-            runtime_start_data["trigger_interval_ticks"] = trigger_interval_ticks
+        cfg_save_dir = self.cfgsvr.save_on_start(self.topnode, run=self.run, run_type=run_type,
+                                                 overwrite_data=runtime_start_data,
+                                                 cfg_method="runtime_start")
 
-        start_data = self.cfg.runtime_start(runtime_start_data)
-        app_seq = getattr(self.cfg, 'start_order', None)
-        ok, failed = self.send_many('start', start_data, 'CONFIGURED', 'RUNNING', sequence=app_seq, raise_on_fail=True)
+        self.return_code = self.topnode.send_command(None, 'start',
+                                                     'CONFIGURED', 'RUNNING',
+                                                     raise_on_fail=True,
+                                                     cfg_method="runtime_start",
+                                                     overwrite_data=runtime_start_data,
+                                                     timeout=self.timeout)
+
+        self.console.log(f"[bold magenta]Started run #{self.run}, saving run data in {cfg_save_dir}[/bold magenta]")
 
 
-    def stop(self) -> NoReturn:
+    def stop(self, force:bool=False) -> NoReturn:
         """
         Sends stop command
         """
 
-        app_seq = getattr(self.cfg, 'stop_order', None)
-        ok, failed = self.send_many('stop', self.cfg.stop, 'RUNNING', 'CONFIGURED', sequence=app_seq, raise_on_fail=True)
+        self.cfgsvr.save_on_stop(self.run)
+        self.return_code = self.topnode.send_command(None, 'stop', 'RUNNING', 'CONFIGURED', raise_on_fail=True, timeout=self.timeout, force=force)
+        self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
 
 
-    def pause(self) -> NoReturn:
+    def pause(self, force:bool=False) -> NoReturn:
         """
         Sends pause command
         """
-        app_seq = getattr(self.cfg, 'pause_order', None)
-        ok, failed = self.send_many('pause', None, 'RUNNING', 'RUNNING', app_seq, raise_on_fail=True)
+
+        self.return_code = self.topnode.send_command(None, 'pause',
+                                                     'RUNNING', 'RUNNING',
+                                                     raise_on_fail=True,
+                                                     timeout=self.timeout,
+                                                     force=force)
 
 
     def resume(self, trigger_interval_ticks: Union[int, None]) -> NoReturn:
@@ -186,19 +160,26 @@ class NanoRC:
         :param      trigger_interval_ticks:  The trigger interval ticks
         :type       trigger_interval_ticks:  int
         """
+
         runtime_resume_data = {}
 
         if not trigger_interval_ticks is None:
             runtime_resume_data["trigger_interval_ticks"] = trigger_interval_ticks
 
-        resume_data = self.cfg.runtime_resume(runtime_resume_data)
+        self.cfgsvr.save_on_resume(self.topnode,
+                                   overwrite_data=runtime_resume_data,
+                                   cfg_method="runtime_resume")
 
-        app_seq = getattr(self.cfg, 'resume_order', None)
-        ok, failed = self.send_many('resume', resume_data, 'RUNNING', 'RUNNING', sequence=app_seq, raise_on_fail=True)
+        self.return_code = self.topnode.send_command(None, 'resume', 'RUNNING', 'RUNNING', raise_on_fail=True, cfg_method="runtime_resume", overwrite_data=runtime_resume_data, timeout=self.timeout)
 
 
-    def scrap(self) -> NoReturn:
+    def scrap(self, path, force:bool=False) -> NoReturn:
         """
         Send scrap command
         """
-        ok, failed = self.send_many('scrap', None, 'CONFIGURED', 'INITIAL', raise_on_fail=True)
+
+        self.return_code = self.topnode.send_command(path, 'scrap',
+                                                     'CONFIGURED', 'INITIAL',
+                                                     raise_on_fail=True,
+                                                     timeout=self.timeout,
+                                                     force=force)
