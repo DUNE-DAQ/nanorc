@@ -21,7 +21,7 @@ from typing import Union, NoReturn
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
-    def __init__(self, console: Console, top_cfg: str, run_num_mgr: str, run_registry: str, timeout: int):
+    def __init__(self, console: Console, top_cfg: str, run_num_mgr, run_registry, logbook, timeout: int):
         super(NanoRC, self).__init__()     
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
@@ -34,7 +34,9 @@ class NanoRC:
         self.cfgsvr.apparatus_id = self.apparatus_id
         self.timeout = timeout
         self.return_code = None
-
+        
+        self.logbook = logbook
+        
         self.topnode = self.cfg.get_tree_structure()
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
 
@@ -101,7 +103,7 @@ class NanoRC:
                                                      timeout=self.timeout)
 
 
-    def start(self, disable_data_storage: bool, run_type:str) -> NoReturn:
+    def start(self, disable_data_storage: bool, run_type:str, message:str="") -> NoReturn:
         """
         Sends start command to the applications
 
@@ -111,6 +113,9 @@ class NanoRC:
         """
 
         self.run = self.run_num_mgr.get_run_number()
+
+        self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
+        self.logbook.message_on_start(message, self.run, run_type)
 
         runtime_start_data = {
             "disable_data_storage": disable_data_storage,
@@ -130,11 +135,24 @@ class NanoRC:
 
         self.console.log(f"[bold magenta]Started run #{self.run}, saving run data in {cfg_save_dir}[/bold magenta]")
 
+    def message(self, message:str="") -> NoReturn:
+        """
+        Append the logbook
+        """
 
-    def stop(self, force:bool=False) -> NoReturn:
+        if message != "":
+            self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
+            self.logbook.add_message(message)
+
+    
+    def stop(self, force:bool=False, message:str="") -> NoReturn:
         """
         Sends stop command
         """
+
+        if message != "":
+            self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
+            self.logbook.message_on_stop(message)
 
         self.cfgsvr.save_on_stop(self.run)
         self.return_code = self.topnode.send_command(None, 'stop', 'RUNNING', 'CONFIGURED', raise_on_fail=True, timeout=self.timeout, force=force)

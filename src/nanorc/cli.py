@@ -16,15 +16,20 @@ import os.path
 import logging
 
 from . import __version__
+
 from anytree.resolver import Resolver
+
 from rich.table import Table
 from rich.panel import Panel
 from rich.console import Console
 from rich.traceback import Traceback
 from rich.progress import *
+
 from nanorc.runmgr import SimpleRunNumberManager
 from nanorc.cfgsvr import FileConfigSaver
 from nanorc.core import NanoRC
+from nanorc.logbook import FileLogbook
+# from nanorc.logbook import ElisaLogbook
 
 class NanoContext:
     """docstring for NanoContext"""
@@ -95,10 +100,11 @@ def validatePath(ctx, param, prompted_path):
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
+@click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
 @click.argument('top_cfg', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, top_cfg):
+def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, top_cfg):
 
     obj.print_traceback = traceback
 
@@ -119,6 +125,11 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, top_cfg):
         rc = NanoRC(obj.console, top_cfg,
                     SimpleRunNumberManager(),
                     FileConfigSaver(cfg_dumpdir),
+                    # Definitely don't want to scribe to ELISA if we are playing around...
+                    # ElisaLogbook('https://np-vd-coldbox-elog.cern.ch/elisa/api/np-vd-coldbox-elog/',
+                    #               '~/.ssocookie.txt',
+                    #               obj.console),
+                    FileLogbook(logbook_prefix, obj.console),
                     timeout)
 
     except Exception as e:
@@ -173,8 +184,9 @@ def conf(obj, path):
 @click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.option('--resume-wait', type=int, default=0, help='Seconds to wait between Start and Resume commands')
+@click.option('--message', type=str, default="")
 @click.pass_obj
-def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int):
+def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str):
     """
     Start Command
     
@@ -186,7 +198,7 @@ def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_
     """
 
     obj.rc.run_num_mgr.set_run_number(run)
-    obj.rc.start(disable_data_storage, "TEST")
+    obj.rc.start(disable_data_storage, "TEST", message=message)
     obj.rc.status()
     time.sleep(resume_wait)
     obj.rc.resume(trigger_interval_ticks)
@@ -195,12 +207,13 @@ def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_
 @cli.command('stop')
 @click.option('--stop-wait', type=int, default=0, help='Seconds to wait between Pause and Stop commands')
 @click.option('--force', default=False, is_flag=True)
+@click.option('--message', type=str, default="")
 @click.pass_obj
-def stop(obj, stop_wait:int, force:bool):
+def stop(obj, stop_wait:int, force:bool, message:str):
     obj.rc.pause(force)
     obj.rc.status()
     time.sleep(stop_wait)
-    obj.rc.stop(force)
+    obj.rc.stop(force, message=message)
     obj.rc.status()
 
 @cli.command('pause')
@@ -221,6 +234,12 @@ def resume(obj:NanoContext, trigger_interval_ticks:int):
     """
     obj.rc.resume(trigger_interval_ticks)
     obj.rc.status()
+
+@cli.command('message')
+@click.argument('message', type=str, default=None)
+@click.pass_obj
+def message(obj, message):
+    obj.rc.message(message)
 
 @cli.command('scrap')
 @click.option('--path', type=str, default=None, callback=validatePath)

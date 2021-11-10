@@ -19,6 +19,8 @@ from rich.console import Console
 from rich.traceback import Traceback
 from rich.progress import *
 
+from nanorc.logbook import ElisaLogbook
+
 from nanorc.core import NanoRC
 from nanorc.runmgr import DBRunNumberManager
 from nanorc.cfgsvr import DBConfigSaver
@@ -69,6 +71,10 @@ def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, cfg_
         rc = NanoRC(obj.console, cfg_dir,
                     DBRunNumberManager(dotnanorc["rundb"]["socket"]),
                     DBConfigSaver(dotnanorc["runregistrydb"]["socket"]),
+                    ElisaLogbook(dotnanorc["elisa"]["connection"],
+                                 dotnanorc["elisa"]["ssocookie"],
+                                 obj.console),
+
                     timeout)
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
@@ -103,8 +109,9 @@ np04cli.add_command(terminate, 'terminate')
 @click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.option('--resume-wait', type=int, default=0, help='Seconds to wait between Start and Resume commands')
+@click.option('--message', type=str, default="")
 @click.pass_obj
-def start(obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int):
+def start(obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str):
     """
     Start Command
 
@@ -113,7 +120,7 @@ def start(obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_inte
         disable_data_storage (bool): Flag to disable data writing to storage
     """
 
-    obj.rc.start(disable_data_storage, run_type)
+    obj.rc.start(disable_data_storage, run_type, message=message)
     obj.rc.status()
     time.sleep(resume_wait)
     obj.rc.resume(trigger_interval_ticks)
