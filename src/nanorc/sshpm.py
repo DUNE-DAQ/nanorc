@@ -71,6 +71,7 @@ class AppProcessDescriptor(object):
         self.proc = None
         self.name = name
         self.logfile = None
+        self.logerrfile = None
         self.ssh_args = None
         self.host = None
         self.cmd = None
@@ -167,11 +168,13 @@ class SSHProcessManager(object):
             cmd=';'.join([ f"export {n}=\"{v}\"" for n,v in app_vars.items()] + boot_info['exec'][app_conf['exec']]['cmd'])
 
             log_file = f'log_{app_name}_{app_conf["port"]}.txt'
+            logerr_file=f'log_{app_name}_{app_conf["port"]}_stderr.txt'
 
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no", cmd]
 
             desc = AppProcessDescriptor(app_name)
             desc.logfile = log_file
+            desc.logerrfile = logerr_file
             desc.cmd = cmd
             desc.ssh_args = ssh_args
             desc.host = host
@@ -190,6 +193,7 @@ class SSHProcessManager(object):
             proc = sh.ssh(
                 *desc.ssh_args,
                 _out=file_logger(desc.logfile),
+                _err=file_logger(desc.logerrfile),
                 _bg=True,
                 _bg_exc=False,
                 _new_session=True,
