@@ -73,7 +73,7 @@ def print_run_config(obj, run_number, get_config, dotnanorc):
                  dotnanorc["runregistrydb"]["user"],
                  dotnanorc["runregistrydb"]["password"], log)
     
-    data = json.loads(r.text)[0][0]
+    data = json.loads(r.text)[1][0]
     
     run_number      = data[0]
     start_timestamp = data[1]
