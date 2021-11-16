@@ -26,9 +26,8 @@ from nanorc.runmgr import DBRunNumberManager
 from nanorc.cfgsvr import DBConfigSaver
 from nanorc.credmgr import credentials
 from .cli import *
-
 # ------------------------------------------------------------------------------
-@click_shell.shell(prompt='shonky np04rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
+@click_shell.shell(prompt='anonymous@np04rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 @click.version_option(__version__)
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
@@ -37,17 +36,23 @@ from .cli import *
 @click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
 
 @click.argument('cfg_dir', type=click.Path(exists=True))
+@click.argument('user', type=str)
 @click.pass_obj
 @click.pass_context
-def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, cfg_dir):
+def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, cfg_dir, user):
     obj.print_traceback = traceback
-
+    print(ctx.__dict__.keys())
+    # if ctx.parent: print("parent",ctx.parent)
+    # if ctx.command: print("command",)
+    # if ctx.params: print("params",ctx.params)
+    # if ctx.args: print("args",ctx.args)
+    ctx.command.shell.prompt = f"{user}@np04rc> "
     grid = Table(title='Shonky Nano04RC', show_header=False, show_edge=False)
     grid.add_column()
-    grid.add_row("This is an admittedly shonky nanp RC to control DUNE-DAQ applications.")
+    grid.add_row("This is an admittedly shonky nano RC to control DUNE-DAQ applications.")
     grid.add_row("  Give it a command and it will do your biddings,")
     grid.add_row("  but trust it and it will betray you!")
-    grid.add_row("Use it with care!")
+    grid.add_row(f"Use it with care, {user}!")
 
     obj.console.print(Panel.fit(grid))
 
@@ -68,7 +73,7 @@ def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, cfg_
                               dotnanorc["runregistrydb"]["password"])
         logging.getLogger("cli").info("RunDB socket "+dotnanorc["rundb"]["socket"])
         logging.getLogger("cli").info("RunRegistryDB socket "+dotnanorc["runregistrydb"]["socket"])
-        rc = NanoRC(obj.console, cfg_dir,
+        rc = NanoRC(obj.console, cfg_dir, user,
                     DBRunNumberManager(dotnanorc["rundb"]["socket"]),
                     DBConfigSaver(dotnanorc["runregistrydb"]["socket"]),
                     ElisaLogbook(dotnanorc["elisa"]["connection"],
@@ -102,6 +107,9 @@ np04cli.add_command(resume, 'resume')
 np04cli.add_command(scrap, 'scrap')
 np04cli.add_command(wait, 'wait')
 np04cli.add_command(terminate, 'terminate')
+np04cli.add_command(message, 'message')
+np04cli.add_command(change_user, 'change_user')
+
 
 @np04cli.command('start')
 @click.argument('run-type', required=True,

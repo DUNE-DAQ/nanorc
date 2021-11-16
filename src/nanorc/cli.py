@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 
 
@@ -93,6 +94,7 @@ def validatePath(ctx, param, prompted_path):
 
     return hierarchy
 
+
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 @click.version_option(__version__)
@@ -105,7 +107,6 @@ def validatePath(ctx, param, prompted_path):
 @click.pass_obj
 @click.pass_context
 def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, top_cfg):
-
     obj.print_traceback = traceback
 
     grid = Table(title='Shonky NanoRC', show_header=False, show_edge=False)
@@ -122,7 +123,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, top
         updateLogLevel(loglevel)
 
     try:
-        rc = NanoRC(obj.console, top_cfg,
+        rc = NanoRC(obj.console, top_cfg, "anonymous",
                     SimpleRunNumberManager(),
                     FileConfigSaver(cfg_dumpdir),
                     # Definitely don't want to scribe to ELISA if we are playing around...
@@ -241,6 +242,14 @@ def resume(obj:NanoContext, trigger_interval_ticks:int):
 def message(obj, message):
     obj.rc.message(message)
 
+@cli.command('change_user')
+@click.argument('user', type=str, default=None)
+@click.pass_obj
+@click.pass_context
+def change_user(ctx, obj, user):
+    ctx.parent.command.shell.prompt = f"{user}@np04rc> "
+    obj.rc.change_user(user)
+    
 @cli.command('scrap')
 @click.option('--path', type=str, default=None, callback=validatePath)
 @click.option('--force', default=False, is_flag=True)

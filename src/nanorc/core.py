@@ -21,8 +21,9 @@ from typing import Union, NoReturn
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
-    def __init__(self, console: Console, top_cfg: str, run_num_mgr, run_registry, logbook, timeout: int):
-        super(NanoRC, self).__init__()     
+    def __init__(self, console: Console, top_cfg: str, user:str, run_num_mgr, run_registry, logbook, timeout: int):
+        super(NanoRC, self).__init__()
+        self.user = user
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
         self.cfg = TreeBuilder(top_cfg, self.console)
@@ -115,7 +116,7 @@ class NanoRC:
         self.run = self.run_num_mgr.get_run_number()
 
         self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
-        self.logbook.message_on_start(message, self.run, run_type)
+        self.logbook.message_on_start(message, self.run, run_type, user=self.user)
 
         runtime_start_data = {
             "disable_data_storage": disable_data_storage,
@@ -142,9 +143,16 @@ class NanoRC:
 
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
-            self.logbook.add_message(message)
+            self.logbook.add_message(message, user=self.user)
 
-    
+    def change_user(self, user:str) -> NoReturn:
+        """
+        Change the user
+        """
+        self.log.info(f"User {user} taking over!")
+        self.user = user
+
+        
     def stop(self, force:bool=False, message:str="") -> NoReturn:
         """
         Sends stop command
@@ -152,7 +160,7 @@ class NanoRC:
 
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
-            self.logbook.message_on_stop(message)
+            self.logbook.message_on_stop(message, user=self.user)
 
         self.cfgsvr.save_on_stop(self.run)
         self.return_code = self.topnode.send_command(None, 'stop', 'RUNNING', 'CONFIGURED', raise_on_fail=True, timeout=self.timeout, force=force)
