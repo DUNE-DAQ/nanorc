@@ -25,7 +25,7 @@ from nanorc.credmgr import credentials
 
 def query(socket:str, query:str, user:str, password:str, log) -> dict:
     try:
-        print(socket+query)
+        print(socket+"/"+query)
         r = requests.get(socket+"/"+query,
                          auth=(user,password),
                          timeout=2)
@@ -48,8 +48,11 @@ def query(socket:str, query:str, user:str, password:str, log) -> dict:
 @click.argument('run_number', default=None, required=False)
 @click.option('--get-config', type=bool, default=True, help="whether to download the configuration and render it")
 @click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
+@click.option('--html/--no-html', default=True, help='whether we should start a little HTML server, short-lived to see the result')
+@click.option('--host', type=str, default="localhost", help='Where the temp server should serve HTML')
+@click.option('--port', type=int, default=5001, help='Which port the temp server should serve HTML')
 @click.pass_obj
-def print_run_config(obj, run_number, get_config, dotnanorc):
+def print_run_config(obj, run_number, get_config, dotnanorc, html, host, port):
     dotnanorc = os.path.expanduser(dotnanorc)
     log = logging.getLogger("getconf")
 
@@ -74,23 +77,17 @@ def print_run_config(obj, run_number, get_config, dotnanorc):
                  dotnanorc["runregistrydb"]["password"], log)
     
     data = json.loads(r.text)[1][0]
-    
-    run_number      = data[0]
-    start_timestamp = data[1]
-    end_timestamp   = data[2]
-    apparatus_id    = data[3]
-    run_type        = data[4]
-    
+    keys = json.loads(r.text)[0]
     obj.console.export_html()
-    
+    zip_iterator = zip(keys, data)
+    data_dict = dict(zip_iterator)
+    run_number = data_dict['RUN_NUMBER']
     text=f"Considering run number {run_number}"
-    grid = Table(title=f'Run #{run_number}', show_header=False, show_edge=True)
+    grid = Table(title=f"Run #{run_number}", show_header=False, show_edge=True)
     grid.add_column()
     grid.add_column()
-    grid.add_row("Run type"  , run_type       )
-    grid.add_row("Start time", start_timestamp)
-    grid.add_row("End time"  , end_timestamp  )
-    grid.add_row("Apparatus" , apparatus_id   )
+    for key, val in data_dict.items():
+        grid.add_row(str(key), str(val))
     obj.console.print(grid)
 
     if not get_config: return
@@ -131,9 +128,16 @@ def print_run_config(obj, run_number, get_config, dotnanorc):
                 grid.add_row(JSON(fi.read()))
                 obj.console.print(grid)
 
+    if not html:
+        return
+
     html_text = obj.console.export_html()
     class Server:
-        def __init__(self, html_text):
+        def __init__(self, html_text, host, port):
+            self.host = host
+            if host == "0.0.0.0" or host == "localhost":
+                self.host = socket.gethostname()
+            self.port = port
             self.html_text = html_text
 
         def run(self):
@@ -141,12 +145,14 @@ def print_run_config(obj, run_number, get_config, dotnanorc):
 
             def index():
                 return self.html_text
+            
 
             app.add_url_rule("/", "index", index, methods=["GET"])
-            app.run(host='0.0.0.0', port=5001, debug=True)
+            app.run(host=self.host, port=self.port, debug=False, use_reloader=False)
 
-    serv = Server(html_text)
-    obj.console.print(f"\n\n\n\n\nYou can now navigate to:\nhttp:{socket.gethostname()}:5001\nCtrl-C when you are done!\n\n\n\n\n")
+    serv = Server(html_text, host, port)
+    
+    obj.console.print(f"\n\n\n\n\nYou can now navigate to:\nhttp:{serv.host}:{serv.port}\nCtrl-C when you are done!\n\n\n\n\n")
     serv.run()
 
 
