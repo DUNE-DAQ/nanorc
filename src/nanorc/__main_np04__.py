@@ -41,11 +41,6 @@ from .cli import *
 @click.pass_context
 def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, cfg_dir, user):
     obj.print_traceback = traceback
-    print(ctx.__dict__.keys())
-    # if ctx.parent: print("parent",ctx.parent)
-    # if ctx.command: print("command",)
-    # if ctx.params: print("params",ctx.params)
-    # if ctx.args: print("args",ctx.args)
     ctx.command.shell.prompt = f"{user}@np04rc> "
     grid = Table(title='Shonky Nano04RC', show_header=False, show_edge=False)
     grid.add_column()
@@ -77,9 +72,7 @@ def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, cfg_
                     DBRunNumberManager(dotnanorc["rundb"]["socket"]),
                     DBConfigSaver(dotnanorc["runregistrydb"]["socket"]),
                     ElisaLogbook(dotnanorc["elisa"]["connection"],
-                                 dotnanorc["elisa"]["ssocookie"],
                                  obj.console),
-
                     timeout)
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
