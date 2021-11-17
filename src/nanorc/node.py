@@ -179,7 +179,8 @@ class SubsystemNode(NodeMixin):
     def boot(self) -> NoReturn:
         self.log.debug(f"Sending boot to {self.name}")
         try:
-            self.pm = SSHProcessManager(self.console)
+            if self.pm is None:
+                self.pm = SSHProcessManager(self.console)
             self.pm.boot(self.cfgmgr.boot)
         except Exception as e:
             self.console.print_exception()
