@@ -1,12 +1,15 @@
 from elisa_client_api.elisa import Elisa
 from elisa_client_api.searchCriteria import SearchCriteria
 from elisa_client_api.messageInsert import MessageInsert
+from elisa_client_api.messageReply import MessageReply
 from elisa_client_api.exception import *
 
 import logging
 import os.path
 import subprocess
 import copy
+import time
+
 
 class FileLogbook:
     def __init__(self, path:str, console):
@@ -40,83 +43,94 @@ class ElisaLogbook:
     def __init__(self, connection:str, console):
         self.console = console
         self.elisa_arguments={"connection":connection}
-        self.current_id = None
-        self.current_run = None
         self.log = logging.getLogger(self.__class__.__name__)
+        self._start_new_message_thread()
 
     def _start_new_message_thread(self):
+        self.log.info("ELisA logbook: Next message will be a new thread")
         self.current_id = None
         self.current_run = None
+        self.current_run_type = None
 
 
     def _generate_new_sso_cookie(self):
+        SSO_COOKIE_TIMEOUT=3600.*2.
         SSO_COOKIE_PATH=os.path.expanduser("~/.sso_cookie.txt")
-        args=["cern-get-sso-cookie", "--krb", "-r", "-u", "https://np-vd-coldbox-elog.cern.ch", "-o", f"{SSO_COOKIE_PATH}"]
-        proc = subprocess.run(args)
-        if proc.returncode != 0:
-            self.log.error("Couldn't get SSO Cookie!")
-            raise RuntimeError("Couldn't get SSO cookie!")
+        if (time.time() - os.path.getmtime(SSO_COOKIE_PATH))>SSO_COOKIE_TIMEOUT:
+            self.log.info("ELisA logbook: Regenerating the SSO cookie")
+            args=["cern-get-sso-cookie", "--krb", "-r", "-u", "https://np-vd-coldbox-elog.cern.ch", "-o", f"{SSO_COOKIE_PATH}"]
+            proc = subprocess.run(args)
+            if proc.returncode != 0:
+                self.log.error("ELisA logbook: Couldn't get SSO cookie!")
+                raise RuntimeError("ELisA logbook: Couldn't get SSO cookie!")
         return SSO_COOKIE_PATH
 
-    def _respond_to(self, subject:str, body:str, author:str):
+
+    def _respond_to(self, subject:str, body:str, author:str, mtype:str):
         elisa_arg = copy.deepcopy(self.elisa_arguments)
         sso = {"ssocookie": self._generate_new_sso_cookie()}
         elisa_arg.update(sso)
-        
-        if not self.original_id:
+
+        if not self.current_id:
+            self.log.info("ELisA logbook: Creating a new thread")
             elisa_inst = Elisa(**elisa_arg)
             message = MessageInsert()
             message.author = author
             message.subject = subject
-            message.type = "Default"
+            message.type = "Automatic"
+            message.Automatic_Message_Type = mtype
             message.systemsAffected = ["DAQ"]
             message.body = body
             try:
-                ret = self.elisa_instance.insertMessage(message)
+                ret = elisa_inst.insertMessage(message)
             except ElisaError as ex:
-                self.log.error(str(ex))
+                self.log.error(f"ELisA logbook: {str(ex)}")
+                self.log.error(ret)
+                raise ex
             self.current_id = ret.id
         else:
-            ## hack in the connection for an reply to a message (why not?)
-            ## according to https://atlasdaq.cern.ch/elisaAPIdoc/elisa-rest-api/protocol.html#reply-to-a-message
-            ## if we post a message to messages/4442050 we should respond to message 4442050
-            reply_arguments = elisa_arg
-            reply_arguments["connection"] += f"/messages/{self.id}"
-            elisa_inst = Elisa(**reply_arguments)
-            message = MessageInsert()
-            message.subject = subject
+            self.log.info(f"ELisA logbook: Answering to message ID{self.current_id}")
+            elisa_inst = Elisa(**elisa_arg)
+            message = MessageReply(self.current_id)
             message.author = author
-            message.type = "Default"
             message.systemsAffected = ["DAQ"]
+            message.Automatic_Message_Type = mtype
             message.body = body
             try:
-                ret = self.elisa_instance.insertMessage(message)
+                ret = elisa_inst.replyToMessage(message)
             except ElisaError as ex:
-                self.log.error(str(ex))
+                self.log.error(f"ELisA logbook: {str(ex)}")
+                self.log.error(ret)
+                raise ex
             ## store for next time around...
             self.current_id = ret.id
+        self.log.info(f"ELisA logbook: Sent message (ID{self.current_id})")
 
 
 
     def message_on_start(self, message:str, run_num:int, run_type:str, user:str):
-        text = f"User {user} started run {run_num} of type {run_type}\n"
+        self.current_run_num = run_num
+        self.current_run_type = run_type
+
+        text = f"<p>User {user} started run {self.current_run_num} of type {self.current_run_type}</p>"
         if message != "":
-            text += user+": "+message+"\n"
-        title = f"{user} started new run {run_num} ({run_type})"
-        self._respond_to(subject=title, body=text, author=user)
+            text += "<p>"+user+": "+message+"</p>"
+        else:
+            text += "<p>log automatically generated by NanoRC.</p>"
+        title = f"{user} started new run {self.current_run_num} ({self.current_run_type})"
+        self._respond_to(subject=title, body=text, author=user, mtype="SoR")
 
     def add_message(self, message:str, user:str):
         if message != "":
-            text = user+": "+message+"\n"
-            self._respond_to(subject="NanoRC comment", body=text, author=user)
+            text = "<p>"+user+": "+message+"</p>"
+            self._respond_to(subject="User comment", body=text, author=user, mtype="Alarm")
 
     def message_on_stop(self, message:str, user:str):
         if message!="":
-            text = user+": "+message+"\n"
-        text += f"User {user} finished run {run_num}\n"
-        title = f"{user} ended run {run_num} ({run_type})"
-        self._respond_to(subject=title, body=text, author=user)
+            text = "<p>"+user+": "+message+"</p>"
+        else:
+            text += "<p>log automatically generated by NanoRC.</p>"
+        text += f"<p>User {user} finished run {self.current_run_num}</p>"
+        title = f"{user} ended run {self.current_run_num} ({self.current_run_type})"
+        self._respond_to(subject=title, body=text, author=user, mtype="EoR")
         self._start_new_message_thread()
-
-
-
