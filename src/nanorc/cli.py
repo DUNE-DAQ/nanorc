@@ -29,14 +29,13 @@ from rich.progress import *
 from nanorc.runmgr import SimpleRunNumberManager
 from nanorc.cfgsvr import FileConfigSaver
 from nanorc.core import NanoRC
-from nanorc.logbook import FileLogbook
-# from nanorc.logbook import ElisaLogbook
+from nanorc.logbook import *
 
 class NanoContext:
     """docstring for NanoContext"""
     def __init__(self, console: Console):
         """Nanorc Context for click use.
-        
+
         Args:
             console (Console): rich console for messages and logging
         """
@@ -81,7 +80,7 @@ def validatePath(ctx, param, prompted_path):
 
     if prompted_path is None:
         return None
-        
+
     hierarchy = prompted_path.split("/")
 
     topnode = ctx.obj.rc.topnode
@@ -102,12 +101,15 @@ def validatePath(ctx, param, prompted_path):
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
+@click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
 @click.argument('top_cfg', type=click.Path(exists=True))
+@click.argument('user', type=str)
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, top_cfg):
+def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, kerberos, top_cfg, user):
     obj.print_traceback = traceback
+    ctx.command.shell.prompt = f"{user}@rc> "
 
     grid = Table(title='Shonky NanoRC', show_header=False, show_edge=False)
     grid.add_column()
@@ -123,20 +125,20 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, top
         updateLogLevel(loglevel)
 
     try:
-        rc = NanoRC(obj.console, top_cfg, "anonymous",
+        rc = NanoRC(obj.console, top_cfg, user,
                     SimpleRunNumberManager(),
                     FileConfigSaver(cfg_dumpdir),
                     # Definitely don't want to scribe to ELISA if we are playing around...
-                    # ElisaLogbook('https://np-vd-coldbox-elog.cern.ch/elisa/api/np-vd-coldbox-elog/',
-                    #               '~/.ssocookie.txt',
-                    #               obj.console),
-                    FileLogbook(logbook_prefix, obj.console),
-                    timeout)
+                    ElisaLogbook('https://np-vd-coldbox-elog.cern.ch/elisa/api/np-vd-coldbox-elog/',
+                                 obj.console),
+                    # FileLogbook(logbook_prefix, obj.console),
+                    timeout,
+                    kerberos)
 
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()
-        
+
     def cleanup_rc():
         logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
         rc.terminate()
@@ -147,7 +149,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, top
     obj.rc = rc
     rc.ls(False)
 
-    
+
 
 @cli.command('status')
 @click.pass_obj
@@ -190,12 +192,12 @@ def conf(obj, path):
 def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str):
     """
     Start Command
-    
+
     Args:
         obj (NanoContext): Context object
         run (int): Run number
         disable_data_storage (bool): Flag to disable data writing to storage
-    
+
     """
 
     obj.rc.run_num_mgr.set_run_number(run)
@@ -228,7 +230,7 @@ def pause(obj):
 @click.pass_obj
 def resume(obj:NanoContext, trigger_interval_ticks:int):
     """Resume Command
-    
+
     Args:
         obj (NanoContext): Context object
         trigger_interval_ticks (int): Trigger separation in ticks
@@ -249,7 +251,7 @@ def message(obj, message):
 def change_user(ctx, obj, user):
     ctx.parent.command.shell.prompt = f"{user}@np04rc> "
     obj.rc.change_user(user)
-    
+
 @cli.command('scrap')
 @click.option('--path', type=str, default=None, callback=validatePath)
 @click.option('--force', default=False, is_flag=True)
