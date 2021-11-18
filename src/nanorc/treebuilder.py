@@ -23,13 +23,15 @@ class TreeBuilder:
                 self.extract_json_to_nodes(d, child)
             elif isinstance(d, str):
                 node = SubsystemNode(name=n,
+                                     ssh_conf=self.ssh_conf,
                                      cfgmgr=ConfigManager(d),
                                      console=self.console,
                                      parent=mother)
             else:
                 raise RuntimeError(f"ERROR processing the tree {n}: {d} I don't know what that's supposed to mean?")
 
-    def __init__(self, top_cfg, console):
+    def __init__(self, top_cfg, console, ssh_conf):
+        self.ssh_conf = ssh_conf
         if os.path.isdir(top_cfg):
             data = {
                 "apparatus_id": top_cfg,

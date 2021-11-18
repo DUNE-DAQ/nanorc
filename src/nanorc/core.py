@@ -21,12 +21,19 @@ from typing import Union, NoReturn
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
-    def __init__(self, console: Console, top_cfg: str, user:str, run_num_mgr, run_registry, logbook, timeout: int):
+    def __init__(self, console: Console, top_cfg: str, user:str, run_num_mgr, run_registry, logbook, timeout: int, use_kerb=True):
         super(NanoRC, self).__init__()
         self.user = user
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
-        self.cfg = TreeBuilder(top_cfg, self.console)
+
+        ssh_conf = []
+        if not use_kerb:
+            ssh_conf = ["-o GSSAPIAuthentication=no"]
+
+        self.cfg = TreeBuilder(top_cfg=top_cfg,
+                               console=self.console,
+                               ssh_conf=ssh_conf)
         self.apparatus_id = self.cfg.apparatus_id
 
         self.run_num_mgr = run_num_mgr
@@ -35,9 +42,9 @@ class NanoRC:
         self.cfgsvr.apparatus_id = self.apparatus_id
         self.timeout = timeout
         self.return_code = None
-        
+
         self.logbook = logbook
-        
+
         self.topnode = self.cfg.get_tree_structure()
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
 
@@ -115,8 +122,17 @@ class NanoRC:
 
         self.run = self.run_num_mgr.get_run_number()
 
-        self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
-        self.logbook.message_on_start(message, self.run, run_type, user=self.user)
+        if message != "":
+            self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
+
+        try:
+            self.logbook.message_on_start(message, self.run, run_type, user=self.user)
+        except Exception as e:
+            elisa_connection = self.logbook.elisa_arguments['connection']
+            stop_index = elisa_connection.find("/api/")
+            elisa_connection = elisa_connection[:stop_index]
+            self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {elisa_connection}\nError text:\n{str(e)}")
+
 
         runtime_start_data = {
             "disable_data_storage": disable_data_storage,
@@ -143,7 +159,14 @@ class NanoRC:
 
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
-            self.logbook.add_message(message, user=self.user)
+            try:
+                self.logbook.add_message(message, user=self.user)
+            except Exception as e:
+                elisa_connection = self.logbook.elisa_arguments['connection']
+                stop_index = elisa_connection.find("/api/")
+                elisa_connection = elisa_connection[:stop_index]
+                self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {elisa_connection}\nError text:\n{str(e)}")
+
 
     def change_user(self, user:str) -> NoReturn:
         """
@@ -152,7 +175,7 @@ class NanoRC:
         self.log.info(f"User {user} taking over!")
         self.user = user
 
-        
+
     def stop(self, force:bool=False, message:str="") -> NoReturn:
         """
         Sends stop command
@@ -160,7 +183,14 @@ class NanoRC:
 
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
-            self.logbook.message_on_stop(message, user=self.user)
+            try:
+                self.logbook.message_on_stop(message, user=self.user)
+            except Exception as e:
+                elisa_connection = self.logbook.elisa_arguments['connection']
+                stop_index = elisa_connection.find("/api/")
+                elisa_connection = elisa_connection[:stop_index]
+                self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {elisa_connection}\nError text:\n{str(e)}")
+
 
         self.cfgsvr.save_on_stop(self.run)
         self.return_code = self.topnode.send_command(None, 'stop', 'RUNNING', 'CONFIGURED', raise_on_fail=True, timeout=self.timeout, force=force)
@@ -182,7 +212,7 @@ class NanoRC:
     def resume(self, trigger_interval_ticks: Union[int, None]) -> NoReturn:
         """
         Sends resume command
-        
+
         :param      trigger_interval_ticks:  The trigger interval ticks
         :type       trigger_interval_ticks:  int
         """
