@@ -34,12 +34,12 @@ from .cli import *
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
-
+@click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.argument('user', type=str)
 @click.pass_obj
 @click.pass_context
-def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, cfg_dir, user):
+def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, kerberos, cfg_dir, user):
     obj.print_traceback = traceback
     ctx.command.shell.prompt = f"{user}@np04rc> "
     grid = Table(title='Shonky Nano04RC', show_header=False, show_edge=False)
@@ -73,7 +73,8 @@ def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, cfg_
                     DBConfigSaver(dotnanorc["runregistrydb"]["socket"]),
                     ElisaLogbook(dotnanorc["elisa"]["connection"],
                                  obj.console),
-                    timeout)
+                    timeout,
+                    kerberos)
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()
@@ -101,7 +102,15 @@ np04cli.add_command(scrap, 'scrap')
 np04cli.add_command(wait, 'wait')
 np04cli.add_command(terminate, 'terminate')
 np04cli.add_command(message, 'message')
-np04cli.add_command(change_user, 'change_user')
+
+@np04cli.command('change_user')
+@click.argument('user', type=str, default=None)
+@click.pass_obj
+@click.pass_context
+def change_user(ctx, obj, user):
+    ctx.parent.command.shell.prompt = f"{user}@np04rc> "
+    obj.rc.change_user(user)
+
 
 
 @np04cli.command('start')

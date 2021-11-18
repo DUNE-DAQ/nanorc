@@ -1,6 +1,4 @@
-
 #!/usr/bin/env python3
-
 
 """
 Command Line Interface for NanoRC
@@ -29,7 +27,7 @@ from rich.progress import *
 from nanorc.runmgr import SimpleRunNumberManager
 from nanorc.cfgsvr import FileConfigSaver
 from nanorc.core import NanoRC
-from nanorc.logbook import *
+from nanorc.logbook import FileLogbook
 
 class NanoContext:
     """docstring for NanoContext"""
@@ -113,10 +111,10 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, ker
 
     grid = Table(title='Shonky NanoRC', show_header=False, show_edge=False)
     grid.add_column()
-    grid.add_row("This is an admittedly shonky nanp RC to control DUNE-DAQ applications.")
+    grid.add_row("This is an admittedly shonky nano RC to control DUNE-DAQ applications.")
     grid.add_row("  Give it a command and it will do your biddings,")
     grid.add_row("  but trust it and it will betray you!")
-    grid.add_row("Use it with care!")
+    grid.add_row(f"Use it with care, {user}!")
 
     obj.console.print(Panel.fit(grid))
 
@@ -128,10 +126,10 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, ker
         rc = NanoRC(obj.console, top_cfg, user,
                     SimpleRunNumberManager(),
                     FileConfigSaver(cfg_dumpdir),
-                    # Definitely don't want to scribe to ELISA if we are playing around...
-                    ElisaLogbook('https://np-vd-coldbox-elog.cern.ch/elisa/api/np-vd-coldbox-elog/',
-                                 obj.console),
-                    # FileLogbook(logbook_prefix, obj.console),
+                    # Definitely don't want to scribe to ELISA if we are playing around... But good to try
+                    # ElisaLogbook('https://np-vd-coldbox-elog.cern.ch/elisa/api/np-vd-coldbox-elog/',
+                    #              obj.console),
+                    FileLogbook(logbook_prefix, obj.console),
                     timeout,
                     kerberos)
 
@@ -249,7 +247,7 @@ def message(obj, message):
 @click.pass_obj
 @click.pass_context
 def change_user(ctx, obj, user):
-    ctx.parent.command.shell.prompt = f"{user}@np04rc> "
+    ctx.parent.command.shell.prompt = f"{user}@rc> "
     obj.rc.change_user(user)
 
 @cli.command('scrap')
