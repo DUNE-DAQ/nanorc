@@ -54,10 +54,11 @@ class ElisaLogbook:
 
 
     def _generate_new_sso_cookie(self):
+        self.log.info("ELisA logbook: Regenerating the SSO cookie?")
         SSO_COOKIE_TIMEOUT=3600.*2.
         SSO_COOKIE_PATH=os.path.expanduser("~/.sso_cookie.txt")
-        if (time.time() - os.path.getmtime(SSO_COOKIE_PATH))>SSO_COOKIE_TIMEOUT:
-            self.log.info("ELisA logbook: Regenerating the SSO cookie")
+        if not os.path.isfile(SSO_COOKIE_PATH) or time.time() - os.path.getmtime(SSO_COOKIE_PATH)>SSO_COOKIE_TIMEOUT:
+            self.log.info("ELisA logbook: Regenerating the SSO cookie!")
             args=["cern-get-sso-cookie", "--krb", "-r", "-u", "https://np-vd-coldbox-elog.cern.ch", "-o", f"{SSO_COOKIE_PATH}"]
             proc = subprocess.run(args)
             if proc.returncode != 0:
