@@ -172,7 +172,8 @@ def cli(output_file, json_dir):
                                             add_nwedge(nwconn)
                             else:
                                 search_nwconnection(key)
-                search_nwconnection(modcfg["data"])            
+                if "data" in modcfg:
+                    search_nwconnection(modcfg["data"])            
     
     for netedge in netedges:
         src = netedges[netedge]["src"]
