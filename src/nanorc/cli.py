@@ -102,11 +102,11 @@ def validatePath(ctx, param, prompted_path):
 @click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
 @click.argument('top_cfg', type=click.Path(exists=True))
-@click.argument('user', type=str)
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, kerberos, top_cfg, user):
+def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, kerberos, top_cfg):
     obj.print_traceback = traceback
+    user = "user"
     ctx.command.shell.prompt = f"{user}@rc> "
 
     grid = Table(title='Shonky NanoRC', show_header=False, show_edge=False)
@@ -126,9 +126,6 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, ker
         rc = NanoRC(obj.console, top_cfg, user,
                     SimpleRunNumberManager(),
                     FileConfigSaver(cfg_dumpdir),
-                    # Definitely don't want to scribe to ELISA if we are playing around... But good to try
-                    # ElisaLogbook('https://np-vd-coldbox-elog.cern.ch/elisa/api/np-vd-coldbox-elog/',
-                    #              obj.console),
                     FileLogbook(logbook_prefix, obj.console),
                     timeout,
                     kerberos)
