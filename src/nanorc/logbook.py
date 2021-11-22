@@ -75,6 +75,7 @@ class ElisaLogbook:
                     else:
                         self.log.error(f"ELisA logbook: NanoRC couldn't execute\n{' '.join(args)}\nPlz try yourself in a different shell after doing a kinit.")
                         raise RuntimeError("ELisA logbook: Couldn't get SSO cookie!") from e
+                it_try += 1
 
 
 
