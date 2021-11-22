@@ -57,14 +57,24 @@ class ElisaLogbook:
         self.log.info("ELisA logbook: Regenerating the SSO cookie?")
         SSO_COOKIE_TIMEOUT=3600.*2.
         SSO_COOKIE_PATH=os.path.expanduser("~/.sso_cookie.txt")
+        max_tries = 3
+        it_try = 0
         if not os.path.isfile(SSO_COOKIE_PATH) or time.time() - os.path.getmtime(SSO_COOKIE_PATH)>SSO_COOKIE_TIMEOUT:
-            self.log.info("ELisA logbook: Regenerating the SSO cookie!")
-            args=["cern-get-sso-cookie", "--krb", "-r", "-u", "https://np-vd-coldbox-elog.cern.ch", "-o", f"{SSO_COOKIE_PATH}"]
-            proc = subprocess.run(args)
-            if proc.returncode != 0:
-                self.log.error("ELisA logbook: Couldn't get SSO cookie!")
-                raise RuntimeError("ELisA logbook: Couldn't get SSO cookie!")
-        return SSO_COOKIE_PATH
+            while True:
+                try:
+                    self.log.info("ELisA logbook: Regenerating the SSO cookie!")
+                    args=["cern-get-sso-cookie", "--krb", "-r", "-u", "https://np-vd-coldbox-elog.cern.ch", "-o", f"{SSO_COOKIE_PATH}"]
+                    proc = subprocess.run(args)
+                    if proc.returncode != 0:
+                        self.log.error("ELisA logbook: Couldn't get SSO cookie!")
+                        raise RuntimeError("ELisA logbook: Couldn't get SSO cookie!")
+                    return SSO_COOKIE_PATH
+                except Exception as e:
+                    if it_try<max_tries:
+                        self.log.error("ELisA logbook: Trying once more...")
+                    else:
+                        raise RuntimeError("ELisA logbook: Couldn't get SSO cookie!") from e
+
 
 
     def _respond_to(self, subject:str, body:str, author:str, mtype:str):
