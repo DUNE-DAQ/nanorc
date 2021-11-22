@@ -59,11 +59,11 @@ class ElisaLogbook:
         SSO_COOKIE_PATH=os.path.expanduser("~/.sso_cookie.txt")
         max_tries = 3
         it_try = 0
+        args=["cern-get-sso-cookie", "--krb", "-r", "-u", "https://np-vd-coldbox-elog.cern.ch", "-o", f"{SSO_COOKIE_PATH}"]
         if not os.path.isfile(SSO_COOKIE_PATH) or time.time() - os.path.getmtime(SSO_COOKIE_PATH)>SSO_COOKIE_TIMEOUT:
             while True:
                 try:
                     self.log.info("ELisA logbook: Regenerating the SSO cookie!")
-                    args=["cern-get-sso-cookie", "--krb", "-r", "-u", "https://np-vd-coldbox-elog.cern.ch", "-o", f"{SSO_COOKIE_PATH}"]
                     proc = subprocess.run(args)
                     if proc.returncode != 0:
                         self.log.error("ELisA logbook: Couldn't get SSO cookie!")
@@ -73,6 +73,7 @@ class ElisaLogbook:
                     if it_try<max_tries:
                         self.log.error("ELisA logbook: Trying once more...")
                     else:
+                        self.log.error(f"ELisA logbook: NanoRC couldn't execute\n{' '.join(args)}\nPlz try yourself in a different shell after doing a kinit.")
                         raise RuntimeError("ELisA logbook: Couldn't get SSO cookie!") from e
 
 
