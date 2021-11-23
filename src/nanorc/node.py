@@ -109,7 +109,10 @@ class GroupNode(NodeMixin):
                 self.log.error(f"{a}: {r}")
             raise RuntimeError(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
 
-        return 0
+        if failed == 0:
+            return 0
+        else:
+            return 1
 
 
     def _propagate_command(self, cmd:str, state_entry:str, state_exit:str,
