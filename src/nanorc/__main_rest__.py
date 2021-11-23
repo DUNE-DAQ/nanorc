@@ -7,11 +7,14 @@ NanoRC's REST API
 import click
 import time
 import re
-from flask import Flask, render_template, request, make_response, stream_with_context, render_template_string, url_for, redirect, jsonify
+from flask import Flask, render_template, request, make_response, stream_with_context, render_template_string, url_for, redirect, jsonify, Markup
 from flask_restful import Api, Resource
+from anytree.exporter import DictExporter
+from anytree.resolver import Resolver
 
 from nanorc.auth import auth
 from threading import Thread
+import threading
 from nanorc.tail import Tail
 # from flask_sso import SSO
 
@@ -19,9 +22,25 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from nanorc.core import *
-from nanorc.cli import loglevels, updateLogLevel, NanoContext
+from nanorc.cli import loglevels, updateLogLevel
 from nanorc.runmgr import SimpleRunNumberManager
 from nanorc.cfgsvr import SimpleConfigSaver
+
+class NanoContext:
+    """docstring for NanoContext"""
+    def __init__(self, console: Console):
+        """Nanorc Context for click use.
+
+        Args:
+            console (Console): rich console for messages and logging
+        """
+        super(NanoContext, self).__init__()
+        self.console = console
+        self.print_traceback = False
+        self.rc = None
+        self.last_command = None
+        self.last_path = None
+        self.worker_thread = None
 
 rc_context = None
 
@@ -31,46 +50,143 @@ api = Api(app)
 def convert_nanorc_return_code(return_code:int):
     return 200 if return_code == 0 else 500
 
-@api.resource('/nanorcrest/sendCmd', methods=['POST'])
-class sendcmd(Resource):
+def validatePath(rc, prompted_path):
+    hierarchy = []
+    if "/" in prompted_path:
+        hierarchy = prompted_path.split("/")
+
+    topnode = rc.topnode
+
+    r = Resolver('name')
+    try:
+        node = r.get(topnode, prompted_path)
+    except Exception as ex:
+        raise RuntimeError(f"Couldn't find {prompted_path} in the tree") from ex
+
+    return hierarchy
+
+@api.resource('/nanorcrest/status', methods=['GET'])
+class status(Resource):
+    @auth.login_required
+    def get(self):
+        if rc_context.worker_thread and rc_context.worker_thread.is_alive():
+            return "I'm busy!"
+        else:
+            rc_context.console.export_html()
+            rc_context.rc.status()
+            return Markup(rc_context.console.export_html())
+
+# @api.resource('/nanorcrest/node', methods=['GET'])
+# class node(Resource):
+#     @auth.login_required
+#     def get(self, path):
+#         resp = make_response(resp_data, convert_nanorc_return_code(200))
+
+@api.resource('/nanorcrest/tree', methods=['GET'])
+class tree(Resource):
+    @auth.login_required
+    def get(self):
+        if rc_context.rc.topnode:
+            exporter = DictExporter(attriter=lambda attrs: [(k, v) for k, v in attrs if k == "name"])
+            json_tree = exporter.export(rc_context.rc.topnode)
+            resp = make_response(jsonify(json_tree))
+            return resp
+        return "No tree initialised!"
+    
+@api.resource('/nanorcrest/command', methods=['POST', 'GET'])
+class command(Resource):
+    @auth.login_required
+    def get(self):
+        resp_data = {
+            "command": rc_context.last_command,
+            "path"   : rc_context.last_path,
+        }
+        print(f"nanorcrest.command.get {jsonify(resp_data)}")
+        return make_response(jsonify(resp_data))
+
     @auth.login_required
     def post(self):
-        print("got an call!")
+        if rc_context.worker_thread and rc_context.worker_thread.is_alive():
+            return "busy!"
         try:
-            if   request.form['cmd'] == 'BOOT':      method = rc_context.rc.boot
-            elif request.form['cmd'] == 'TERMINATE': method = rc_context.rc.terminate
-            elif request.form['cmd'] == 'STATUS':    method = rc_context.rc.status # humm
-            elif request.form['cmd'] == 'INIT':      method = rc_context.rc.init
-            elif request.form['cmd'] == 'CONF':      method = rc_context.rc.conf
-            elif request.form['cmd'] == 'START':     method = rc_context.rc.start
-            elif request.form['cmd'] == 'STOP':      method = rc_context.rc.stop
-            elif request.form['cmd'] == 'PAUSE':     method = rc_context.rc.pause
-            elif request.form['cmd'] == 'RESUME':    method = rc_context.rc.resume
-            elif request.form['cmd'] == 'SCRAP':     method = rc_context.rc.scrap
+            cmd  = request.form['command']
+            path = request.form.get('path')
+            data = request.form.get('data')
+            
+            if   cmd == 'BOOT':      method = rc_context.rc.boot
+            elif cmd == 'TERMINATE': method = rc_context.rc.terminate
+            elif cmd == 'INIT':      method = rc_context.rc.init
+            elif cmd == 'CONF':      method = rc_context.rc.conf
+            elif cmd == 'START':     method = rc_context.rc.start
+            elif cmd == 'STOP':      method = rc_context.rc.stop
+            elif cmd == 'PAUSE':     method = rc_context.rc.pause
+            elif cmd == 'RESUME':    method = rc_context.rc.resume
+            elif cmd == 'SCRAP':     method = rc_context.rc.scrap
             else:
-                raise RuntimeError(f"I don't know of command {request.form['cmd']}")
+                raise RuntimeError(f"I don't know of command {cmd}")
             
-            ## TODO put this in a Thread? and immediately return an ack?
-            return_code = method()
+            logger = logging.getLogger()
+            if os.path.isfile('rest_command.log'):
+                os.remove('rest_command.log')
+            log_handle = logging.FileHandler("rest_command.log")
+            logger.addHandler(log_handle)
+            
+            if cmd == 'BOOT' or cmd == 'TERMINATE' or cmd == 'STOP':
+                rc_context.worker_thread = threading.Thread(target=method, name="command-worker")
 
-            # Flush the console
-            _=rc_context.rc.console.export_html()
-            rc_context.rc.status()
+            elif cmd == 'START':
+                run_type = request.form['run_type']
+                rc_context.rc.run_num_mgr.set_run_number(int(request.form['run_num']))
+
+                disable_data_storage = False
+                if request.form.get('disable_data_storage'):
+                    disable_data_storage = request.form.get('disable_data_storage')
+                args = [disable_data_storage, run_type]
+
+                if request.form.get('trigger_interval_ticks'):
+                    args.append(request.form['trigger_interval_ticks'])
+
+                rc_context.worker_thread = threading.Thread(target=rc_context.rc.start, name="command-worker",
+                                                            args=args)
+
+            elif cmd == 'RESUME':
+                args = []
+
+                if request.form.get('trigger_interval_ticks'):
+                    args.append(request.form['trigger_interval_ticks'])
+
+                rc_context.worker_thread = threading.Thread(target=rc_context.rc.resume, name="command-worker",
+                                                            args=args)
+                
+            else:
+                if not path:
+                    path = rc_context.rc.topnode.name
+                path = validatePath(rc_context.rc, path)
+                
+                rc_context.worker_thread = threading.Thread(target=method, name="command-worker", args=[path])
+            rc_context.worker_thread.start()
             
-            data = {
-                "console_html": rc_context.rc.console.export_html(),
-                "top_cfg"     : rc_context.top_json,
-                "apparatus_id": rc_context.rc.apparatus_id,
-                "sent_cmd"    : request.form['cmd'],
-                "run_number"  : rc_context.rc.run
+            rc_context.worker_thread.join()
+            rc_context.last_command = cmd
+            rc_context.last_path = path
+
+            logger.removeHandler(log_handle)
+            logs = open('rest_command.log').read()
+            
+            resp_data = {
+                "command"    : cmd,
+                "path"       : path,
+                "return_code": rc_context.rc.return_code,
+                "logs"       : logs
             }
-            resp = make_response(data, convert_nanorc_return_code(return_code))
-
+            resp = make_response(resp_data)
+            return resp
+        
         except Exception as e:
             print(e)
             resp = make_response(jsonify({"Exception": str(e)}))
-
-        return resp
+            return resp
+        
     
 @app.route('/')
 @auth.login_required
@@ -93,7 +209,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, host, port, top_cfg
 
     grid = Table(title='Shonky API NanoRC', show_header=False, show_edge=False)
     grid.add_column()
-    grid.add_row("This is an admittedly shonky nanp RC to control DUNE-DAQ applications.")
+    grid.add_row("This is an admittedly shonky nano RC to control DUNE-DAQ applications.")
     grid.add_row("  Give it a command and it will do your biddings,")
     grid.add_row("  but trust it and it will betray you!")
     grid.add_row("Use it with care!")
