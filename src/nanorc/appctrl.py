@@ -23,7 +23,7 @@ class ResponseDispatcher(threading.Thread):
     STOP="RESPONSE_QUEUE_STOP"
 
     def __init__(self, listener):
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, name="listener")
         self.listener = listener
 
     def run(self) -> NoReturn:
