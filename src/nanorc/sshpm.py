@@ -14,8 +14,8 @@ from rich.progress import *
 from rich.table import Table
 
 
-# # ------------------------------------------------
-# # pexpect.spawn(...,preexec_fn=on_parent_exit('SIGTERM'))
+# ------------------------------------------------
+# pexpect.spawn(...,preexec_fn=on_parent_exit('SIGTERM'))
 from ctypes import cdll
 
 # Constant taken from http://linux.die.net/include/linux/prctl.h
@@ -82,7 +82,7 @@ class AppProcessDescriptor(object):
 
 class AppProcessWatcherThread(threading.Thread):
     def __init__(self, pm, app, proc):
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, name="app_process_watcher")
         self.pm = pm
         self.app = app
         self.proc = proc
@@ -127,13 +127,13 @@ class SSHProcessManager(object):
         self.kill()
 
     def watch(self, name, proc):
-        t = AppProcessWatcherThread(self, name, proc)
+        t = AppProcessWatcherThread(self, name+"_watcherthread", proc)
         t.start()
 
         self.watchers.append(t)
 
     def notify_join(self, name, watcher, exc):
-        self.log.info(f"{name} process exited"+(f" with exit code {exc.exit_code}" if exc else ""))
+        self.log.info(f"{name} process exited"+(f" with exit code {exc.exit_code}, {exc.stdout}, {exc.stderr}" if exc else ""))
         self.log.debug(name+str(exc))
         self.event_queue.put((name, exc))
 
@@ -193,7 +193,7 @@ class SSHProcessManager(object):
                 _bg=True,
                 _bg_exc=False,
                 _new_session=True,
-                _preexec_fn=on_parent_exit(signal.SIGTERM),
+                # _preexec_fn=on_parent_exit(signal.SIGTERM),
             )
             self.watch(name, proc)
             desc.proc = proc
@@ -218,7 +218,6 @@ class SSHProcessManager(object):
                 progress.update(waiting, advance=1)
 
                 alive, resp = self.check_apps()
-                # progress.log(alive, resp)
                 for a, t in apps_tasks.items():
                     if a in resp:
                         progress.update(t, completed=1)
