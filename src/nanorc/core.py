@@ -57,6 +57,21 @@ class NanoRC:
 
         self.topnode.print_status(self.apparatus_id, self.console)
 
+    def status_data(self) -> dict:
+        """
+        Displays the status of the applications
+
+        :returns:   status
+        :rtype:     dict
+        """
+
+        if not self.topnode:
+            return {}
+
+        data = self.topnode.tree_status_data()
+        data.update({"apparatus_id": self.apparatus_id})
+        return data
+
 
     def boot(self) -> NoReturn:
         """
