@@ -51,7 +51,9 @@ class ConfigManager:
 
             with open(fpath, "r") as jf:
                 try:
-                    j = json.load(jf)
+                    json_str = jf.read()
+                    json_str = os.path.expandvars(json_str)
+                    j = json.loads(json_str)
                     data[f] = j
                 except json.decoder.JSONDecodeError as e:
                     raise RuntimeError(f"ERROR: failed to load {f}.json") from e
