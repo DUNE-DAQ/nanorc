@@ -48,7 +48,7 @@ def elisaCli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, ker
     grid.add_row("This is an admittedly shonky nano RC to control DUNE-DAQ applications.")
     grid.add_row("  Give it a command and it will do your biddings,")
     grid.add_row("  but trust it and it will betray you!")
-    grid.add_row(f"Use it with care, {user}!")
+    grid.add_row(f"Use it with care, {credentials.user}!")
 
     obj.console.print(Panel.fit(grid))
 
@@ -175,6 +175,7 @@ def main():
     )
 
     console = Console()
+    credentials.console = console # some uglyness right here
     obj = NanoContext(console)
 
     try:
