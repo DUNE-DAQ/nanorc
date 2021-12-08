@@ -21,9 +21,8 @@ from typing import Union, NoReturn
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
-    def __init__(self, console: Console, top_cfg: str, user:str, run_num_mgr, run_registry, logbook, timeout: int, use_kerb=True):
+    def __init__(self, console: Console, top_cfg: str, run_num_mgr, run_registry, logbook, timeout: int, use_kerb=True):
         super(NanoRC, self).__init__()
-        self.user = user
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
 
@@ -49,7 +48,7 @@ class NanoRC:
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
 
         self.listener = None
-
+        
 
     def status(self) -> NoReturn:
         """
@@ -126,12 +125,9 @@ class NanoRC:
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
 
         try:
-            self.logbook.message_on_start(message, self.run, run_type, user=self.user)
+            self.logbook.message_on_start(message, self.run, run_type)
         except Exception as e:
-            elisa_connection = self.logbook.elisa_arguments['connection']
-            stop_index = elisa_connection.find("/api/")
-            elisa_connection = elisa_connection[:stop_index]
-            self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {elisa_connection}\nError text:\n{str(e)}")
+            self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
 
         runtime_start_data = {
@@ -160,20 +156,9 @@ class NanoRC:
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
             try:
-                self.logbook.add_message(message, user=self.user)
+                self.logbook.add_message(message)
             except Exception as e:
-                elisa_connection = self.logbook.elisa_arguments['connection']
-                stop_index = elisa_connection.find("/api/")
-                elisa_connection = elisa_connection[:stop_index]
-                self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {elisa_connection}\nError text:\n{str(e)}")
-
-
-    def change_user(self, user:str) -> NoReturn:
-        """
-        Change the user
-        """
-        self.log.info(f"User {user} taking over!")
-        self.user = user
+                self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
 
     def stop(self, force:bool=False, message:str="") -> NoReturn:
@@ -184,12 +169,9 @@ class NanoRC:
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
             try:
-                self.logbook.message_on_stop(message, user=self.user)
+                self.logbook.message_on_stop(message)
             except Exception as e:
-                elisa_connection = self.logbook.elisa_arguments['connection']
-                stop_index = elisa_connection.find("/api/")
-                elisa_connection = elisa_connection[:stop_index]
-                self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {elisa_connection}\nError text:\n{str(e)}")
+                self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
 
         self.cfgsvr.save_on_stop(self.run)
