@@ -41,13 +41,14 @@ from .cli import *
 @click.pass_context
 def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, kerberos, cfg_dir, user):
     obj.print_traceback = traceback
-    ctx.command.shell.prompt = f"{user}@np04rc> "
+    credentials.change_user(user)
+    ctx.command.shell.prompt = f"{credentials.user}@np04rc> "
     grid = Table(title='Shonky Nano04RC', show_header=False, show_edge=False)
     grid.add_column()
     grid.add_row("This is an admittedly shonky nano RC to control DUNE-DAQ applications.")
     grid.add_row("  Give it a command and it will do your biddings,")
     grid.add_row("  but trust it and it will betray you!")
-    grid.add_row(f"Use it with care, {user}!")
+    grid.add_row(f"Use it with care, {credentials.user}!")
 
     obj.console.print(Panel.fit(grid))
 
@@ -68,13 +69,14 @@ def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, kerb
                               dotnanorc["runregistrydb"]["password"])
         logging.getLogger("cli").info("RunDB socket "+dotnanorc["rundb"]["socket"])
         logging.getLogger("cli").info("RunRegistryDB socket "+dotnanorc["runregistrydb"]["socket"])
-        rc = NanoRC(obj.console, cfg_dir, user,
-                    DBRunNumberManager(dotnanorc["rundb"]["socket"]),
-                    DBConfigSaver(dotnanorc["runregistrydb"]["socket"]),
-                    ElisaLogbook(dotnanorc["elisa"]["connection"],
-                                 obj.console),
-                    timeout,
-                    kerberos)
+        rc = NanoRC(console = obj.console,
+                    top_cfg = cfg_dir,
+                    run_num_mgr = DBRunNumberManager(dotnanorc["rundb"]["socket"]),
+                    run_registry = DBConfigSaver(dotnanorc["runregistrydb"]["socket"]),
+                    logbook = ElisaLogbook(configuration=dotnanorc["elisa"],
+                                           console=obj.console),
+                    timeout = timeout,
+                    use_kerb = kerberos)
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()
@@ -94,24 +96,51 @@ np04cli.add_command(status, 'status')
 np04cli.add_command(boot, 'boot')
 np04cli.add_command(init, 'init')
 np04cli.add_command(conf, 'conf')
-np04cli.add_command(start, 'start')
-np04cli.add_command(stop, 'stop')
 np04cli.add_command(pause, 'pause')
 np04cli.add_command(resume, 'resume')
 np04cli.add_command(scrap, 'scrap')
 np04cli.add_command(wait, 'wait')
 np04cli.add_command(terminate, 'terminate')
-np04cli.add_command(message, 'message')
 
 @np04cli.command('change_user')
 @click.argument('user', type=str, default=None)
 @click.pass_obj
 @click.pass_context
 def change_user(ctx, obj, user):
-    ctx.parent.command.shell.prompt = f"{user}@np04rc> "
-    obj.rc.change_user(user)
+    credentials.change_user(user)
+    ctx.parent.command.shell.prompt = f"{credentials.user}@np04rc > "
+
+@np04cli.command('kinit')
+@click.argument('user', type=str, default=None)
+@click.pass_obj
+@click.pass_context
+def kinit(ctx, obj, user):
+    credentials.new_kerberos_ticket()
+
+@np04cli.command('stop')
+@click.option('--stop-wait', type=int, default=0, help='Seconds to wait between Pause and Stop commands')
+@click.option('--force', default=False, is_flag=True)
+@click.option('--message', type=str, default="")
+@click.pass_obj
+def stop(obj, stop_wait:int, force:bool, message:str):
+    if not credentials.check_kerberos_credentials(login_if_fail=False):
+        self.log.error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
+        return
+    obj.rc.pause(force)
+    obj.rc.status()
+    time.sleep(stop_wait)
+    obj.rc.stop(force, message=message)
+    obj.rc.status()
 
 
+@np04cli.command('message')
+@click.argument('message', type=str, default=None)
+@click.pass_obj
+def message(obj, message):
+    if not credentials.check_kerberos_credentials(login_if_fail=False):
+        self.log.error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
+        return
+    obj.rc.message(message)
 
 @np04cli.command('start')
 @click.argument('run-type', required=True,
@@ -129,6 +158,9 @@ def start(obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_inte
         obj (NanoContext): Context object
         disable_data_storage (bool): Flag to disable data writing to storage
     """
+    if not credentials.check_kerberos_credentials(login_if_fail=False):
+        self.log.error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
+        return
 
     obj.rc.start(disable_data_storage, run_type, message=message)
     obj.rc.status()
@@ -148,6 +180,7 @@ def main():
     )
 
     console = Console()
+    credentials.console = console # some uglyness right here
     obj = NanoContext(console)
 
     try:
