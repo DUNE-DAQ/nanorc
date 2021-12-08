@@ -1,19 +1,24 @@
 import sys, os
 import logging
-
-log = logging.getLogger("werkzeug")
-log.setLevel(logging.ERROR)
+from getpass import getpass
+from datetime import datetime, timedelta
+import subprocess
+import logging
+import tempfile
 
 class Authentication():
     def __init__(self, service:str, user:str, password:str):
         self.service = service
         self.user = user
         self.password = password
+        self.log = logging.getLogger(self.__class__.__name__)
     
-class CredentialManager():
+class CredentialManager:
     def __init__(self):
+        self.log = logging.getLogger(self.__class__.__name__)
         self.authentications = []
-        
+        self.user = None
+
     def add_login(self, service:str, user:str, password:str):
         self.authentications.append(Authentication(service, user, password))
 
@@ -39,7 +44,7 @@ class CredentialManager():
         for auth in self.authentications:
             if service == auth.service:
                 return auth
-        log.error(f"Couldn't find login for service: {service}")
+        self.log.error(f"Couldn't find login for service: {service}")
 
     def rm_login(self, service:str, user:str):
         for auth in self.authentications:
@@ -47,5 +52,66 @@ class CredentialManager():
                 self.authentications.remove(auth)
                 return
 
-credentials = CredentialManager()
+    def change_user(self, user):
+        self.user = user
+        self.check_kerberos_credentials(login_if_fail=True)
         
+    def check_kerberos_credentials(self, login_if_fail=True):
+        while True:
+            args=["klist"] # on my mac, we can specify --json and that gives everything nicely in json format... but...
+            proc = subprocess.run(args, capture_output=True, text=True)
+            raw_kerb_info = proc.stdout.split('\n')
+            kerb_user = None
+            valid_until = None
+            for line in raw_kerb_info:
+                split_line = line.split(' ')
+                split_line =  [x for x in split_line if x!='']
+                find_princ = line.find('Default principal')
+                find_valid = line.find('krbtg')
+                if find_princ!=-1:
+                    kerb_user = split_line[2]
+                    kerb_user = kerb_user.split('@')[0]
+                if find_valid!=-1:
+                    valid_until = split_line[2]+' '+split_line[3]
+        
+            if not kerb_user or not valid_until:
+                self.log.error('CredentialManager: No kerberos ticket!')
+                if login_if_fail:
+                    self.new_kerberos_ticket()
+                else:
+                    return False
+            else:
+                valid_until = datetime.strptime(valid_until, "%d/%m/%y %H:%M:%S")
+                if kerb_user != self.user or datetime.now()+timedelta(hours=2)>valid_until:
+                    self.log.error('CredentialManager: kerberos user and nanorc user are different, or your kerberos ticket will expire soon')
+                    if login_if_fail:
+                        self.new_kerberos_ticket()
+                    else:
+                        return False
+                return True
+
+
+    def new_kerberos_ticket(self):
+        success = False
+        
+        while not success:
+            print(f'Password for {self.user}@CERN.CH:')
+            password = getpass()
+            p = subprocess.Popen(['kinit', self.user+'@CERN.CH'],
+                                 stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout_data = p.communicate(password.encode())
+            print(stdout_data[-1].decode())
+            success = p.returncode==0
+
+    def generate_new_sso_cookie(self, website):
+        SSO_COOKIE_PATH=tempfile.NamedTemporaryFile(mode='w', prefix="ssocookie", delete=False).name
+        max_tries = 3
+        it_try = 0
+        args=["cern-get-sso-cookie", "--krb", "-r", "-u", website, "-o", f"{SSO_COOKIE_PATH}"]
+        proc = subprocess.run(args)
+        if proc.returncode != 0:
+            self.log.error("CredentialManager: Couldn't get SSO cookie!")
+            raise RuntimeError("CredentialManager: Couldn't get SSO cookie!")
+        return SSO_COOKIE_PATH
+    
+credentials = CredentialManager()
