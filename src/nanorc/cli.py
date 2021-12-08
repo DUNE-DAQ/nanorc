@@ -28,6 +28,7 @@ from nanorc.runmgr import SimpleRunNumberManager
 from nanorc.cfgsvr import FileConfigSaver
 from nanorc.core import NanoRC
 from nanorc.logbook import FileLogbook
+from nanorc.credmgr import credentials
 
 class NanoContext:
     """docstring for NanoContext"""
@@ -106,15 +107,15 @@ def validatePath(ctx, param, prompted_path):
 @click.pass_context
 def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, kerberos, top_cfg):
     obj.print_traceback = traceback
-    user = "user"
-    ctx.command.shell.prompt = f"{user}@rc> "
+    credentials.user = 'user'
+    ctx.command.shell.prompt = f'{credentials.user}@rc> '
 
     grid = Table(title='Shonky NanoRC', show_header=False, show_edge=False)
     grid.add_column()
     grid.add_row("This is an admittedly shonky nano RC to control DUNE-DAQ applications.")
     grid.add_row("  Give it a command and it will do your biddings,")
     grid.add_row("  but trust it and it will betray you!")
-    grid.add_row(f"Use it with care, {user}!")
+    grid.add_row(f"Use it with care, {credentials.user}!")
 
     obj.console.print(Panel.fit(grid))
 
@@ -123,7 +124,8 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, ker
         updateLogLevel(loglevel)
 
     try:
-        rc = NanoRC(obj.console, top_cfg, user,
+        rc = NanoRC(obj.console,
+                    top_cfg,
                     SimpleRunNumberManager(),
                     FileConfigSaver(cfg_dumpdir),
                     FileLogbook(logbook_prefix, obj.console),
@@ -176,6 +178,13 @@ def ls(obj):
 def conf(obj, path):
     obj.rc.conf(path)
     obj.rc.status()
+
+
+@cli.command('message')
+@click.argument('message', type=str, default=None)
+@click.pass_obj
+def message(obj, message):
+    obj.rc.message(message)
 
 @cli.command('start')
 @click.argument('run', type=int)
@@ -233,19 +242,6 @@ def resume(obj:NanoContext, trigger_interval_ticks:int):
     obj.rc.resume(trigger_interval_ticks)
     obj.rc.status()
 
-@cli.command('message')
-@click.argument('message', type=str, default=None)
-@click.pass_obj
-def message(obj, message):
-    obj.rc.message(message)
-
-@cli.command('change_user')
-@click.argument('user', type=str, default=None)
-@click.pass_obj
-@click.pass_context
-def change_user(ctx, obj, user):
-    ctx.parent.command.shell.prompt = f"{user}@rc> "
-    obj.rc.change_user(user)
 
 @cli.command('scrap')
 @click.option('--path', type=str, default=None, callback=validatePath)
