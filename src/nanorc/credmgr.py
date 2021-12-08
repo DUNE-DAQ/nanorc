@@ -18,27 +18,26 @@ class CredentialManager:
         self.log = logging.getLogger(self.__class__.__name__)
         self.authentications = []
         self.user = None
+        self.console = None
 
     def add_login(self, service:str, user:str, password:str):
         self.authentications.append(Authentication(service, user, password))
 
     def add_login_from_file(self, service:str, file:str):
         if not os.path.isfile(os.getcwd()+"/"+file+".py"):
-            log.error(f"Couldn't find file {file} in PWD")
+            self.log.error(f"Couldn't find file {file} in PWD")
             raise
             
         sys.path.append(os.getcwd())
         i = __import__(file, fromlist=[''])
         self.add_login(service, i.user, i.password)
-        log.info(f"Added login data from file: {file}")
-        # for auth in self.authentications:
-        #     print(auth.service, auth.user)
+        self.log.info(f"Added login data from file: {file}")
         
     def get_login(self, service:str, user:str):
         for auth in self.authentications:
             if service == auth.service and user == auth.user:
                 return auth
-        log.error(f"Couldn't find login for service: {service}, user: {user}")
+        self.log.error(f"Couldn't find login for service: {service}, user: {user}")
         
     def get_login(self, service:str):
         for auth in self.authentications:
@@ -53,8 +52,11 @@ class CredentialManager:
                 return
 
     def change_user(self, user):
+        previous = self.user
         self.user = user
-        self.check_kerberos_credentials(login_if_fail=True)
+        if not self.check_kerberos_credentials(login_if_fail=True):
+            self.user = previous
+        
         
     def check_kerberos_credentials(self, login_if_fail=True):
         while True:
