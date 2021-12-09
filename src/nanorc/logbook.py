@@ -51,7 +51,6 @@ class ElisaLogbook:
         self.message_attributes = configuration['attributes']
         self.log = logging.getLogger(self.__class__.__name__)
         self.log.info(f'ELisA logbook connection: {configuration["website"]} (API: {configuration["connection"]})')
-        credentials.check_kerberos_credentials()
         
     def _start_new_message_thread(self):
         self.log.info("ELisA logbook: Next message will be a new thread")
