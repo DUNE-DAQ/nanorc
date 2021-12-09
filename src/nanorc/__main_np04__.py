@@ -107,14 +107,13 @@ np04cli.add_command(terminate, 'terminate')
 @click.pass_obj
 @click.pass_context
 def change_user(ctx, obj, user):
-    credentials.change_user(user)
-    ctx.parent.command.shell.prompt = f"{credentials.user}@np04rc > "
+    if credentials.change_user(user):
+        ctx.parent.command.shell.prompt = f"{credentials.user}@np04rc > "
 
 @np04cli.command('kinit')
-@click.argument('user', type=str, default=None)
 @click.pass_obj
 @click.pass_context
-def kinit(ctx, obj, user):
+def kinit(ctx, obj):
     credentials.new_kerberos_ticket()
 
 @np04cli.command('stop')
@@ -123,7 +122,7 @@ def kinit(ctx, obj, user):
 @click.option('--message', type=str, default="")
 @click.pass_obj
 def stop(obj, stop_wait:int, force:bool, message:str):
-    if not credentials.check_kerberos_credentials(login_if_fail=False):
+    if not credentials.check_kerberos_credentials():
         self.log.error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
         return
     obj.rc.pause(force)
@@ -137,7 +136,7 @@ def stop(obj, stop_wait:int, force:bool, message:str):
 @click.argument('message', type=str, default=None)
 @click.pass_obj
 def message(obj, message):
-    if not credentials.check_kerberos_credentials(login_if_fail=False):
+    if not credentials.check_kerberos_credentials():
         self.log.error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
         return
     obj.rc.message(message)
@@ -158,7 +157,7 @@ def start(obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_inte
         obj (NanoContext): Context object
         disable_data_storage (bool): Flag to disable data writing to storage
     """
-    if not credentials.check_kerberos_credentials(login_if_fail=False):
+    if not credentials.check_kerberos_credentials():
         self.log.error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
         return
 

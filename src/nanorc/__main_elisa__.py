@@ -57,7 +57,6 @@ def elisaCli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, ker
         updateLogLevel(loglevel)
 
     try:
-        credentials.check_kerberos_credentials()
         dotnanorc = os.path.expanduser(dotnanorc)
         obj.console.print(f"[blue]Loading {dotnanorc}[/blue]")
         f = open(dotnanorc)
@@ -102,15 +101,14 @@ elisaCli.add_command(terminate, 'terminate')
 @click.pass_obj
 @click.pass_context
 def change_user(ctx, obj, user):
-    credentials.change_user(user)
-    ctx.parent.command.shell.prompt = f"{credentials.user}@elisarc > "
+    if credentials.change_user(user):
+        ctx.parent.command.shell.prompt = f"{credentials.user}@elisarc > "
 
 
 @elisaCli.command('kinit')
-@click.argument('user', type=str, default=None)
 @click.pass_obj
 @click.pass_context
-def kinit(ctx, obj, user):
+def kinit(ctx, obj):
     credentials.new_kerberos_ticket()
 
 @elisaCli.command('stop')
@@ -119,8 +117,8 @@ def kinit(ctx, obj, user):
 @click.option('--message', type=str, default="")
 @click.pass_obj
 def stop(obj, stop_wait:int, force:bool, message:str):
-    if not credentials.check_kerberos_credentials(login_if_fail=False):
-        self.log.error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
+    if not credentials.check_kerberos_credentials():
+        logging.error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
         return
     obj.rc.pause(force)
     obj.rc.status()
@@ -133,8 +131,8 @@ def stop(obj, stop_wait:int, force:bool, message:str):
 @click.argument('message', type=str, default=None)
 @click.pass_obj
 def message(obj, message):
-    if not credentials.check_kerberos_credentials(login_if_fail=False):
-        self.log.error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
+    if not credentials.check_kerberos_credentials():
+        logging.error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
         return
     obj.rc.message(message)
 
@@ -153,8 +151,8 @@ def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_
         obj (NanoContext): Context object
         disable_data_storage (bool): Flag to disable data writing to storage
     """
-    if not credentials.check_kerberos_credentials(login_if_fail=False):
-        self.log.error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
+    if not credentials.check_kerberos_credentials():
+        logging.error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
         return
 
     obj.rc.run_num_mgr.set_run_number(run)
