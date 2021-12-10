@@ -1,7 +1,7 @@
 from transitions import Machine
 from functools import partial
 
-class FSMMachine(Machine):
+class FSM(Machine):
     def __init__(self, cfg):
         self.states_cfg = cfg["states"]
         self.transitions_cfg= cfg["transitions"]
@@ -31,7 +31,7 @@ class FSMMachine(Machine):
             # remove the old direct transitions
             transition_to_remove.append(transition)
 
-        states = self.states_cfg + transition_state_to_add + ["error"]
+        states = self.states_cfg + transition_state_to_add
         super().__init__(states=states, initial=states[0], send_event=True)
         
         for transition in self.acting_transitions+self.finalisor_transitions:
@@ -53,18 +53,18 @@ class FSMMachine(Machine):
         if not hasattr(model, name):
             setattr(model, name, func)
 
-    def add_node(self, model):
+    def make_node_fsm(self, node):
         for tr in self.acting_transitions:
             function_name = 'on_enter_'+tr["dest"]
-            if not getattr(model, function_name, None):
-                setattr(model, function_name, model._on_enter_callback.__get__(model))
+            if not getattr(node, function_name, None):
+                setattr(node, function_name, node._on_enter_callback.__get__(node))
             function_name = 'on_exit_'+tr["dest"]
-            if not getattr(model, function_name, None):
-                setattr(model, function_name, model._on_exit_callback.__get__(model))
+            if not getattr(node, function_name, None):
+                setattr(node, function_name, node._on_exit_callback.__get__(node))
 
         for tr in self.acting_transitions+self.finalisor_transitions:
-            new_method = partial(self._can_, tr["trigger"], model)
+            new_method = partial(self._can_, tr["trigger"], node)
             function_name = "can_"+tr["trigger"]
-            self._checked_assignment(model, function_name, new_method)
+            self._checked_assignment(node, function_name, new_method)
 
-        super().add_model(model)
+        super().add_model(node)
