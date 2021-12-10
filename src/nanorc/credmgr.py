@@ -78,22 +78,21 @@ class CredentialManager:
                 split_line = line.split(' ')
                 split_line =  [x for x in split_line if x!='']
                 find_princ = line.find('Default principal')
-                find_valid = line.find('krbtg')
                 if find_princ!=-1:
                     kerb_user = split_line[2]
                     kerb_user = kerb_user.split('@')[0]
-                if find_valid!=-1:
-                    valid_until = split_line[2]+' '+split_line[3]
 
-            if not kerb_user or not valid_until:
+                if kerb_user:
+                    break
+
+            if not kerb_user:
                 if not silent: self.log.error('CredentialManager: No kerberos ticket!')
                 return False
+            elif kerb_user != self.user: # we enforce the user is thec
+                return False
             else:
-                valid_until = datetime.strptime(valid_until, "%d/%m/%y %H:%M:%S")
-                if kerb_user != self.user or datetime.now()+timedelta(hours=2)>valid_until:
-                    if not silent: self.log.error('CredentialManager: kerberos user and nanorc user are different, or your kerberos ticket will expire soon')
-                    return False
-                return True
+                return True if subprocess.call(['klist', '-s']) == 0 else False
+
 
 
     def new_kerberos_ticket(self):
