@@ -19,7 +19,6 @@ from rich.console import Console
 from rich.traceback import Traceback
 from rich.progress import *
 
-from nanorc.logbook import ElisaLogbook
 
 from nanorc.core import NanoRC
 from nanorc.runmgr import DBRunNumberManager
@@ -69,12 +68,12 @@ def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, kerb
                               dotnanorc["runregistrydb"]["password"])
         logging.getLogger("cli").info("RunDB socket "+dotnanorc["rundb"]["socket"])
         logging.getLogger("cli").info("RunRegistryDB socket "+dotnanorc["runregistrydb"]["socket"])
+
         rc = NanoRC(console = obj.console,
                     top_cfg = cfg_dir,
                     run_num_mgr = DBRunNumberManager(dotnanorc["rundb"]["socket"]),
                     run_registry = DBConfigSaver(dotnanorc["runregistrydb"]["socket"]),
-                    logbook = ElisaLogbook(configuration=dotnanorc["elisa"],
-                                           console=obj.console),
+                    logbook_type = "elisa",
                     timeout = timeout,
                     use_kerb = kerberos)
     except Exception as e:

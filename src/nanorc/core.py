@@ -6,12 +6,11 @@ from rich.console import Console
 from rich.style import Style
 from rich.pretty import Pretty
 from .node import GroupNode
-# from .sshpm import SSHProcessManager
 from .treebuilder import TreeBuilder
 from .cfgsvr import FileConfigSaver, DBConfigSaver
-# from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
 from .credmgr import credentials
-
+from .logbook import ElisaLogbook, FileLogbook
+import importlib
 from rich.traceback import Traceback
 
 from datetime import datetime
@@ -21,7 +20,8 @@ from typing import Union, NoReturn
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
-    def __init__(self, console: Console, top_cfg: str, run_num_mgr, run_registry, logbook, timeout: int, use_kerb=True):
+    def __init__(self, console: Console, top_cfg: str, run_num_mgr, run_registry, logbook_type:str, timeout: int,
+                 use_kerb=True, logbook_prefix=""):
         super(NanoRC, self).__init__()
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
@@ -41,14 +41,28 @@ class NanoRC:
         self.cfgsvr.apparatus_id = self.apparatus_id
         self.timeout = timeout
         self.return_code = None
+        self.logbook = None
+        if logbook_type == "elisa":
+            try:
+                from . import confdata
+                elisa_conf = json.loads(importlib.resources.read_text(confdata, "elisa_conf.json"))
+                if elisa_conf.get(self.apparatus_id):
+                    self.logbook = ElisaLogbook(configuration = elisa_conf[self.apparatus_id],
+                                                console = console)
+                else:
+                    self.log.error("Can't find config {self.apparatus_id} confdata/elisa_conf.json, reverting to file logbook!")
+            except Exception as e:
+                self.log.error(f"Can't find confdata/elisa_conf.json, reverting to file logbook! {str(e)}")
 
-        self.logbook = logbook
+        if not self.logbook:
+            self.log.info("Using filelogbook")
+            self.logbook = FileLogbook(logbook_prefix, self.console)
 
         self.topnode = self.cfg.get_tree_structure()
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
 
         self.listener = None
-        
+
 
     def status(self) -> NoReturn:
         """

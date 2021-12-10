@@ -19,8 +19,6 @@ from rich.console import Console
 from rich.traceback import Traceback
 from rich.progress import *
 
-from nanorc.logbook import ElisaLogbook
-
 from nanorc.core import NanoRC
 from nanorc.runmgr import DBRunNumberManager
 from nanorc.cfgsvr import DBConfigSaver
@@ -67,8 +65,7 @@ def elisaCli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, ker
                     top_cfg = cfg_dir,
                     run_num_mgr = SimpleRunNumberManager(),
                     run_registry = FileConfigSaver(cfg_dumpdir),
-                    logbook = ElisaLogbook(configuration=dotnanorc["elisa"],
-                                           console=obj.console),
+                    logbook_type = "elisa",
                     timeout = timeout,
                     use_kerb = kerberos)
     except Exception as e:
@@ -161,7 +158,7 @@ def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_
     time.sleep(resume_wait)
     obj.rc.resume(trigger_interval_ticks)
     obj.rc.status()
-    
+
 def main():
     from rich.logging import RichHandler
 

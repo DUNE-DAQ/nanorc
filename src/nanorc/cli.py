@@ -124,13 +124,14 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, ker
         updateLogLevel(loglevel)
 
     try:
-        rc = NanoRC(obj.console,
-                    top_cfg,
-                    SimpleRunNumberManager(),
-                    FileConfigSaver(cfg_dumpdir),
-                    FileLogbook(logbook_prefix, obj.console),
-                    timeout,
-                    kerberos)
+        rc = NanoRC(console = obj.console,
+                    top_cfg = top_cfg,
+                    run_num_mgr = SimpleRunNumberManager(),
+                    run_registry = FileConfigSaver(cfg_dumpdir),
+                    logbook_type = "file",
+                    timeout = timeout,
+                    use_kerb = kerberos,
+                    logbook_prefix = logbook_prefix)
 
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
