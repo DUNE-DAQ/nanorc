@@ -1,7 +1,6 @@
 import sys, os
 import logging
 from getpass import getpass
-from datetime import datetime, timedelta
 import subprocess
 import logging
 import tempfile
