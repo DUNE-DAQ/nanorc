@@ -163,26 +163,25 @@ class AppCommander:
     def send_command(
         self,
         cmd_id: str,
-        cmd_data: dict,
-        # entry_state: str = "ANY",
-        # exit_state: str = "ANY",
+        cmd_data: dict
     ):
         # Use moo schema here?
         cmd = {
             "id": cmd_id,
-            "data": cmd_data,
-            # "entry_state": entry_state,
-            # "exit_state": exit_state,
+            "data": cmd_data
         }
-        self.log.info(f"Sending {cmd_id} to {self.app} ({self.app_url})")
+        self.log.info(f"Sending {cmd_id} to {self.app} (http://{self.app_host}:{str(self.app_port)})")
         self.log.debug(json.dumps(cmd, sort_keys=True, indent=2))
 
         headers = {
             "content-type": "application/json",
             "X-Answer-Port": str(self.listener_port),
         }
-        ack = requests.post(self.app_url, data=json.dumps(cmd), headers=headers)
-        self.log.info(f"Ack: {ack}")
+        try:
+            ack = requests.post(self.app_url, data=json.dumps(cmd), headers=headers)
+            self.log.info(f"Ack: {ack}")
+        except:
+            raise RuntimeError(f"Couldn't send {cmd_id} to {self.app} (http://{self.app_host}:{str(self.app_port)})")
         self.sent_cmd = cmd_id
 
         # return await_response(timeout)
