@@ -125,23 +125,22 @@ class NanoRC:
         self.console.log(f"[bold magenta]Started run #{self.run}, saving run data in {cfg_save_dir}[/bold magenta]")
 
 
-    def stop(self) -> NoReturn:
+    def stop(self, force:bool=False) -> NoReturn:
         """
         Sends stop command
         """
 
-        self.return_code = self.topnode.stop(None, raise_on_fail=True, timeout=self.timeout)
-        if self.return_code != 0:
-            self.cfgsvr.save_on_stop(self.run)
-            self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
+        self.cfgsvr.save_on_stop(self.run)
+        self.return_code = self.topnode.stop(None, raise_on_fail=True, timeout=self.timeout, force=force)
+        self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
 
 
-    def pause(self) -> NoReturn:
+    def pause(self, force:bool=False) -> NoReturn:
         """
         Sends pause command
         """
 
-        self.return_code = self.topnode.pause(None, raise_on_fail=True, timeout=self.timeout)
+        self.return_code = self.topnode.pause(None, raise_on_fail=True, timeout=self.timeout, force=force)
 
 
     def resume(self, trigger_interval_ticks: Union[int, None]) -> NoReturn:
@@ -168,9 +167,9 @@ class NanoRC:
                                                timeout=self.timeout)
 
 
-    def scrap(self, path) -> NoReturn:
+    def scrap(self, path, force:bool=False) -> NoReturn:
         """
         Send scrap command
         """
 
-        self.return_code = self.topnode.scrap(None, raise_on_fail=True, timeout=self.timeout)
+        self.return_code = self.topnode.scrap(None, raise_on_fail=True, timeout=self.timeout, force=force)

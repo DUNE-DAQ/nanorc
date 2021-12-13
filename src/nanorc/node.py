@@ -1,6 +1,6 @@
 from anytree import NodeMixin, RenderTree, PreOrderIter
 from anytree.resolver import Resolver
-from transitions import Machine
+import requests
 import time
 from datetime import datetime
 from rich.console import Console
@@ -24,6 +24,7 @@ class ApplicationNode(GroupNode):
     def __init__(self, name, sup, console, fsm_conf, parent=None):
         # Absolutely no children for ApplicationNode
         super().__init__(name=name, console=console, fsm_conf=fsm_conf, parent=parent, children=None)
+        self.name = name
         self.sup = sup
 
     def on_enter_boot_ing(self, _):
@@ -129,6 +130,15 @@ class SubsystemNode(GroupNode):
         appset = list(self.children)
         failed = []
 
+        for n in appset:
+            if not n.sup.desc.proc.is_alive() or not n.sup.commander.ping():
+                text = f"'{n.name}' seems to be dead. So I cannot initiate transition '{state_entry}' -> '{state_exit}'."
+                if force:
+                    self.log.error(text+f"\nBut! '--force' was specified, so I'll ignore '{n.name}'!")
+                    appset.remove(n)
+                else:
+                    raise RuntimeError(text+"\nYou may be able to use '--force' if you want to 'stop' or 'scrap' the run.")
+
         if not sequence:
             # Loop over data keys if no sequence is specified or all apps, if data is empty
 
@@ -144,6 +154,7 @@ class SubsystemNode(GroupNode):
                 n.trigger(command)
                 ## APP now in *_ing
                 n.sup.send_command(command, cmd_data=data)
+
 
             start = datetime.now()
 
