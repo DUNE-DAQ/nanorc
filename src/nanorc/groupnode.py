@@ -5,7 +5,7 @@ from enum import Enum
 import threading
 from queue import Queue
 from transitions.core import MachineError
-
+import time
 from .fsm import FSM
 
 class ErrorCode(Enum):
@@ -58,7 +58,7 @@ class GroupNode(NodeMixin):
         self.parent = parent
         if children:
             self.children = children
-            
+
         self.fsm_conf = fsm_conf
         self.fsm = FSM(fsm_conf)
         self.fsm.make_node_fsm(self)
@@ -105,9 +105,8 @@ class GroupNode(NodeMixin):
 
         still_to_exec = []
         for child in self.children:
-            self.log.info(f"{self.name} is propagating '{command}' to child {child.name}")
             still_to_exec.append(child) # a record of which children still need to finish their task
-            child.trigger(command)
+            child.trigger(command, **event.kwargs)
 
         failed_resp = []
         for _ in range(event.kwargs["timeout"]):
