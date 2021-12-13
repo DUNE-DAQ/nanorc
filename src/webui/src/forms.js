@@ -52,22 +52,17 @@ class OutputForm extends React.Component {
       useEffect(() => {
         if (isLoading) {
           const sendCommand = async () => {
-            const json = {
-              "data": {
-                  "command": "BOOT"
-              },
-              'Authorization': 'Basic ' + btoa('fooUsr:barPass')
-          }
-            //const modes = await axios.post("/nanorcrest/command"{data:'command='+p.label}, { auth: {username: 'fooUsr',password: 'barPass'}});
-            const modes = await axios.post("/nanorcrest/command", json);
-            console.log(modes);
-            modes.data={
-              "command": "BOOT",
-              "logs": "",
-              "path": null,
-              "return_code": 0
-            }
-            p.self.setState({ reply: modes.data });      
+            const form = new FormData();
+            form.append("command", p.label.toUpperCase());
+            const tok = 'fooUsr:barPass';
+            const hash = Buffer.from(tok, 'utf8').toString('base64');
+            const Basic = 'Basic ' + hash;
+            const modes = await axios.post("/nanorcrest/command", form, {headers : { 'Authorization' : Basic }});
+            this.setState({reply: modes.data}, () => {
+              this.fetchStatus(this.props.statusUrl).catch(e => {
+                  // handle error
+              });
+          });
         };
         sendCommand();
         setLoading(false);
@@ -101,37 +96,22 @@ class OutputForm extends React.Component {
     }
 
     fetchStatus = async path => {
-      //const modes = await axios.get(path, {}, {auth: {username: 'fooUsr',password: 'barPass'}});
-      const modes = {data:""};
-      modes.data = {"apparatus_id": "listrev",
-      "children": [
-        {
-          "children": [
-            {
-              "alive": true,
-              "last_cmd_failed": false,
-              "last_ok_cmd": "init",
-              "last_sent_cmd": "init",
-              "name": "lr1",
-              "ping": true
-            },
-            {
-              "alive": true,
-              "last_cmd_failed": false,
-              "last_ok_cmd": "init",
-              "last_sent_cmd": "init",
-              "name": "lr2",
-              "ping": true
-            }
-          ],
-          "name": "listrev"
-        }
-      ],
-      "name": "listrev"
-    }
+      const tok = 'fooUsr:barPass';
+      const hash = Buffer.from(tok, 'utf8').toString('base64');
+      const Basic = 'Basic ' + hash;
+      const modes = await axios.get(path, {}, {headers : { 'Authorization' : Basic }});
+      console.log(modes)
+     
+    if (modes.data!="I'm busy!"){
       this.setState({
           status: modes.data.children[0],
           })
+        }else{
+          this.setState({
+            status: modes.data,
+            })
+        }
+        console.log(this.state.status)
   }
 
     fetchForm(name){
