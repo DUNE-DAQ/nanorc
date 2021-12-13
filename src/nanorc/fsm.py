@@ -7,14 +7,24 @@ class FSM(Machine):
         self.transitions_cfg= cfg["transitions"]
         self.acting_transitions = []
         self.finalisor_transitions = []
-        
+
         transition_state_to_add = []
         transition_to_remove = []
         # we need to loop over transitions, because if they are long, new states are added
         for transition in self.transitions_cfg:
+            matched_from = False
+            matched_to = False
+            for state in self.states_cfg:
+                if transition['source'] == "*" or transition['source'] == state:
+                    matched_from = True
+                if transition['dest'] == "*" or transition['dest'] == state:
+                    matched_to   = True
+            if not matched_from or not matched_to:
+                raise RuntimeError(f'Transitions \'{transition["trigger"]}\' doesn\'t match for either its source or destination state: \'{transition["source"]}\' -> \'{transition["dest"]}\', list of states: {self.states_cfg}')
+
             name = transition["trigger"]+"_ing"
             transition_state_to_add += [name]
-            
+
             # add these new states
             self.acting_transitions.append({
                 "trigger":transition["trigger"],
@@ -27,13 +37,13 @@ class FSM(Machine):
                 "source": name,
                 "dest": transition["dest"]
             })
-            
+
             # remove the old direct transitions
             transition_to_remove.append(transition)
 
         states = self.states_cfg + transition_state_to_add
         super().__init__(states=states, initial=states[0], send_event=True)
-        
+
         for transition in self.acting_transitions+self.finalisor_transitions:
             self.add_transition(transition["trigger"], transition["source"], transition["dest"])
 
