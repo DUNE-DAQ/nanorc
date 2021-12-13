@@ -99,7 +99,7 @@ class OutputForm extends React.Component {
       const tok = 'fooUsr:barPass';
       const hash = Buffer.from(tok, 'utf8').toString('base64');
       const Basic = 'Basic ' + hash;
-      const modes = await axios.get(path, {}, {headers : { 'Authorization' : Basic }});
+      const modes = await axios.get(path, {headers : { 'Authorization' : Basic }});
       console.log(modes)
      
     if (modes.data!="I'm busy!"){
