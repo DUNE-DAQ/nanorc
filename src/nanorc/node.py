@@ -13,6 +13,7 @@ from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoRespons
 from typing import Union, NoReturn
 from .fsm import FSM
 from .groupnode import GroupNode, ErrorCode
+from rich.progress import *
 
 log = logging.getLogger("transitions.core")
 log.setLevel(logging.ERROR)
@@ -28,29 +29,18 @@ class ApplicationNode(GroupNode):
     def on_enter_boot_ing(self, _):
         # all this is delegated to the subsystem
         self.log.info(f"Application {self.name} booted")
-        time.sleep(10)
         self.end_boot()
 
     def _on_enter_callback(self, event):
-        comm = event.event.name
-        self.log.info(f"{comm} to {self.name}")
-        args = event.kwargs
-        wait = args["wait"]
-        data = args["data"]
-
-        if wait:
-            self.sup.send_command_and_wait(comm, data)
-        else:
-            self.sup.send_command(comm, data)
+        pass
 
     def _on_exit_callback(self, event):
-        # all this is delegated to the subsystem
-        comm = event.event.name
-        self.log.info(f"{comm} to {self.name}")
+        pass
 
     def on_enter_terminate_ing(self, _):
         self.sup.terminate()
         self.command_sender.stop()
+        self.end_terminate()
 
 class SubsystemNode(GroupNode):
     def __init__(self, name:str, cfgmgr, console, fsm_conf, parent=None, children=None):
@@ -105,7 +95,7 @@ class SubsystemNode(GroupNode):
             "failed": [f['node'] for f in failed],
             "error": failed,
         }
-    
+
         if response['status_code'] != ErrorCode.Success:
             self.to_error(event=event, response=response)
         else:
@@ -131,7 +121,7 @@ class SubsystemNode(GroupNode):
     def _on_enter_callback(self, event):
         command = event.event.name
         cfg_method = event.kwargs.get("cfg_method")
-        timeout = event.kwargs.get("timeout")
+        timeout = event.kwargs["timeout"]
         self.log.info(f"Sending {command} to the subsystem {self.name}")
 
         sequence = getattr(self.cfgmgr, command+'_order', None)
@@ -151,64 +141,38 @@ class SubsystemNode(GroupNode):
                 else:
                     data = getattr(self.cfgmgr, command)
 
-                child_command = getattr(n, command)
-                child_command(wait=False, data=data[n.name] if data else {})
+                n.trigger(command)
+                ## APP now in *_ing
+                n.sup.send_command(command, cmd_data=data)
 
             start = datetime.now()
 
-            while(appset):
-                done = []
-                for n in appset:
-                    try:
-                        r = n.sup.check_response()
-                    except NoResponse:
-                        continue
+            with Progress(SpinnerColumn(),
+                          TextColumn("[progress.description]{task.description}"),
+                          BarColumn(),
+                          TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+                          TimeRemainingColumn(),
+                          TimeElapsedColumn(),
+                          console=self.console,
+                          ) as progress:
+                apps_tasks = {
+                    c.name: progress.add_task(f"[blue]{c.name}", total=1) for c in self.children
+                }
+                waiting = progress.add_task("[yellow]timeout", total=timeout)
+                for _ in range(timeout*10):
+                    progress.update(waiting, advance=0.1)
+                    if len(appset)==0: break
+                    done = []
+                    for n in appset:
+                        try:
+                            r = n.sup.check_response()
+                        except NoResponse:
+                            continue
 
-                    done += [n]
-
-                    if r['success']:
-                        child_end_command = getattr(n, "end_"+command)
-                        child_end_command()
-                    else:
-                        response = {
-                            "node":n.name,
-                            "status_code" : r,
-                            "state": n.state,
-                            "command": command,
-                            "error": r,
-                        }
-                        failed.append(response)
-
-                        n.to_error(event=event, response=response)
-
-                for d in done:
-                    appset.remove(d)
-
-                now = datetime.now()
-                elapsed = (now - start).total_seconds()
-
-                if elapsed > timeout:
-                    raise RuntimeError("Send multicommand failed")
-
-                time.sleep(0.1)
-                self.log.debug("tic toc")
-
-        else:
-            # There probably is a way to do that in a much nicer, pythonesque, way
-            for n in sequence:
-                for child_node in appset:
-                    if n == child_node.name:
-                        if cfg_method:
-                            f=getattr(self.cfgmgr,cfg_method)
-                            data = f(overwrite_data)
-                        else:
-                            data = getattr(self.cfgmgr, command)
-
-                        child_command = getattr(n, command)
-                        child_command(wait=True, data=data[n.name] if data else {})
+                        done += [n]
+                        progress.update(apps_tasks[n.name], completed=1)
                         if r['success']:
-                            child_end_command = getattr(n, "end_"+command)
-                            child_end_command()
+                            n.trigger("end_"+command)
                         else:
                             response = {
                                 "node":n.name,
@@ -218,7 +182,49 @@ class SubsystemNode(GroupNode):
                                 "error": r,
                             }
                             failed.append(response)
-                            n.to_error(event=event, response=response)
+                            n.to_error(event=event)
+
+                    for d in done:
+                        appset.remove(d)
+
+                    time.sleep(0.1)
+
+        else:
+            # There probably is a way to do that in a much nicer, pythonesque, way
+            for n in sequence:
+                # YUK
+                child_node = [cn for cn in appset if cn.name == n][0]
+                if cfg_method:
+                    f=getattr(self.cfgmgr,cfg_method)
+                    data = f(overwrite_data)
+                else:
+                    data = getattr(self.cfgmgr, command)
+
+                kwargs = {'wait': False,
+                          'cmd_data': data}
+                event.kwargs.update(kwargs)
+                child_node.sup.send_command_and_wait(comm, cmd_data=data)
+                for _ in range(event.kwargs['timeout']):
+                    try:
+                        r = child_node.sup.check_response()
+                    except NoResponse:
+                        time.sleep(1)
+                        continue
+                    if r['success']:
+                        child_end_command = getattr(child_node, "end_"+command)
+                        child_end_command()
+                        break
+                    else:
+                        response = {
+                            "node":n.name,
+                            "status_code" : r,
+                            "state": n.state,
+                            "command": command,
+                            "error": r,
+                        }
+                        failed.append(response)
+                        n.to_error(event=event, response=response)
+                        break
 
         if failed:
             response = {
