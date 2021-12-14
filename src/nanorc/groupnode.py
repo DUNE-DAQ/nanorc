@@ -15,7 +15,7 @@ class ErrorCode(Enum):
     InvalidTransition=30
 
 class GroupNode(NodeMixin):
-    def __init__(self, name:str, console, fsm_conf, parent=None, children=None):
+    def __init__(self, name:str, console, fsm_conf, parent=None, children=None, order=None):
         self.console = console
         self.log = logging.getLogger(self.__class__.__name__+"_"+name)
 
@@ -30,6 +30,7 @@ class GroupNode(NodeMixin):
         self.fsm.make_node_fsm(self)
         self.return_code = ErrorCode.Success
         self.status_receiver_queue = Queue()
+        self.order = order if order else dict()
 
 
     def on_enter_terminate_ing(self, _) -> NoReturn:
@@ -64,9 +65,25 @@ class GroupNode(NodeMixin):
         self.log.info(f"{self.name} received command '{command}'")
 
         still_to_exec = []
-        for child in self.children:
-            still_to_exec.append(child) # a record of which children still need to finish their task
-            child.trigger(command, **event.kwargs)
+        active_thread = []
+        if command in self.order:
+            self.log.info(f'Propagating to children nodes in the order {self.order[command]}')
+            for cn in self.order[command]:
+                child = [c for c in self.children if c.name == cn][0]
+                still_to_exec.append(child) # a record of which children still need to finish their task
+                child.trigger(command, **event.kwargs)
+        else:
+            self.log.info(f'Propagating to children nodes simultaneously')
+            for child in self.children:
+                still_to_exec.append(child) # a record of which children still need to finish their task
+                all_kwargs = {
+                    "trigger_name":command,
+                }
+                all_kwargs.update(event.kwargs)
+                thread = threading.Thread(target=child.trigger, kwargs=all_kwargs)
+                thread.start()
+                active_thread.append(thread)
+
 
         failed_resp = []
         for _ in range(event.kwargs["timeout"]):
@@ -136,4 +153,3 @@ class GroupNode(NodeMixin):
             return response['status_code']
         else:
             return ErrorCode.Success
-

@@ -56,9 +56,11 @@ class TreeBuilder:
         self.apparatus_id = self.top_cfg["apparatus_id"]
         del self.top_cfg['apparatus_id']
 
-        fsm_conf = json.load(open(top_cfg))['fsm_conf']
+        fsm_conf = self.top_cfg['fsm_conf']
         del self.top_cfg['fsm_conf']
-        self.topnode = GroupNode(self.apparatus_id, console=self.console, fsm_conf=fsm_conf)
+        top_node_order = self.top_cfg.get('command_order')
+        del self.top_cfg['command_order']
+        self.topnode = GroupNode(self.apparatus_id, console=self.console, fsm_conf=fsm_conf, order=top_node_order)
         self.extract_json_to_nodes(self.top_cfg, self.topnode, fsm_conf=fsm_conf)
 
     # This should get changed so that it copies the node, and strips the config
