@@ -5,6 +5,7 @@ from datetime import datetime
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
+from anytree import PreOrderIter
 
 import logging
 from .sshpm import SSHProcessManager
@@ -51,6 +52,24 @@ class GroupNode(NodeMixin):
                 table.add_row(pre+node.name)
 
         console.print(table)
+
+    def node_status_data(self) -> dict:
+        data = {}
+        data["name"] = self.name
+        return data
+
+    def tree_status_data(self) -> dict:
+        data = self.node_status_data()
+        if not self.children:
+            return data
+        
+        children_data = []
+        for node in self.children:
+            children_data.append(node.tree_status_data())
+            
+        data.update({"children": children_data})
+        
+        return data
 
     def print(self, leg:bool=False, console:Console=None) -> int:
         if console:
@@ -152,7 +171,7 @@ class GroupNode(NodeMixin):
 
 
 # Now on to useful stuff
-class ApplicationNode(NodeMixin):
+class ApplicationNode(GroupNode):
     def __init__(self, name, sup, parent=None):
         self.name = name
         self.sup = sup
@@ -165,8 +184,22 @@ class ApplicationNode(NodeMixin):
     def send_command(self, *args, **kwargs):
         raise RuntimeError("ERROR: You can't send a command directly to an application! Send it to the parent subsystem!")
 
+    def node_status_data(self) -> dict:
+        data = {}
+        data["name"] = self.name
+        sup = self.sup
+        alive = sup.desc.proc.is_alive()
+        ping  = sup.commander.ping()
+        last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
+        data["alive"] = alive
+        data["ping"] = ping
+        data["last_sent_cmd"] = sup.last_sent_command
+        data["last_cmd_failed"] = last_cmd_failed
+        data["last_ok_cmd"] = sup.last_ok_command
+        return data
 
-class SubsystemNode(NodeMixin):
+
+class SubsystemNode(GroupNode):
     def __init__(self, name:str, cfgmgr, console, parent=None, children=None):
         self.name = name
         self.cfgmgr = cfgmgr

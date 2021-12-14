@@ -72,15 +72,27 @@ class status(Resource):
         if rc_context.worker_thread and rc_context.worker_thread.is_alive():
             return "I'm busy!"
         else:
-            rc_context.console.export_html()
-            rc_context.rc.status()
-            return Markup(rc_context.console.export_html())
+            data = rc_context.rc.status_data()
+            resp = make_response(jsonify(data))
+            return resp
 
-# @api.resource('/nanorcrest/node', methods=['GET'])
-# class node(Resource):
-#     @auth.login_required
-#     def get(self, path):
-#         resp = make_response(resp_data, convert_nanorc_return_code(200))
+@api.resource('/nanorcrest/node/<path>', methods=['GET'])
+class node(Resource):
+    @auth.login_required
+    def get(self, path):
+        path = "/"+path.replace(".", "/")
+        try:
+            path = validatePath(rc_context.rc, path)
+        except Exception as ex:
+            resp = make_response(f"Couldn't find {path} in the tree")
+            return resp
+
+        r = Resolver('name')
+        path = "/".join(path)
+        node = r.get(rc_context.rc.topnode, path)
+        data = node.node_status_data()
+        resp = make_response(data, 200)
+        return resp
 
 @api.resource('/nanorcrest/tree', methods=['GET'])
 class tree(Resource):
