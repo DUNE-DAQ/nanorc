@@ -14,15 +14,16 @@ import click
 import click_shell
 import os.path
 import logging
-from anytree.resolver import Resolver
 
+from . import __version__
+from anytree.resolver import Resolver
 from rich.table import Table
 from rich.panel import Panel
 from rich.console import Console
 from rich.traceback import Traceback
 from rich.progress import *
 from nanorc.runmgr import SimpleRunNumberManager
-from nanorc.cfgsvr import SimpleConfigSaver
+from nanorc.cfgsvr import FileConfigSaver
 from nanorc.core import NanoRC
 
 class NanoContext:
@@ -71,6 +72,10 @@ def updateLogLevel(loglevel):
             handler.setLevel(sh_command_level)
 
 def validatePath(ctx, param, prompted_path):
+
+    if prompted_path is None:
+        return None
+        
     hierarchy = prompted_path.split("/")
 
     topnode = ctx.obj.rc.topnode
@@ -85,11 +90,11 @@ def validatePath(ctx, param, prompted_path):
 
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
+@click.version_option(__version__)
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
-
 @click.argument('top_cfg', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
@@ -113,8 +118,9 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, top_cfg):
     try:
         rc = NanoRC(obj.console, top_cfg,
                     SimpleRunNumberManager(),
-                    SimpleConfigSaver(cfg_dumpdir),
+                    FileConfigSaver(cfg_dumpdir),
                     timeout)
+
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()
@@ -122,10 +128,13 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, top_cfg):
     def cleanup_rc():
         logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
         rc.terminate()
-        ctx.exit(rc.return_code)
+        if rc.return_code:
+            ctx.exit(rc.return_code)
 
     ctx.call_on_close(cleanup_rc)
     obj.rc = rc
+    rc.ls(False)
+
     
 
 @cli.command('status')
@@ -140,7 +149,7 @@ def boot(obj):
     obj.rc.status()
 
 @cli.command('init')
-@click.argument('path', type=str, default="", callback=validatePath)
+@click.option('--path', type=str, default=None, callback=validatePath)
 @click.pass_obj
 def init(obj, path):
     obj.rc.init(path)
@@ -153,7 +162,7 @@ def ls(obj):
 
 
 @cli.command('conf')
-@click.argument('path', type=str, default="", callback=validatePath)
+@click.option('--path', type=str, default=None, callback=validatePath)
 @click.pass_obj
 def conf(obj, path):
     obj.rc.conf(path)
@@ -180,45 +189,45 @@ def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_
     obj.rc.start(disable_data_storage, "TEST")
     obj.rc.status()
     time.sleep(resume_wait)
-    obj.rc.resume(None, trigger_interval_ticks)
+    obj.rc.resume(trigger_interval_ticks)
     obj.rc.status()
 
 @cli.command('stop')
 @click.option('--stop-wait', type=int, default=0, help='Seconds to wait between Pause and Stop commands')
+@click.option('--force', default=False, is_flag=True)
 @click.pass_obj
-def stop(obj, stop_wait:int):
-    obj.rc.pause(None)
+def stop(obj, stop_wait:int, force:bool):
+    obj.rc.pause(force)
     obj.rc.status()
     time.sleep(stop_wait)
-    obj.rc.stop()
+    obj.rc.stop(force)
     obj.rc.status()
 
 @cli.command('pause')
-@click.argument('path', type=str, default="", callback=validatePath)
 @click.pass_obj
-def pause(obj, path):
-    obj.rc.pause(path)
+def pause(obj):
+    obj.rc.pause()
     obj.rc.status()
 
 @cli.command('resume')
-@click.argument('path', type=str, default="", callback=validatePath)
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.pass_obj
-def resume(obj:NanoContext, path:str, trigger_interval_ticks:int):
+def resume(obj:NanoContext, trigger_interval_ticks:int):
     """Resume Command
     
     Args:
         obj (NanoContext): Context object
         trigger_interval_ticks (int): Trigger separation in ticks
     """
-    obj.rc.resume(path, trigger_interval_ticks)
+    obj.rc.resume(trigger_interval_ticks)
     obj.rc.status()
 
 @cli.command('scrap')
-@click.argument('path', type=str, default="", callback=validatePath)
+@click.option('--path', type=str, default=None, callback=validatePath)
+@click.option('--force', default=False, is_flag=True)
 @click.pass_obj
-def scrap(obj, path):
-    obj.rc.scrap(path)
+def scrap(obj, path, force):
+    obj.rc.scrap(path, force)
     obj.rc.status()
 
 @cli.command('terminate')

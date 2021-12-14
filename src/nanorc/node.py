@@ -1,11 +1,12 @@
 from anytree import NodeMixin, RenderTree, PreOrderIter
 from anytree.resolver import Resolver
+import requests
 import time
 from datetime import datetime
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
-from anytree import PreOrderIter
+from rich.panel import Panel
 
 import logging
 from .sshpm import SSHProcessManager
@@ -53,40 +54,28 @@ class GroupNode(NodeMixin):
 
         console.print(table)
 
-    def node_status_data(self) -> dict:
-        data = {}
-        data["name"] = self.name
-        return data
-
-    def tree_status_data(self) -> dict:
-        data = self.node_status_data()
-        if not self.children:
-            return data
-        
-        children_data = []
-        for node in self.children:
-            children_data.append(node.tree_status_data())
-            
-        data.update({"children": children_data})
-        
-        return data
-
     def print(self, leg:bool=False, console:Console=None) -> int:
         if console:
             print_func = console.print
         else:
             print_func = print
 
+        rows = []
         try:
             for pre, _, node in RenderTree(self):
                 if node == self:
-                    print_func(f"{pre}[red]{node.name}[/red]")
+                    # print_func(f"{pre}[red]{node.name}[/red]")
+                    rows.append(f"{pre}[red]{node.name}[/red]")
                 elif isinstance(node, SubsystemNode):
-                    print_func(f"{pre}[yellow]{node.name}[/yellow]")
+                    # print_func(f"{pre}[yellow]{node.name}[/yellow]")
+                    rows.append(f"{pre}[yellow]{node.name}[/yellow]")
                 elif isinstance(node, ApplicationNode):
-                    print_func(f"{pre}[blue]{node.name}[/blue]")
+                    # print_func(f"{pre}[blue]{node.name}[/blue]")
+                    rows.append(f"{pre}[blue]{node.name}[/blue]")
                 else:
-                    print_func(f"{pre}{node.name}")
+                    rows.append(f"{pre}{node.name}")
+
+            print_func(Panel.fit('\n'.join(rows)))
 
             if leg:
                 print_func("\nLegend:")
@@ -100,15 +89,12 @@ class GroupNode(NodeMixin):
             raise RuntimeError(f"Tree is corrupted")
         return 0
 
-    def send_command(self, path:[str], cmd:str,
-                     state_entry:str, state_exit:str,
-                     cfg_method:str=None, overwrite_data:dict={},
-                     raise_on_fail:bool=True,
-                     timeout:int=None) -> int:
+    def send_command(self, path:[str], cmd:str, state_entry:str, state_exit:str, cfg_method:str=None, overwrite_data:dict={}, raise_on_fail:bool=True, timeout:int=None, force:bool=False) -> int:
+
         if path:
             r = Resolver('name')
             prompted_path = "/".join(path)
-            print(f"node.send_command prompted path {prompted_path}")
+            self.log.info(f"node.send_command prompted path {prompted_path}")
             node = r.get(self, prompted_path)
         else:
             node = self
@@ -117,9 +103,7 @@ class GroupNode(NodeMixin):
 
         if not node: return
 
-        ok, failed = node._propagate_command(cmd=cmd, state_entry=state_entry, state_exit=state_exit,
-                                             cfg_method=cfg_method, overwrite_data=overwrite_data,
-                                             timeout=timeout)
+        ok, failed = node._propagate_command(cmd=cmd, state_entry=state_entry, state_exit=state_exit, cfg_method=cfg_method, overwrite_data=overwrite_data, timeout=timeout, force=force)
 
         if raise_on_fail and len(failed)>0:
             self.log.error(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
@@ -128,23 +112,18 @@ class GroupNode(NodeMixin):
                 self.log.error(f"{a}: {r}")
             raise RuntimeError(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
 
-        if failed == 0:
-            return 0
-        else:
-            return 1
+        return 0
 
 
-    def _propagate_command(self, cmd:str, state_entry:str, state_exit:str,
-                          cfg_method:str=None, overwrite_data:dict={},
-                          timeout:int=None) -> tuple:
+    def _propagate_command(self, cmd:str, state_entry:str, state_exit:str, cfg_method:str=None, overwrite_data:dict={}, timeout:int=None, force:bool=False) -> tuple:
 
         ok, failed = {}, {}
 
         for child in self.children:
             o, f = child._propagate_command(cmd=cmd,
-                                           state_entry = state_entry, state_exit = state_exit,
-                                           cfg_method = cfg_method, overwrite_data = overwrite_data,
-                                           timeout = timeout)
+                                            state_entry = state_entry, state_exit = state_exit,
+                                            cfg_method = cfg_method, overwrite_data = overwrite_data,
+                                            timeout = timeout, force=force)
             ok.update(o)
             failed.update(f)
 
@@ -171,7 +150,7 @@ class GroupNode(NodeMixin):
 
 
 # Now on to useful stuff
-class ApplicationNode(GroupNode):
+class ApplicationNode(NodeMixin):
     def __init__(self, name, sup, parent=None):
         self.name = name
         self.sup = sup
@@ -184,22 +163,8 @@ class ApplicationNode(GroupNode):
     def send_command(self, *args, **kwargs):
         raise RuntimeError("ERROR: You can't send a command directly to an application! Send it to the parent subsystem!")
 
-    def node_status_data(self) -> dict:
-        data = {}
-        data["name"] = self.name
-        sup = self.sup
-        alive = sup.desc.proc.is_alive()
-        ping  = sup.commander.ping()
-        last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
-        data["alive"] = alive
-        data["ping"] = ping
-        data["last_sent_cmd"] = sup.last_sent_command
-        data["last_cmd_failed"] = last_cmd_failed
-        data["last_ok_cmd"] = sup.last_ok_command
-        return data
 
-
-class SubsystemNode(GroupNode):
+class SubsystemNode(NodeMixin):
     def __init__(self, name:str, cfgmgr, console, parent=None, children=None):
         self.name = name
         self.cfgmgr = cfgmgr
@@ -242,16 +207,22 @@ class SubsystemNode(GroupNode):
             self.pm.terminate()
 
 
-    def _propagate_command(self, cmd:str,
-                          state_entry:str, state_exit:str,
-                          cfg_method:str=None, overwrite_data:dict={},
-                          timeout:int=None) -> tuple:
+    def _propagate_command(self, cmd:str, state_entry:str, state_exit:str, cfg_method:str=None, overwrite_data:dict={}, timeout:int=None, force:bool=False) -> tuple:
         self.log.debug(f"Sending {cmd} to {self.name}")
 
         sequence = getattr(self.cfgmgr, cmd+'_order', None)
 
         appset = list(self.children)
         ok, failed = {}, {}
+
+        for n in appset:
+            if not n.sup.desc.proc.is_alive() or not n.sup.commander.ping():
+                text = f"'{n.name}' seems to be dead. So I cannot initiate transition '{state_entry}' -> '{state_exit}'."
+                if force:
+                    self.log.error(text+f"\nBut! '--force' was specified, so I'll ignore '{n.name}'!")
+                    appset.remove(n)
+                else:
+                    raise RuntimeError(text+"\nYou may be able to use '--force' if you want to 'stop' or 'scrap' the run.")
 
         if not sequence:
             # Loop over data keys if no sequence is specified or all apps, if data is empty
@@ -266,6 +237,7 @@ class SubsystemNode(GroupNode):
                     data = getattr(self.cfgmgr, cmd)
 
                 n.sup.send_command(cmd, data[n.name] if data else {}, state_entry, state_exit)
+
 
             start = datetime.now()
 
@@ -303,10 +275,10 @@ class SubsystemNode(GroupNode):
                             data = f(overwrite_data)
                         else:
                             data = getattr(self.cfgmgr, cmd)
+
                         r = child_node.sup.send_command_and_wait(cmd, data[n] if data else {},
                                                                  state_entry, state_exit, timeout)
                         (ok if r['success'] else failed)[n] = r
 
 
         return (ok, failed)
-

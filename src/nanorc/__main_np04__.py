@@ -12,6 +12,7 @@ import click_shell
 import os.path
 import logging
 
+from . import __version__
 from rich.table import Table
 from rich.panel import Panel
 from rich.console import Console
@@ -26,6 +27,7 @@ from .cli import *
 
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky np04rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
+@click.version_option(__version__)
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
@@ -75,10 +77,12 @@ def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, cfg_
     def cleanup_rc():
         logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
         rc.terminate()
-        ctx.exit(rc.return_code)
+        if rc.return_code:
+            ctx.exit(rc.return_code)
 
     ctx.call_on_close(cleanup_rc)
     obj.rc = rc
+    rc.ls(False)
 
 
 np04cli.add_command(status, 'status')
@@ -112,7 +116,7 @@ def start(obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_inte
     obj.rc.start(disable_data_storage, run_type)
     obj.rc.status()
     time.sleep(resume_wait)
-    obj.rc.resume(None,trigger_interval_ticks)
+    obj.rc.resume(trigger_interval_ticks)
     obj.rc.status()
 
 
