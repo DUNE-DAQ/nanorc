@@ -42,8 +42,11 @@ class ApplicationNode(GroupNode):
         self.end_terminate()
 
 class SubsystemNode(GroupNode):
-    def __init__(self, name:str, cfgmgr, console, fsm_conf, parent=None, children=None):
+    def __init__(self, name:str, ssh_conf, cfgmgr, fsm_conf, console, parent=None, children=None):
         super().__init__(name=name, console=console, fsm_conf=fsm_conf, parent=parent, children=children)
+        self.name = name
+        self.ssh_conf = ssh_conf
+
         self.cfgmgr = cfgmgr
         self.pm = None
         self.listener = None
@@ -52,7 +55,7 @@ class SubsystemNode(GroupNode):
     def on_enter_boot_ing(self, event) -> NoReturn:
         self.log.info(f'Subsystem {self.name} is booting')
         try:
-            self.pm = SSHProcessManager(self.console)
+            self.pm = SSHProcessManager(self.console, self.ssh_conf)
             self.pm.boot(self.cfgmgr.boot)
         except Exception as e:
             self.console.print_exception()

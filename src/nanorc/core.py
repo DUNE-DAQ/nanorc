@@ -10,6 +10,8 @@ from .treebuilder import TreeBuilder
 from .cfgsvr import FileConfigSaver, DBConfigSaver
 from .credmgr import credentials
 from .node_render import *
+from .logbook import ElisaLogbook, FileLogbook
+import importlib
 from rich.traceback import Traceback
 
 from datetime import datetime
@@ -19,12 +21,19 @@ from typing import Union, NoReturn
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
-    def __init__(self, console: Console, top_cfg: str, run_num_mgr: str, run_registry: str, timeout: int):
-        super(NanoRC, self).__init__()     
+    def __init__(self, console: Console, top_cfg: str, run_num_mgr, run_registry, logbook_type:str, timeout: int,
+                 use_kerb=True, logbook_prefix=""):
+        super(NanoRC, self).__init__()
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
 
-        self.cfg = TreeBuilder(top_cfg, self.console)
+        ssh_conf = []
+        if not use_kerb:
+            ssh_conf = ["-o GSSAPIAuthentication=no"]
+
+        self.cfg = TreeBuilder(top_cfg=top_cfg,
+                               console=self.console,
+                               ssh_conf=ssh_conf)
         self.apparatus_id = self.cfg.apparatus_id
 
         self.run_num_mgr = run_num_mgr
@@ -33,6 +42,22 @@ class NanoRC:
         self.cfgsvr.apparatus_id = self.apparatus_id
         self.timeout = timeout
         self.return_code = None
+        self.logbook = None
+        if logbook_type == "elisa":
+            try:
+                from . import confdata
+                elisa_conf = json.loads(importlib.resources.read_text(confdata, "elisa_conf.json"))
+                if elisa_conf.get(self.apparatus_id):
+                    self.logbook = ElisaLogbook(configuration = elisa_conf[self.apparatus_id],
+                                                console = console)
+                else:
+                    self.log.error(f"Can't find config {self.apparatus_id} confdata/elisa_conf.json, reverting to file logbook!")
+            except Exception as e:
+                self.log.error(f"Can't find confdata/elisa_conf.json, reverting to file logbook! {str(e)}")
+
+        if not self.logbook:
+            self.log.info("Using filelogbook")
+            self.logbook = FileLogbook(logbook_prefix, self.console)
 
         self.topnode = self.cfg.get_tree_structure()
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
@@ -92,7 +117,7 @@ class NanoRC:
         self.return_code = self.topnode.return_code.value
 
 
-    def start(self, disable_data_storage: bool, run_type:str) -> NoReturn:
+    def start(self, disable_data_storage: bool, run_type:str, message:str="") -> NoReturn:
         """
         Sends start command to the applications
 
@@ -106,6 +131,15 @@ class NanoRC:
             self.return_code = 1
             return
         self.run = self.run_num_mgr.get_run_number()
+
+        if message != "":
+            self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
+
+        try:
+            self.logbook.message_on_start(message, self.run, run_type)
+        except Exception as e:
+            self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
+
 
         runtime_start_data = {
             "disable_data_storage": disable_data_storage,
@@ -132,11 +166,32 @@ class NanoRC:
             self.log.error(f"[bold red]There was an error when starting the run #{self.run}[/bold red]:")
             self.log.error(f'Response: {self.topnode.response}')
 
+    def message(self, message:str="") -> NoReturn:
+        """
+        Append the logbook
+        """
 
-    def stop(self, force:bool=False) -> NoReturn:
+        if message != "":
+            self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
+            try:
+                self.logbook.add_message(message)
+            except Exception as e:
+                self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
+
+
+    def stop(self, force:bool=False, message:str="") -> NoReturn:
         """
         Sends stop command
         """
+
+        if message != "":
+            self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
+            try:
+                self.logbook.message_on_stop(message)
+            except Exception as e:
+                self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
+
+
         self.cfgsvr.save_on_stop(self.run)
         self.topnode.stop(path=None, raise_on_fail=True, timeout=self.timeout, force=force)
         self.return_code = self.topnode.return_code.value
@@ -154,7 +209,7 @@ class NanoRC:
     def resume(self, trigger_interval_ticks: Union[int, None]) -> NoReturn:
         """
         Sends resume command
-        
+
         :param      trigger_interval_ticks:  The trigger interval ticks
         :type       trigger_interval_ticks:  int
         """

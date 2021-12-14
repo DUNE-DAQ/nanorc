@@ -110,14 +110,14 @@ class SSHProcessManager(object):
         for i in instances:
             i.kill()
 
-    def __init__(self, console: Console):
+    def __init__(self, console: Console, ssh_conf):
         super(SSHProcessManager, self).__init__()
         self.console = console
         self.log = logging.getLogger(__name__)
         self.apps = {}
         self.watchers = []
         self.event_queue = queue.Queue()
-
+        self.ssh_conf = ssh_conf
         # Add self to the list of instances
         self.__instances.add(self)
 
@@ -168,7 +168,10 @@ class SSHProcessManager(object):
 
             log_file = f'log_{app_name}_{app_conf["port"]}.txt'
 
-            ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no", cmd]
+            ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"]
+            # if not self.can_use_kerb:
+            ssh_args += self.ssh_conf
+            ssh_args += [cmd]
 
             desc = AppProcessDescriptor(app_name)
             desc.logfile = log_file

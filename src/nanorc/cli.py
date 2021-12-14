@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-
 """
 Command Line Interface for NanoRC
 """
@@ -16,21 +15,26 @@ import os.path
 import logging
 
 from . import __version__
+
 from anytree.resolver import Resolver
+
 from rich.table import Table
 from rich.panel import Panel
 from rich.console import Console
 from rich.traceback import Traceback
 from rich.progress import *
+
 from nanorc.runmgr import SimpleRunNumberManager
 from nanorc.cfgsvr import FileConfigSaver
 from nanorc.core import NanoRC
+from nanorc.logbook import FileLogbook
+from nanorc.credmgr import credentials
 
 class NanoContext:
     """docstring for NanoContext"""
     def __init__(self, console: Console):
         """Nanorc Context for click use.
-        
+
         Args:
             console (Console): rich console for messages and logging
         """
@@ -75,7 +79,7 @@ def validatePath(ctx, param, prompted_path):
 
     if prompted_path is None:
         return None
-        
+
     hierarchy = prompted_path.split("/")
 
     topnode = ctx.obj.rc.topnode
@@ -88,6 +92,7 @@ def validatePath(ctx, param, prompted_path):
 
     return hierarchy
 
+
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 @click.version_option(__version__)
@@ -95,19 +100,22 @@ def validatePath(ctx, param, prompted_path):
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
+@click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
+@click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
 @click.argument('top_cfg', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, top_cfg):
-
+def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, kerberos, top_cfg):
     obj.print_traceback = traceback
+    credentials.user = 'user'
+    ctx.command.shell.prompt = f'{credentials.user}@rc> '
 
     grid = Table(title='Shonky NanoRC', show_header=False, show_edge=False)
     grid.add_column()
     grid.add_row("This is an admittedly shonky nano RC to control DUNE-DAQ applications.")
     grid.add_row("  Give it a command and it will do your biddings,")
     grid.add_row("  but trust it and it will betray you!")
-    grid.add_row("Use it with care!")
+    grid.add_row(f"Use it with care, {credentials.user}!")
 
     obj.console.print(Panel.fit(grid))
 
@@ -116,10 +124,14 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, top_cfg):
         updateLogLevel(loglevel)
 
     try:
-        rc = NanoRC(obj.console, top_cfg,
-                    SimpleRunNumberManager(),
-                    FileConfigSaver(cfg_dumpdir),
-                    timeout)
+        rc = NanoRC(console = obj.console,
+                    top_cfg = top_cfg,
+                    run_num_mgr = SimpleRunNumberManager(),
+                    run_registry = FileConfigSaver(cfg_dumpdir),
+                    logbook_type = "file",
+                    timeout = timeout,
+                    use_kerb = kerberos,
+                    logbook_prefix = logbook_prefix)
 
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
@@ -168,26 +180,35 @@ def conf(obj, path):
     obj.rc.conf(path)
     obj.rc.status()
 
+
+@cli.command('message')
+@click.argument('message', type=str, default=None)
+@click.pass_obj
+def message(obj, message):
+    obj.rc.message(message)
+
 @cli.command('start')
 @click.argument('run', type=int)
 @click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.option('--resume-wait', type=int, default=0, help='Seconds to wait between Start and Resume commands')
+@click.option('--message', type=str, default="")
 @click.pass_obj
-def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int):
+def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str):
     """
     Start Command
-    
+
     Args:
         obj (NanoContext): Context object
         run (int): Run number
         disable_data_storage (bool): Flag to disable data writing to storage
-    
+
     """
 
     obj.rc.run_num_mgr.set_run_number(run)
-    ret = obj.rc.start(disable_data_storage, "TEST")
+    obj.rc.start(disable_data_storage, "TEST", message=message)
     obj.rc.status()
+    time.sleep(resume_wait)
     if obj.rc.return_code == 0:
         time.sleep(resume_wait)
         obj.rc.resume(trigger_interval_ticks)
@@ -196,12 +217,13 @@ def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_
 @cli.command('stop')
 @click.option('--stop-wait', type=int, default=0, help='Seconds to wait between Pause and Stop commands')
 @click.option('--force', default=False, is_flag=True)
+@click.option('--message', type=str, default="")
 @click.pass_obj
-def stop(obj, stop_wait:int, force:bool):
+def stop(obj, stop_wait:int, force:bool, message:str):
     obj.rc.pause(force)
     obj.rc.status()
     time.sleep(stop_wait)
-    obj.rc.stop(force)
+    obj.rc.stop(force, message=message)
     obj.rc.status()
 
 @cli.command('pause')
@@ -215,13 +237,14 @@ def pause(obj):
 @click.pass_obj
 def resume(obj:NanoContext, trigger_interval_ticks:int):
     """Resume Command
-    
+
     Args:
         obj (NanoContext): Context object
         trigger_interval_ticks (int): Trigger separation in ticks
     """
     obj.rc.resume(trigger_interval_ticks)
     obj.rc.status()
+
 
 @cli.command('scrap')
 @click.option('--path', type=str, default=None, callback=validatePath)
