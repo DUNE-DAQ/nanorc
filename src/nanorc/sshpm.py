@@ -137,7 +137,7 @@ class SSHProcessManager(object):
         self.log.debug(name+str(exc))
         self.event_queue.put((name, exc))
 
-    def boot(self, boot_info):
+    def boot(self, boot_info, log_path='.'):
 
         if self.apps:
             raise RuntimeError(
@@ -166,7 +166,7 @@ class SSHProcessManager(object):
                 })
             cmd=';'.join([ f"export {n}=\"{v}\"" for n,v in app_vars.items()] + boot_info['exec'][app_conf['exec']]['cmd'])
 
-            log_file = f'log_{app_name}_{app_conf["port"]}.txt'
+            log_file = f'{log_path}/log_{app_name}_{app_conf["port"]}.txt'
 
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"]
             # if not self.can_use_kerb:
@@ -196,6 +196,7 @@ class SSHProcessManager(object):
                 _bg=True,
                 _bg_exc=False,
                 _new_session=True,
+                _err_to_out=True,
                 _preexec_fn=on_parent_exit(signal.SIGTERM),
             )
             self.watch(name, proc)
