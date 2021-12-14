@@ -45,8 +45,12 @@ class NanoRC:
         self.return_code = None
         self.logbook = None
         self.log_path = os.path.expandvars(log_path)
+
         if not os.path.isdir(self.log_path):
-            raise RuntimeError(f'Logging path: {log_path} doesn\'t exist!')
+            try:
+                os.path.makedirs(self.log_path)
+            except Exception as e:
+                raise RuntimeError(f'Logging path: {self.log_path} doesn\'t exist, and I cannot create it!') from e
 
         if logbook_type == "elisa":
             try:
