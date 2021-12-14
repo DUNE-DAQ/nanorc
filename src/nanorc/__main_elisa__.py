@@ -31,13 +31,12 @@ from .cli import *
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
-@click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
 @click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.argument('user', type=str)
 @click.pass_obj
 @click.pass_context
-def elisaCli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, kerberos, cfg_dir, user):
+def elisaCli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, kerberos, cfg_dir, user):
     obj.print_traceback = traceback
     credentials.change_user(user)
     ctx.command.shell.prompt = f"{credentials.user}@nano_elisarc> "
@@ -55,12 +54,6 @@ def elisaCli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, ker
         updateLogLevel(loglevel)
 
     try:
-        dotnanorc = os.path.expanduser(dotnanorc)
-        obj.console.print(f"[blue]Loading {dotnanorc}[/blue]")
-        f = open(dotnanorc)
-        dotnanorc = json.load(f)
-        logging.getLogger("cli").info("RunDB socket "+dotnanorc["rundb"]["socket"])
-        logging.getLogger("cli").info("RunRegistryDB socket "+dotnanorc["runregistrydb"]["socket"])
         rc = NanoRC(console = obj.console,
                     top_cfg = cfg_dir,
                     run_num_mgr = SimpleRunNumberManager(),

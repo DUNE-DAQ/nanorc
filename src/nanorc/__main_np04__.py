@@ -11,6 +11,7 @@ import click
 import click_shell
 import os.path
 import logging
+import importlib.resources as resources
 
 from . import __version__
 from rich.table import Table
@@ -24,6 +25,8 @@ from nanorc.core import NanoRC
 from nanorc.runmgr import DBRunNumberManager
 from nanorc.cfgsvr import DBConfigSaver
 from nanorc.credmgr import credentials
+from . import confdata
+
 from .cli import *
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='anonymous@np04rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
@@ -60,19 +63,23 @@ def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, kerb
         obj.console.print(f"[blue]Loading {dotnanorc}[/blue]")
         f = open(dotnanorc)
         dotnanorc = json.load(f)
+
+        rundb_socket = json.loads(resources.read_text(confdata, "run_number.json"))['socket']
+        runreg_socket = json.loads(resources.read_text(confdata, "run_registry.json"))['socket']
+
         credentials.add_login("rundb",
                               dotnanorc["rundb"]["user"],
                               dotnanorc["rundb"]["password"])
         credentials.add_login("runregistrydb",
                               dotnanorc["runregistrydb"]["user"],
                               dotnanorc["runregistrydb"]["password"])
-        logging.getLogger("cli").info("RunDB socket "+dotnanorc["rundb"]["socket"])
-        logging.getLogger("cli").info("RunRegistryDB socket "+dotnanorc["runregistrydb"]["socket"])
+        logging.getLogger("cli").info("RunDB socket "+rundb_socket)
+        logging.getLogger("cli").info("RunRegistryDB socket "+runreg_socket)
 
         rc = NanoRC(console = obj.console,
                     top_cfg = cfg_dir,
-                    run_num_mgr = DBRunNumberManager(dotnanorc["rundb"]["socket"]),
-                    run_registry = DBConfigSaver(dotnanorc["runregistrydb"]["socket"]),
+                    run_num_mgr = DBRunNumberManager(rundb_socket),
+                    run_registry = DBConfigSaver(runreg_socket),
                     logbook_type = "elisa",
                     timeout = timeout,
                     use_kerb = kerberos)

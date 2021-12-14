@@ -50,7 +50,7 @@ class NanoRC:
                     self.logbook = ElisaLogbook(configuration = elisa_conf[self.apparatus_id],
                                                 console = console)
                 else:
-                    self.log.error("Can't find config {self.apparatus_id} confdata/elisa_conf.json, reverting to file logbook!")
+                    self.log.error(f"Can't find config {self.apparatus_id} confdata/elisa_conf.json, reverting to file logbook!")
             except Exception as e:
                 self.log.error(f"Can't find confdata/elisa_conf.json, reverting to file logbook! {str(e)}")
 
