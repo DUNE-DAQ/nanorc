@@ -37,7 +37,7 @@ from .cli import *
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
 @click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
-@click.option('--log-path', type=click.Path(exists=True), default="/log/nanorc", help='Prefix for the logs of the applications')
+@click.option('--log-path', type=click.Path(), default="/log/nanorc", help='Prefix for the logs of the applications')
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.argument('user', type=str)
 @click.pass_obj
