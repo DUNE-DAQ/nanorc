@@ -167,7 +167,7 @@ class SubsystemNode(GroupNode):
                 child_node.trigger(command)
                 ## APP now in *_ing
 
-                child_node.sup.send_command(command, cmd_data=data, entry_state=entry_state, exit_state=exit_state)
+                child_node.sup.send_command(command, cmd_data=data[child_node.name] if data else {}, entry_state=entry_state, exit_state=exit_state)
 
 
             start = datetime.now()
@@ -216,7 +216,8 @@ class SubsystemNode(GroupNode):
                           'cmd_data': data}
                 event.kwargs.update(kwargs)
                 child_node.trigger(command)
-                r = child_node.sup.send_command_and_wait(command, cmd_data=data, timeout=event.kwargs['timeout'],
+                r = child_node.sup.send_command_and_wait(command, cmd_data=data[child_node.name] if data else {},
+                                                         timeout=event.kwargs['timeout'],
                                                          entry_state=entry_state, exit_state=exit_state)
                 if r['success']:
                     child_node.trigger("end_"+command)
