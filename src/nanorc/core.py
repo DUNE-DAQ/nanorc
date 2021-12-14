@@ -48,7 +48,7 @@ class NanoRC:
 
         if not os.path.isdir(self.log_path):
             try:
-                os.path.makedirs(self.log_path)
+                os.makedirs(self.log_path)
             except Exception as e:
                 raise RuntimeError(f'Logging path: {self.log_path} doesn\'t exist, and I cannot create it!') from e
 
