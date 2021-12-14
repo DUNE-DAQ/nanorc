@@ -100,12 +100,13 @@ def validatePath(ctx, param, prompted_path):
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
-@click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
+@click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
+@click.option('--log-path', type=click.Path(exists=True), default=".", help='Prefix for the logs of the applications')
 @click.argument('top_cfg', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, kerberos, top_cfg):
+def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, kerberos, log_path, top_cfg):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f'{credentials.user}@rc> '
@@ -131,6 +132,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, ker
                     logbook_type = "file",
                     timeout = timeout,
                     use_kerb = kerberos,
+                    log_path = log_path,
                     logbook_prefix = logbook_prefix)
 
     except Exception as e:

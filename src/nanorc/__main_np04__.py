@@ -37,11 +37,12 @@ from .cli import *
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
 @click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
+@click.option('--log-path', type=click.Path(exists=True), default="/log", help='Prefix for the logs of the applications')
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.argument('user', type=str)
 @click.pass_obj
 @click.pass_context
-def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, kerberos, cfg_dir, user):
+def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, kerberos, log_path, cfg_dir, user):
     obj.print_traceback = traceback
     credentials.change_user(user)
     ctx.command.shell.prompt = f"{credentials.user}@np04rc> "
@@ -82,6 +83,7 @@ def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, kerb
                     run_registry = DBConfigSaver(runreg_socket),
                     logbook_type = "elisa",
                     timeout = timeout,
+                    log_path = log_path,
                     use_kerb = kerberos)
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")

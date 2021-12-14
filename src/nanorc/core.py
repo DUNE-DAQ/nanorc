@@ -2,26 +2,28 @@ import logging
 import time
 import json
 import os
+import importlib
+
+from datetime import datetime
+from typing import Union, NoReturn
+
 from rich.console import Console
 from rich.style import Style
 from rich.pretty import Pretty
+from rich.traceback import Traceback
+
 from .node import GroupNode
 from .treebuilder import TreeBuilder
 from .cfgsvr import FileConfigSaver, DBConfigSaver
 from .credmgr import credentials
 from .logbook import ElisaLogbook, FileLogbook
-import importlib
-from rich.traceback import Traceback
 
-from datetime import datetime
-
-from typing import Union, NoReturn
 
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
     def __init__(self, console: Console, top_cfg: str, run_num_mgr, run_registry, logbook_type:str, timeout: int,
-                 use_kerb=True, logbook_prefix=""):
+                 use_kerb=True, logbook_prefix="", log_path='.'):
         super(NanoRC, self).__init__()
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
@@ -42,6 +44,10 @@ class NanoRC:
         self.timeout = timeout
         self.return_code = None
         self.logbook = None
+        self.log_path = os.path.expandvars(log_path)
+        if not os.path.isdir(self.log_path):
+            raise RuntimeError(f'Logging path: {log_path} doesn\'t exist!')
+
         if logbook_type == "elisa":
             try:
                 from . import confdata
@@ -82,8 +88,14 @@ class NanoRC:
         """
         Boots applications
         """
-
-        self.return_code = self.topnode.boot()
+        now = datetime.now() # current date and time
+        date_time = now.strftime("%Y%m%d_%H%M%S")
+        time_stamp_log_path = self.log_path + f'/logs_{date_time}'
+        try:
+            os.mkdir(time_stamp_log_path)
+        except:
+            raise RuntimeError(f'Can\'t create directory {time_stamp_log_path} not booting.')
+        self.return_code = self.topnode.boot(log_path=time_stamp_log_path)
 
 
     def terminate(self) -> NoReturn:
