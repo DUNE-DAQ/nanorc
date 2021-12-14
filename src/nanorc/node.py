@@ -131,10 +131,9 @@ class SubsystemNode(GroupNode):
 
         entry_state = event.transition.source.upper()
         exit_state = self.get_destination(command).upper()
-        if entry_state in appfwk_state_dictionnary.keys(): entry_state = appfwk_state_dictionnary[entry_state]
-        if exit_state  in appfwk_state_dictionnary.keys(): exit_state  = appfwk_state_dictionnary[exit_state]
+        if entry_state in appfwk_state_dictionnary: entry_state = appfwk_state_dictionnary[entry_state]
+        if exit_state  in appfwk_state_dictionnary: exit_state  = appfwk_state_dictionnary[exit_state]
 
-        print (f'entry_state={entry_state}, exit_state={exit_state}')
 
         sequence = getattr(self.cfgmgr, command+'_order', None)
         log = f"Sending {command} to the subsystem {self.name}"
