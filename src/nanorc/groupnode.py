@@ -71,7 +71,13 @@ class GroupNode(NodeMixin):
             for cn in self.order[command]:
                 child = [c for c in self.children if c.name == cn][0]
                 still_to_exec.append(child) # a record of which children still need to finish their task
-                child.trigger(command, **event.kwargs)
+                try:
+                    child.trigger(command, **event.kwargs)
+                except Exception as e:
+                    if force:
+                        self.log.error(f'Failed to send \'{command}\' to \'{child.name}\', --force was specified so continuing anyway')
+                        continue
+                    raise Exception from e
         else:
             self.log.info(f'Propagating to children nodes simultaneously')
             for child in self.children:
