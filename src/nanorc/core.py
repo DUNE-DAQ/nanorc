@@ -51,7 +51,7 @@ class NanoRC:
                 os.makedirs(self.log_path)
             except Exception as e:
                 raise RuntimeError(f'Logging path: {self.log_path} doesn\'t exist, and I cannot create it!') from e
-
+        self.log.info(f'Logfiles are in {self.log_path}')
         if logbook_type == "elisa":
             try:
                 from . import confdata
@@ -97,6 +97,7 @@ class NanoRC:
         time_stamp_log_path = self.log_path + f'/logs_{date_time}'
         try:
             os.mkdir(time_stamp_log_path)
+            self.log.info(f'Logfiles are in {time_stamp_log_path}')
         except:
             raise RuntimeError(f'Can\'t create directory {time_stamp_log_path} not booting.')
         self.return_code = self.topnode.boot(log_path=time_stamp_log_path)
