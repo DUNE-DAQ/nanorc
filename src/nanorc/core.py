@@ -47,7 +47,6 @@ class NanoRC:
         :returns:   Nothing
         :rtype:     None
         """
-
         if not self.topnode:
             return
 
@@ -58,22 +57,22 @@ class NanoRC:
         """
         Boots applications
         """
-
-        self.return_code = self.topnode.boot(timeout=self.timeout)
+        self.topnode.boot(timeout=self.timeout)
+        self.return_code = self.topnode.return_code.value
 
 
     def terminate(self) -> NoReturn:
         """
         Terminates applications (but keep all the subsystems structure)
         """
-        self.return_code = self.topnode.terminate()
+        self.topnode.terminate()
+        self.return_code = self.topnode.return_code.value
 
 
     def ls(self, leg:bool=True) -> NoReturn:
         """
         Print the nodes
         """
-
         self.return_code = print_node(node=self.topnode, console=self.console, leg=leg)
 
 
@@ -81,16 +80,16 @@ class NanoRC:
         """
         Initializes the applications.
         """
-
-        self.return_code = self.topnode.init(path=path, raise_on_fail=True, timeout=self.timeout)
+        self.topnode.init(path=path, raise_on_fail=True, timeout=self.timeout)
+        self.return_code = self.topnode.return_code.value
 
 
     def conf(self, path) -> NoReturn:
         """
         Sends configure command to the applications.
         """
-
-        self.return_code = self.topnode.conf(path, raise_on_fail=True, timeout=self.timeout)
+        self.topnode.conf(path=path, raise_on_fail=True, timeout=self.timeout)
+        self.return_code = self.topnode.return_code.value
 
 
     def start(self, disable_data_storage: bool, run_type:str) -> NoReturn:
@@ -104,7 +103,8 @@ class NanoRC:
         # self.return_code = self.topnode.allowed("start", None)
         if not self.topnode.can_start():
             self.console.log(f"I cannot start now! {self.topnode.name} is {self.topnode.state}!")
-            return 1
+            self.return_code = 1
+            return
         self.run = self.run_num_mgr.get_run_number()
 
         runtime_start_data = {
@@ -112,26 +112,34 @@ class NanoRC:
             "run": self.run,
         }
 
-        cfg_save_dir = self.cfgsvr.save_on_start(self.topnode, run=self.run, run_type=run_type,
-                                                 overwrite_data=runtime_start_data,
-                                                 cfg_method="runtime_start")
+        try:
+            cfg_save_dir = self.cfgsvr.save_on_start(self.topnode, run=self.run, run_type=run_type,
+                                                     overwrite_data=runtime_start_data,
+                                                     cfg_method="runtime_start")
+        except Exception as e:
+            self.log.error(f'Couldn\'t save the configuration so not starting a run!\n{str(e)}')
+            self.return_code = 1
+            return
 
-        self.return_code = self.topnode.start(None,
-                                              raise_on_fail=True,
-                                              cfg_method="runtime_start",
-                                              overwrite_data=runtime_start_data,
-                                              timeout=self.timeout)
-
-        self.console.log(f"[bold magenta]Started run #{self.run}, saving run data in {cfg_save_dir}[/bold magenta]")
+        self.topnode.start(path=None, raise_on_fail=True,
+                           cfg_method="runtime_start",
+                           overwrite_data=runtime_start_data,
+                           timeout=self.timeout)
+        self.return_code = self.topnode.return_code.value
+        if self.return_code == 0:
+            self.log.info(f"[bold magenta]Started run #{self.run}, saving run data in {cfg_save_dir}[/bold magenta]")
+        else:
+            self.log.error(f"[bold red]There was an error when starting the run #{self.run}[/bold red]:")
+            self.log.error(f'Response: {self.topnode.response}')
 
 
     def stop(self, force:bool=False) -> NoReturn:
         """
         Sends stop command
         """
-
         self.cfgsvr.save_on_stop(self.run)
-        self.return_code = self.topnode.stop(None, raise_on_fail=True, timeout=self.timeout, force=force)
+        self.topnode.stop(path=None, raise_on_fail=True, timeout=self.timeout, force=force)
+        self.return_code = self.topnode.return_code.value
         self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
 
 
@@ -139,8 +147,8 @@ class NanoRC:
         """
         Sends pause command
         """
-
-        self.return_code = self.topnode.pause(None, raise_on_fail=True, timeout=self.timeout, force=force)
+        self.topnode.pause(path=None, raise_on_fail=True, timeout=self.timeout, force=force)
+        self.return_code = self.topnode.return_code.value
 
 
     def resume(self, trigger_interval_ticks: Union[int, None]) -> NoReturn:
@@ -150,7 +158,6 @@ class NanoRC:
         :param      trigger_interval_ticks:  The trigger interval ticks
         :type       trigger_interval_ticks:  int
         """
-
         runtime_resume_data = {}
 
         if not trigger_interval_ticks is None:
@@ -160,16 +167,16 @@ class NanoRC:
                                    overwrite_data=runtime_resume_data,
                                    cfg_method="runtime_resume")
 
-        self.return_code = self.topnode.resume(None,
-                                               raise_on_fail=True,
-                                               cfg_method="runtime_resume",
-                                               overwrite_data=runtime_resume_data,
-                                               timeout=self.timeout)
+        self.topnode.resume(path=None, raise_on_fail=True,
+                            cfg_method="runtime_resume",
+                            overwrite_data=runtime_resume_data,
+                            timeout=self.timeout)
+        self.return_code = self.topnode.return_code.value
 
 
     def scrap(self, path, force:bool=False) -> NoReturn:
         """
         Send scrap command
         """
-
-        self.return_code = self.topnode.scrap(None, raise_on_fail=True, timeout=self.timeout, force=force)
+        self.topnode.scrap(path=None, raise_on_fail=True, timeout=self.timeout, force=force)
+        self.return_code = self.topnode.return_code.value
