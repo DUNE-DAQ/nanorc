@@ -165,8 +165,9 @@ class ApplicationNode(NodeMixin):
 
 
 class SubsystemNode(NodeMixin):
-    def __init__(self, name:str, cfgmgr, console, parent=None, children=None):
+    def __init__(self, name:str, ssh_conf, cfgmgr, console, parent=None, children=None):
         self.name = name
+        self.ssh_conf = ssh_conf
         self.cfgmgr = cfgmgr
         self.pm = None
         self.listener = None
@@ -179,7 +180,7 @@ class SubsystemNode(NodeMixin):
     def boot(self) -> NoReturn:
         self.log.debug(f"Sending boot to {self.name}")
         try:
-            self.pm = SSHProcessManager(self.console)
+            self.pm = SSHProcessManager(self.console, self.ssh_conf)
             self.pm.boot(self.cfgmgr.boot)
         except Exception as e:
             self.console.print_exception()

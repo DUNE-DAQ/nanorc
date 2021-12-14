@@ -5,6 +5,7 @@ Command Line Interface for NanoRC
 """
 
 from .cli import *
+from .credmgr import credentials
 
 def main():
     from rich.logging import RichHandler
@@ -15,8 +16,9 @@ def main():
         datefmt="[%X]",
         handlers=[RichHandler(rich_tracebacks=True)]
     )
-
+    
     console = Console()
+    credentials.console = console # some uglyness right here
     obj = NanoContext(console)
 
     try:
