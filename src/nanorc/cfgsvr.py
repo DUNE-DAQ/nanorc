@@ -40,7 +40,7 @@ class FileConfigSaver:
         outdir = self.outdir+prefix+str(run)
         if os.path.exists(outdir):
             raise RuntimeError(f"Folder containing the run {run} already exists!")
-            
+
         return outdir+"/"
 
     def _get_new_resume_file_name(self, path:str) -> str:
@@ -80,8 +80,10 @@ class FileConfigSaver:
         """
         if not self.cfgmgr:
             raise RuntimeError(f"{__name__}: ERROR : You need to set the cfgmgr of this ConfigSaver")
-        
-        self.thisrun_outdir = self._get_new_out_dir_name(run)
+        try:
+            self.thisrun_outdir = self._get_new_out_dir_name(run)
+        except Exception as e:
+            raise RuntimeError(str(e))
 
         for node in PreOrderIter(apps):
             if isinstance(node, SubsystemNode):
