@@ -84,28 +84,28 @@ class ResponseListener:
     def register(self, app: str, handler):
         """
         Register a new notification handler
-        
+
         :param      app:           The application
         :type       app:           str
         :param      handler:       The handler
         :type       handler:       { type_description }
-        
+
         :rtype:     None
-        
+
         :raises     RuntimeError:  { exception_description }
         """
         if app in self.handlers:
             raise RuntimeError(f"Handler already registered with notification listerner for app {app}")
-        
+
         self.handlers[app] = handler
 
     def unregister(self, app: str) -> NoReturn:
         """
         De-register a notification handler
-        
+
         Args:
             app (str): application name
-        
+
         """
         if not app in self.handlers:
             return RuntimeError(f"No handler registered for app {app}")
@@ -160,15 +160,17 @@ class AppCommander:
         except:
             return False
 
-    def send_command(
-        self,
-        cmd_id: str,
-        cmd_data: dict
-    ):
+    def send_command(self,
+                     cmd_id: str,
+                     cmd_data: dict,
+                     entry_state="ANY",
+                     exit_state="ANY"):
         # Use moo schema here?
         cmd = {
             "id": cmd_id,
-            "data": cmd_data
+            "data": cmd_data,
+            "entry_state": entry_state,
+            "exit_state": exit_state,
         }
         self.log.info(f"Sending {cmd_id} to {self.app} (http://{self.app_host}:{str(self.app_port)})")
         self.log.debug(json.dumps(cmd, sort_keys=True, indent=2))
@@ -177,34 +179,29 @@ class AppCommander:
             "content-type": "application/json",
             "X-Answer-Port": str(self.listener_port),
         }
-        try:
-            ack = requests.post(self.app_url, data=json.dumps(cmd), headers=headers)
-            self.log.info(f"Ack: {ack}")
-        except:
-            raise RuntimeError(f"Couldn't send {cmd_id} to {self.app} (http://{self.app_host}:{str(self.app_port)})")
+        ack = requests.post(self.app_url, data=json.dumps(cmd), headers=headers)
+        self.log.info(f"Ack: {ack}")
         self.sent_cmd = cmd_id
 
-        # return await_response(timeout)
 
     def check_response(self, timeout: int = 0) -> dict:
         """Check if a response is present in the queue
-        
+
         Args:
             timeout (int, optional): Timeout in seconds
-        
+
         Returns:
             dict: Command response is json
-        
+
         Raises:
             NoResponse: Description
             ResponseTimeout: Description
-        
-        
+
+
         """
         try:
             r = self.response_queue.get(block=(timeout>0), timeout=timeout)
             self.log.info(f"Received reply from {self.app} to {self.sent_cmd}")
-            self.log.debug(json.dumps(r, sort_keys=True, indent=2))
             self.sent_cmd = None
 
         except queue.Empty:
@@ -236,40 +233,30 @@ class AppSupervisor:
         self.listener = listener
         self.listener.register(desc.name, self.commander)
 
-    def send_command(
-            self,
-            cmd_id: str,
-            cmd_data: dict,
-            # entry_state: str = "ANY",
-            # exit_state: str = "ANY",
-            ):
+    def send_command(self,
+                     cmd_id: str,
+                     cmd_data: dict,
+                     entry_state="ANY",
+                     exit_state="ANY"):
         self.last_sent_command = cmd_id
-        self.commander.send_command(
-            cmd_id, cmd_data, #entry_state, exit_state
-        )
+        self.commander.send_command(cmd_id, cmd_data, entry_state, exit_state)
 
-    def check_response(
-            self,
-            timeout: int = 0,
-        ):
-        r = self.commander.check_response(
-            timeout
-        )
+    def check_response(self, timeout: int = 0):
+
+        r = self.commander.check_response(timeout)
 
         if r["result"] == "OK":
             self.last_ok_command = self.last_sent_command
 
         return r
 
-    def send_command_and_wait(
-            self,
-            cmd_id: str,
-            cmd_data: dict,
-            # entry_state: str = "ANY",
-            # exit_state: str = "ANY",
-            timeout: int = 10,
-        ):
-        self.send_command(cmd_id, cmd_data)#, entry_state, exit_state)
+    def send_command_and_wait(self,
+                              cmd_id: str,
+                              cmd_data: dict,
+                              timeout: int = 10,
+                              entry_state="ANY",
+                              exit_state="ANY"):
+        self.send_command(cmd_id, cmd_data, entry_state, exit_state)
         return self.check_response(timeout)
 
     def terminate(self):
@@ -294,7 +281,7 @@ def test_listener():
     import time
     class DummyApp(object):
         """docstring for Dummy"""
-        
+
         def notify(self, reply):
             print(f"Received response: {reply}")
 
@@ -315,4 +302,3 @@ def test_listener():
 
 if __name__ == '__main__':
     test_listener()
-    

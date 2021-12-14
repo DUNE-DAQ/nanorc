@@ -14,40 +14,6 @@ class ErrorCode(Enum):
     Failed=20
     InvalidTransition=30
 
-class CommandSender(threading.Thread):
-    '''
-    A class to send command to the node
-    '''
-    STOP="COMMAND_QUEUE_STOP"
-
-    def __init__(self, node):
-        threading.Thread.__init__(self, name=f"command_sender_{node.name}")
-        self.node = node
-        self.queue = Queue()
-
-
-    def add_command(self, cmd):
-        self.queue.put(cmd)
-
-
-    def run(self):
-        while True:
-            command = self.queue.get()
-            if command == self.STOP:
-                break
-            if command:
-                cmd = getattr(self.node, command, None)
-                if not cmd:
-                    raise RuntimeError(f"ERROR: {self.node.name}: I don't know of '{command}'")
-                self.node.console.log(f"{self.node.name} Ack: executing '{command}'")
-                cmd()
-                self.node.console.log(f"{self.node.name} Finished '{command}'")
-
-
-    def stop(self):
-        self.queue.put_nowait(self.STOP)
-        self.join()
-
 class GroupNode(NodeMixin):
     def __init__(self, name:str, console, fsm_conf, parent=None, children=None):
         self.console = console
@@ -62,20 +28,14 @@ class GroupNode(NodeMixin):
         self.fsm_conf = fsm_conf
         self.fsm = FSM(fsm_conf)
         self.fsm.make_node_fsm(self)
-
-        self.command_sender = CommandSender(self)
-        self.command_sender.start()
+        self.return_code = ErrorCode.Success
         self.status_receiver_queue = Queue()
 
-    def send_command(self, command):
-        ## Use the command_sender to send commands
-        self.command_sender.add_command(command)
 
     def on_enter_terminate_ing(self, _) -> NoReturn:
         if self.children:
             for child in self.children:
                 child.terminate()
-        self.command_sender.stop()
         self.end_terminate()
 
 
@@ -110,15 +70,14 @@ class GroupNode(NodeMixin):
 
         failed_resp = []
         for _ in range(event.kwargs["timeout"]):
-            if not self.status_receiver_queue.empty():
-                response = self.status_receiver_queue.get()
+            response = self.status_receiver_queue.get()
+            if response:
+                for child in self.children:
+                    if response["node"] == child.name:
+                        still_to_exec.remove(child)
 
-            for child in self.children:
-                if response["node"] == child.name:
-                    still_to_exec.remove(child)
-
-                    if response["status_code"] != ErrorCode.Success:
-                        failed_resp.append(response)
+                        if response["status_code"] != ErrorCode.Success:
+                            failed_resp.append(response)
 
             if len(still_to_exec) == 0 or len(failed_resp)>0: # if all done, continue
                 break
@@ -165,45 +124,16 @@ class GroupNode(NodeMixin):
             self.to_error(event=event, response=response)
         else:
             # Initiate the transition on this node to say that we have finished
-            finalisor = getattr(self, "end_"+command, None)
-            finalisor(response=response)
+            self.trigger("end_"+command, response=response)
 
 
     def _on_exit_callback(self, event):
         response = event.kwargs.get("response")
         if self.parent:
             self.parent.status_receiver_queue.put(response)
-
-    def send_cmd(self, cmd:str, path:[str]=None, raise_on_fail:bool=True, timeout=30, *args, **kwargs) -> int:
-
-        if path:
-            r = Resolver('name')
-            prompted_path = "/".join(path)
-            node = r.get(self, prompted_path)
+        if response:
+            self.response = response
+            return response['status_code']
         else:
-            node = self
+            return ErrorCode.Success
 
-        self.log.info(f"Sending {cmd} to {node.name}, timeout={timeout}")
-
-        if not node:
-            ## Probably overkill
-            raise RuntimeError(f"The node {'/'.join(path)} doesn't exist!")
-
-        command = getattr(node, cmd, None)
-        if not command:
-            raise RuntimeError(f"{node.name} doesn't know how to execute {cmd}")
-
-        try:
-            command(raise_on_fail=raise_on_fail, timeout=timeout, *args, **kwargs)
-        except MachineError as e:
-            self.return_code = ErrorCode.InvalidTransition
-            self.log.error(f"FSM Error: You are not allowed to send \"{cmd}\" to {node.name} as it is in \"{node.state}\" state. Error:\n{str(e)}")
-            return self.return_code
-        except Exception as e:
-            self.return_code = ErrorCode.Failed
-            if raise_on_fail:
-                raise RuntimeError(f"Execution of {cmd} failed on {node.name}") from e
-            else:
-                return self.return_code
-
-        return 0
