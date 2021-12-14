@@ -59,11 +59,19 @@ class FSM(Machine):
 
         return False
 
+    def _get_dest(self, transition):
+        for t in self.transitions_cfg:
+            if t["trigger"] == transition:
+                return t['dest']
+        raise RuntimeError(f'Transition {transition} is not a transition in your toplevelcfg.json')
+
     def _checked_assignment(self, model, name, func):
         if not hasattr(model, name):
             setattr(model, name, func)
 
     def make_node_fsm(self, node):
+        self._checked_assignment(node, "get_destination", self._get_dest)
+
         for tr in self.acting_transitions:
             function_name = 'on_enter_'+tr["dest"]
             if not getattr(node, function_name, None):
