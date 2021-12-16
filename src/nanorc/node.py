@@ -63,6 +63,7 @@ class SubsystemNode(GroupNode):
             return
 
         self.listener = ResponseListener(self.cfgmgr.boot["response_listener"]["port"])
+
         children = []
         failed = []
         for n,d in self.pm.apps.items():
@@ -144,6 +145,10 @@ class SubsystemNode(GroupNode):
         self.log.info(log)
         appset = list(self.children)
         failed = []
+
+        if not self.listener.flask_follower.is_alive():
+            self.log.error('Response listener is not alive, trying to respawn it!!')
+            self.listener.flask_follower = self.listener.create_follower()
 
         for n in appset:
             if not n.sup.desc.proc.is_alive() or not n.sup.commander.ping():

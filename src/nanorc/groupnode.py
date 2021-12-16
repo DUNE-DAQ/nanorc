@@ -66,6 +66,7 @@ class GroupNode(NodeMixin):
 
         still_to_exec = []
         active_thread = []
+        force = event.kwargs.get('force')
         if command in self.order:
             self.log.info(f'Propagating to children nodes in the order {self.order[command]}')
             for cn in self.order[command]:
