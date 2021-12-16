@@ -120,12 +120,20 @@ class GroupNode(NodeMixin):
         ok, failed = {}, {}
 
         for child in self.children:
-            o, f = child._propagate_command(cmd=cmd,
-                                            state_entry = state_entry, state_exit = state_exit,
-                                            cfg_method = cfg_method, overwrite_data = overwrite_data,
-                                            timeout = timeout, force=force)
-            ok.update(o)
-            failed.update(f)
+            try:
+                o, f = child._propagate_command(cmd=cmd,
+                                                state_entry = state_entry, state_exit = state_exit,
+                                                cfg_method = cfg_method, overwrite_data = overwrite_data,
+                                                timeout = timeout, force=force)
+                ok.update(o)
+                failed.update(f)
+            except Exception as e:
+                if force:
+                    self.log.error(f'Command {cmd} failed on {child.node}\nError message: {str(e)}')
+                else:
+                    self.log.error(f'Command {cmd} failed on {child.node}\nError message: {str(e)}')
+                    raise RuntimeError(f'Command {cmd} failed on {child.node}') from e
+                
 
         return (ok, failed)
 
