@@ -38,6 +38,48 @@ class ResponseDispatcher(threading.Thread):
         self.listener.response_queue.put_nowait(self.STOP)
         self.join()
 
+class FlaskFollower(threading.Thread):
+    def __init__(self, logger, queue, port):
+        threading.Thread.__init__(self)
+        self.log = logger
+        self.flask = None
+        self.queue = queue
+        self.port = port
+
+    def _create_flask(self) -> Process:
+        app = Flask(__name__)
+
+        def index():
+            json = request.get_json(force=True)
+            # enqueue command reply
+            self.queue.put(json)
+            return "Response received"
+
+        app.add_url_rule("/response", "index", index, methods=["POST"])
+        thread_name = f'listener'
+        flask_srv = Process(target=app.run, kwargs={"host": "0.0.0.0", "port": self.port}, name=thread_name)
+        flask_srv.daemon = False
+        flask_srv.start()
+        self.log.info(f'ResponseListener Flask lives on {flask_srv.pid}')
+        return flask_srv
+
+    def stop(self) -> NoReturn:
+        self.flask.terminate()
+        self.flask.join()
+        self.join()
+
+
+    def _create_and_join_flask(self):
+        self.flask = self._create_flask()
+        self.log.info('ResponseListener: starting to follow Flask!')
+        return_code = self.flask.join()
+        if return_code:
+            self.log.error(f'ResponseListener: Flask terminated, return code: {return_code}.')
+        else:
+            self.log.info(f'ResponseListener: Flask joined')
+
+    def run(self) -> NoReturn:
+        self._create_and_join_flask()
 
 class ResponseListener:
     """
@@ -48,37 +90,25 @@ class ResponseListener:
         self.port = port
         self.response_queue = Queue()
         self.handlers = {}
-        self.flask = self._create()
+        self.flask_follower = self.create_follower()
         self.dispatcher = ResponseDispatcher(self)
         self.dispatcher.start()
 
+    def create_follower(self):
+        ff = FlaskFollower(self.log, self.response_queue, self.port)
+        ff.start()
+        return ff
     def __del__(self):
         self.terminate()
-
-    def _create(self) -> Process:
-        app = Flask(__name__)
-
-        # @app.route('/response', methods = ['POST'])
-        def index():
-            json = request.get_json(force=True)
-            # enqueue command reply
-            self.response_queue.put(json)
-            return "Response received"
-
-        app.add_url_rule("/response", "index", index, methods=["POST"])
-
-        flask_srv = Process(target=app.run, kwargs={"host": "0.0.0.0", "port": self.port})
-        flask_srv.start()
-        return flask_srv
 
     def terminate(self):
         """
         Terminate the listener
         """
-        if self.flask:
-            self.flask.terminate()
-            self.flask.join()
-        self.flask = None
+        if self.flask_follower:
+            self.flask_follower.stop()
+
+        self.flask_follower = None
         self.dispatcher.stop()
 
     def register(self, app: str, handler):
@@ -196,8 +226,6 @@ class AppCommander:
         Raises:
             NoResponse: Description
             ResponseTimeout: Description
-
-
         """
         try:
             r = self.response_queue.get(block=(timeout>0), timeout=timeout)
@@ -242,7 +270,6 @@ class AppSupervisor:
         self.commander.send_command(cmd_id, cmd_data, entry_state, exit_state)
 
     def check_response(self, timeout: int = 0):
-
         r = self.commander.check_response(timeout)
 
         if r["result"] == "OK":
