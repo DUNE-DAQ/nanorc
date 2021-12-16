@@ -94,7 +94,7 @@ class NanoRC:
         """
         now = datetime.now() # current date and time
         date_time = now.strftime("%Y%m%d_%H%M%S")
-        time_stamp_log_path = self.log_path + f'/logs_{date_time}'
+        time_stamp_log_path = self.log_path + f'/logs_{self.apparatus_id}_{credentials.user}_{date_time}'
         try:
             os.mkdir(time_stamp_log_path)
             self.log.info(f'Logfiles are in {time_stamp_log_path}')
