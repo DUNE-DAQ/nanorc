@@ -129,7 +129,7 @@ def kinit(ctx, obj):
 @click.pass_obj
 def stop(obj, stop_wait:int, force:bool, message:str):
     if not credentials.check_kerberos_credentials():
-        self.log.error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
+        logging.getLogger("cli").error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
         return
     obj.rc.pause(force)
     obj.rc.status()
@@ -143,7 +143,7 @@ def stop(obj, stop_wait:int, force:bool, message:str):
 @click.pass_obj
 def message(obj, message):
     if not credentials.check_kerberos_credentials():
-        self.log.error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
+        logging.getLogger("cli").error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
         return
     obj.rc.message(message)
 
@@ -164,7 +164,7 @@ def start(obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_inte
         disable_data_storage (bool): Flag to disable data writing to storage
     """
     if not credentials.check_kerberos_credentials():
-        self.log.error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
+        logging.getLogger("cli").error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
         return
 
     obj.rc.start(disable_data_storage, run_type, message=message)
