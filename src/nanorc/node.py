@@ -216,6 +216,10 @@ class SubsystemNode(NodeMixin):
         appset = list(self.children)
         ok, failed = {}, {}
 
+        if not self.listener.flask_follower.is_alive():
+            self.log.error('Response listener is not alive, trying to respawn it!!')
+            self.listener.flask_follower = self.listener.create_follower()
+
         for n in appset:
             if not n.sup.desc.proc.is_alive() or not n.sup.commander.ping():
                 text = f"'{n.name}' seems to be dead. So I cannot initiate transition '{state_entry}' -> '{state_exit}'."
