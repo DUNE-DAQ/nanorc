@@ -120,12 +120,20 @@ class GroupNode(NodeMixin):
         ok, failed = {}, {}
 
         for child in self.children:
-            o, f = child._propagate_command(cmd=cmd,
-                                            state_entry = state_entry, state_exit = state_exit,
-                                            cfg_method = cfg_method, overwrite_data = overwrite_data,
-                                            timeout = timeout, force=force)
-            ok.update(o)
-            failed.update(f)
+            try:
+                o, f = child._propagate_command(cmd=cmd,
+                                                state_entry = state_entry, state_exit = state_exit,
+                                                cfg_method = cfg_method, overwrite_data = overwrite_data,
+                                                timeout = timeout, force=force)
+                ok.update(o)
+                failed.update(f)
+            except Exception as e:
+                if force:
+                    self.log.error(f'Command {cmd} failed on {child.node}\nError message: {str(e)}')
+                else:
+                    self.log.error(f'Command {cmd} failed on {child.node}\nError message: {str(e)}')
+                    raise RuntimeError(f'Command {cmd} failed on {child.node}') from e
+                
 
         return (ok, failed)
 
@@ -215,6 +223,10 @@ class SubsystemNode(NodeMixin):
 
         appset = list(self.children)
         ok, failed = {}, {}
+
+        if not self.listener.flask_follower.is_alive():
+            self.log.error('Response listener is not alive, trying to respawn it!!')
+            self.listener.flask_follower = self.listener.create_follower()
 
         for n in appset:
             if not n.sup.desc.proc.is_alive() or not n.sup.commander.ping():
