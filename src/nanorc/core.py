@@ -42,6 +42,7 @@ class NanoRC:
         self.timeout = timeout
         self.return_code = None
         self.logbook = None
+        self.log_path = None
         if logbook_type == "elisa":
             try:
                 from . import confdata
@@ -83,7 +84,7 @@ class NanoRC:
         Boots applications
         """
 
-        self.return_code = self.topnode.boot()
+        self.return_code = self.topnode.boot(self.log_path)
 
 
     def terminate(self) -> NoReturn:
