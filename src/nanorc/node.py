@@ -146,14 +146,14 @@ class GroupNode(NodeMixin):
             child.terminate()
         return 0
 
-    def boot(self) -> int:
+    def boot(self, log=None) -> int:
         self.log.debug(f"Sending boot to {self.name}")
 
         if not self.children:
             return
 
         for child in self.children:
-            child.boot()
+            child.boot(log)
         return 0
 
 
@@ -185,11 +185,11 @@ class SubsystemNode(NodeMixin):
         if children:
             self.children = children
 
-    def boot(self) -> NoReturn:
+    def boot(self, log=None) -> NoReturn:
         self.log.debug(f"Sending boot to {self.name}")
         try:
             self.pm = SSHProcessManager(self.console, self.ssh_conf)
-            self.pm.boot(self.cfgmgr.boot)
+            self.pm.boot(self.cfgmgr.boot, log)
         except Exception as e:
             self.console.print_exception()
             self.return_code = 11
