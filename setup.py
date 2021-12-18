@@ -10,7 +10,7 @@ setup(
         "rich",
         "sh",
         "graphviz",
-        "kubernetes",
+        "kubernetes==18.20.0",
         "docker",
         "PySocks"
     ],
