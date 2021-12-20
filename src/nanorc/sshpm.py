@@ -196,7 +196,13 @@ class SSHProcessManager(object):
                 apps_running += [name]
         if apps_running:
             raise RuntimeError(f"ERROR: apps already running? {apps_running}")
-
+        
+        self.exit_lock = threading.Lock()
+        self.ssh_exit_code = 0
+        def done(cmd, success, exit_code):
+            with self.exit_lock:
+                self.ssh_exit_code = exit_code
+                
         for name, desc in self.apps.items():
             proc = sh.ssh(
                 *desc.ssh_args,
@@ -205,6 +211,7 @@ class SSHProcessManager(object):
                 _bg_exc=False,
                 _new_session=True,
                 _preexec_fn=on_parent_exit(signal.SIGTERM),
+                _done = done,
             )
             self.watch(name, proc)
             desc.proc = proc
@@ -237,6 +244,10 @@ class SSHProcessManager(object):
                 if resp == list(self.apps.keys()):
                     progress.update(waiting, visible=False)
                     break
+                with self.exit_lock:
+                    if self.ssh_exit_code>0:
+                        progress.log(f'ERROR! An application didn\'t boot, exit_code is {self.ssh_exit_code}')
+                        break
                 time.sleep(1)
 
     def check_apps(self):
