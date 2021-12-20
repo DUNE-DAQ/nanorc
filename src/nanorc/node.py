@@ -129,10 +129,10 @@ class GroupNode(NodeMixin):
                 failed.update(f)
             except Exception as e:
                 if force:
-                    self.log.error(f'Command {cmd} failed on {child.node}\nError message: {str(e)}')
+                    self.log.error(f'Command {cmd} failed on {child.name}\nError message: {str(e)}')
                 else:
-                    self.log.error(f'Command {cmd} failed on {child.node}\nError message: {str(e)}')
-                    raise RuntimeError(f'Command {cmd} failed on {child.node}') from e
+                    self.log.error(f'Command {cmd} failed on {child.name}\nError message: {str(e)}')
+                    raise RuntimeError(f'Command {cmd} failed on {child.name}') from e
                 
 
         return (ok, failed)
