@@ -2,6 +2,7 @@ import logging
 import requests
 import queue
 import json
+import time
 import socket
 import threading
 
@@ -45,6 +46,8 @@ class FlaskFollower(threading.Thread):
         self.flask = None
         self.queue = queue
         self.port = port
+        self.ready_lock = threading.Lock()
+        self.ready_lock.acquire()
 
     def _create_flask(self) -> Process:
         app = Flask(__name__)
@@ -55,12 +58,29 @@ class FlaskFollower(threading.Thread):
             self.queue.put(json)
             return "Response received"
 
+        def get():
+            return "ready"
+
         app.add_url_rule("/response", "index", index, methods=["POST"])
+        app.add_url_rule("/", "get", get, methods=["GET"])
         thread_name = f'listener'
         flask_srv = Process(target=app.run, kwargs={"host": "0.0.0.0", "port": self.port}, name=thread_name)
         flask_srv.daemon = False
         flask_srv.start()
         self.log.info(f'ResponseListener Flask lives on {flask_srv.pid}')
+        ## app.is_ready() would be good here, rather horrible polling inside a try
+        while True:
+            try:
+                resp = requests.get(f"http://0.0.0.0:{self.port}/")
+                if resp.text == "ready":
+                    break
+            except Exception as e:
+                pass
+                # print(e)
+            time.sleep(0.5)
+
+        # We don't release that lock before we have received a "ready" from the listener
+        self.ready_lock.release()
         return flask_srv
 
     def stop(self) -> NoReturn:
@@ -70,6 +90,8 @@ class FlaskFollower(threading.Thread):
 
 
     def _create_and_join_flask(self):
+        if not self.ready_lock.locked:
+            self.ready_lock.acquire()
         self.flask = self._create_flask()
         self.log.info('ResponseListener: starting to follow Flask!')
         return_code = self.flask.join()
@@ -95,9 +117,12 @@ class ResponseListener:
         self.dispatcher.start()
 
     def create_follower(self):
-        ff = FlaskFollower(self.log, self.response_queue, self.port)
-        ff.start()
+        ff = FlaskFollower(self.log, self.response_queue, self.port) # locked
+        ff.start() # should unlock
+        ff.ready_lock.acquire() # make sure that everything is ready
+        ff.ready_lock.release()
         return ff
+
     def __del__(self):
         self.terminate()
 
@@ -114,28 +139,28 @@ class ResponseListener:
     def register(self, app: str, handler):
         """
         Register a new notification handler
-        
+
         :param      app:           The application
         :type       app:           str
         :param      handler:       The handler
         :type       handler:       { type_description }
-        
+
         :rtype:     None
-        
+
         :raises     RuntimeError:  { exception_description }
         """
         if app in self.handlers:
             raise RuntimeError(f"Handler already registered with notification listerner for app {app}")
-        
+
         self.handlers[app] = handler
 
     def unregister(self, app: str) -> NoReturn:
         """
         De-register a notification handler
-        
+
         Args:
             app (str): application name
-        
+
         """
         if not app in self.handlers:
             return RuntimeError(f"No handler registered for app {app}")
@@ -219,13 +244,13 @@ class AppCommander:
 
     def check_response(self, timeout: int = 0) -> dict:
         """Check if a response is present in the queue
-        
+
         Args:
             timeout (int, optional): Timeout in seconds
-        
+
         Returns:
             dict: Command response is json
-        
+
         Raises:
             NoResponse: Description
             ResponseTimeout: Description
@@ -272,6 +297,8 @@ class AppSupervisor:
             entry_state: str = "ANY",
             exit_state: str = "ANY",
             ):
+        self.listener.flask_follower.ready_lock.acquire()
+        self.listener.flask_follower.ready_lock.release()
         self.last_sent_command = cmd_id
         self.commander.send_command(
             cmd_id, cmd_data, entry_state, exit_state
@@ -298,6 +325,8 @@ class AppSupervisor:
             exit_state: str = "ANY",
             timeout: int = 10,
         ):
+        self.listener.flask_follower.ready_lock.acquire()
+        self.listener.flask_follower.ready_lock.release()
         self.send_command(cmd_id, cmd_data, entry_state, exit_state)
         return self.check_response(timeout)
 
@@ -323,7 +352,7 @@ def test_listener():
     import time
     class DummyApp(object):
         """docstring for Dummy"""
-        
+
         def notify(self, reply):
             print(f"Received response: {reply}")
 
@@ -344,4 +373,3 @@ def test_listener():
 
 if __name__ == '__main__':
     test_listener()
-    
