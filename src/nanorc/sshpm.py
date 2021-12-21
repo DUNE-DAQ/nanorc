@@ -196,12 +196,6 @@ class SSHProcessManager(object):
                 apps_running += [name]
         if apps_running:
             raise RuntimeError(f"ERROR: apps already running? {apps_running}")
-        
-        # self.exit_lock = threading.Lock()
-        # self.ssh_exit_code = 0
-        # def done(cmd, success, exit_code):
-        #     with self.exit_lock:
-        #         self.ssh_exit_code = exit_code
                 
         for name, desc in self.apps.items():
             proc = sh.ssh(
@@ -262,7 +256,11 @@ class SSHProcessManager(object):
 
             # Process status
             if not desc.proc.is_alive():
-                failed[name] = desc.proc.exit_code()
+                try:
+                    exit_code = desc.proc.exit_code
+                except sh.ErrorReturnCode as e:
+                    exit_code = e.exit_code
+                failed[name] = exit_code
             else:
                 alive += [name]
     
@@ -284,7 +282,7 @@ class SSHProcessManager(object):
         alive, failed, resp = self.check_apps()
 
         for app, desc in self.apps.items():
-            table.add_row(app, "alive" if app in alive else f"dead[{failed[app]}]", str(app in resp), desc.host)
+            table.add_row(app, "alive" if (app in alive) else f"dead[{failed[app]}]", str(app in resp), desc.host)
         self.console.print(table)
 
 

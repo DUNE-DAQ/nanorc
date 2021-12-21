@@ -37,7 +37,15 @@ class GroupNode(NodeMixin):
         for pre, _, node in RenderTree(self):
             if isinstance(node, ApplicationNode):
                 sup = node.sup
-                alive = sup.desc.proc.is_alive()
+                if sup.desc.proc.is_alive():
+                    alive = 'alive'
+                else:
+                    try:
+                        exit_code = sup.desc.proc.exit_code
+                    except sh.ErrorReturnCode as e:
+                        exit_code = e.exit_code
+                    alive = f'dead[{exit_code}]'
+
                 ping  = sup.commander.ping()
                 last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
                 table.add_row(
