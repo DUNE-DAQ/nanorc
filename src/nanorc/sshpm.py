@@ -197,11 +197,11 @@ class SSHProcessManager(object):
         if apps_running:
             raise RuntimeError(f"ERROR: apps already running? {apps_running}")
         
-        self.exit_lock = threading.Lock()
-        self.ssh_exit_code = 0
-        def done(cmd, success, exit_code):
-            with self.exit_lock:
-                self.ssh_exit_code = exit_code
+        # self.exit_lock = threading.Lock()
+        # self.ssh_exit_code = 0
+        # def done(cmd, success, exit_code):
+        #     with self.exit_lock:
+        #         self.ssh_exit_code = exit_code
                 
         for name, desc in self.apps.items():
             proc = sh.ssh(
@@ -211,7 +211,7 @@ class SSHProcessManager(object):
                 _bg_exc=False,
                 _new_session=True,
                 _preexec_fn=on_parent_exit(signal.SIGTERM),
-                _done = done,
+                # _done = done,
             )
             self.watch(name, proc)
             desc.proc = proc
@@ -235,45 +235,56 @@ class SSHProcessManager(object):
             for _ in range(timeout):
                 progress.update(waiting, advance=1)
 
-                alive, resp = self.check_apps()
-                # progress.log(alive, resp)
+                alive, failed, resp = self.check_apps()
+
                 for a, t in apps_tasks.items():
                     if a in resp:
                         progress.update(t, completed=1)
+
                 progress.update(total, completed=len(resp))
-                if resp == list(self.apps.keys()):
+                
+                if set.union(set(resp), set(failed.keys())) == set(self.apps.keys()):
                     progress.update(waiting, visible=False)
                     break
-                with self.exit_lock:
-                    if self.ssh_exit_code>0:
-                        progress.log(f'ERROR! An application didn\'t boot, exit_code is {self.ssh_exit_code}')
-                        break
+
                 time.sleep(1)
 
     def check_apps(self):
         responding = []
         alive = []
+        failed = {}
+
         for name, desc in self.apps.items():
 
-            if desc.proc is not None and desc.proc.is_alive():
+            if desc.proc is None:
+                # Should I throw an error here?
+                continue
+
+            # Process status
+            if not desc.proc.is_alive():
+                failed[name] = desc.proc.exit_code()
+            else:
                 alive += [name]
-            if desc.proc is not None and is_port_open(
-                desc.host, desc.conf["port"]
-            ):
-                responding += [name]
-        return alive, responding
+    
+                # Command port status
+                if is_port_open(
+                        desc.host, desc.conf["port"]
+                    ):
+                    responding += [name]
+
+        return alive, failed, responding
 
     def status_apps(self):
-        table = Table(title="Apps (process")
+        table = Table(title="Apps (process)")
         table.add_column("name", style="magenta")
         table.add_column("is alive", style="magenta")
         table.add_column("open port", style="magenta")
         table.add_column("host", style="magenta")
 
-        alive, resp = self.check_apps()
+        alive, failed, resp = self.check_apps()
 
         for app, desc in self.apps.items():
-            table.add_row(app, str(app in alive), str(app in resp), desc.host)
+            table.add_row(app, "alive" if app in alive else f"dead[{failed[app]}]", str(app in resp), desc.host)
         self.console.print(table)
 
 
