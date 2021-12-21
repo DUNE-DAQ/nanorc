@@ -39,7 +39,7 @@ class ResponseDispatcher(threading.Thread):
         self.listener.response_queue.put_nowait(self.STOP)
         self.join()
 
-class FlaskFollower(threading.Thread):
+class FlaskManager(threading.Thread):
     def __init__(self, logger, queue, port):
         threading.Thread.__init__(self)
         self.log = logger
@@ -93,12 +93,8 @@ class FlaskFollower(threading.Thread):
         if not self.ready_lock.locked:
             self.ready_lock.acquire()
         self.flask = self._create_flask()
-        self.log.info('ResponseListener: starting to follow Flask!')
-        return_code = self.flask.join()
-        if return_code:
-            self.log.error(f'ResponseListener: Flask terminated, return code: {return_code}.')
-        else:
-            self.log.info(f'ResponseListener: Flask joined')
+        self.flask.join()
+        self.log.info(f'ResponseListener: Flask joined')
 
     def run(self) -> NoReturn:
         self._create_and_join_flask()
@@ -112,16 +108,16 @@ class ResponseListener:
         self.port = port
         self.response_queue = Queue()
         self.handlers = {}
-        self.flask_follower = self.create_follower()
+        self.flask_manager = self.create_manager()
         self.dispatcher = ResponseDispatcher(self)
         self.dispatcher.start()
 
-    def create_follower(self):
-        ff = FlaskFollower(self.log, self.response_queue, self.port) # locked
-        ff.start() # should unlock
-        ff.ready_lock.acquire() # make sure that everything is ready
-        ff.ready_lock.release()
-        return ff
+    def create_manager(self):
+        fm = FlaskManager(self.log, self.response_queue, self.port) # locked
+        fm.start() # should unlock
+        fm.ready_lock.acquire() # make sure that everything is ready
+        fm.ready_lock.release()
+        return fm
 
     def __del__(self):
         self.terminate()
@@ -130,10 +126,10 @@ class ResponseListener:
         """
         Terminate the listener
         """
-        if self.flask_follower:
-            self.flask_follower.stop()
+        if self.flask_manager:
+            self.flask_manager.stop()
 
-        self.flask_follower = None
+        self.flask_manager = None
         self.dispatcher.stop()
 
     def register(self, app: str, handler):
@@ -297,8 +293,8 @@ class AppSupervisor:
             entry_state: str = "ANY",
             exit_state: str = "ANY",
             ):
-        self.listener.flask_follower.ready_lock.acquire()
-        self.listener.flask_follower.ready_lock.release()
+        self.listener.flask_manager.ready_lock.acquire()
+        self.listener.flask_manager.ready_lock.release()
         self.last_sent_command = cmd_id
         self.commander.send_command(
             cmd_id, cmd_data, entry_state, exit_state
@@ -325,8 +321,8 @@ class AppSupervisor:
             exit_state: str = "ANY",
             timeout: int = 10,
         ):
-        self.listener.flask_follower.ready_lock.acquire()
-        self.listener.flask_follower.ready_lock.release()
+        self.listener.flask_manager.ready_lock.acquire()
+        self.listener.flask_manager.ready_lock.release()
         self.send_command(cmd_id, cmd_data, entry_state, exit_state)
         return self.check_response(timeout)
 

@@ -224,9 +224,9 @@ class SubsystemNode(NodeMixin):
         appset = list(self.children)
         ok, failed = {}, {}
 
-        if not self.listener.flask_follower.is_alive():
+        if not self.listener.flask_manager.is_alive():
             self.log.error('Response listener is not alive, trying to respawn it!!')
-            self.listener.flask_follower = self.listener.create_follower()
+            self.listener.flask_manager = self.listener.create_manager()
 
         for n in appset:
             if not n.sup.desc.proc.is_alive() or not n.sup.commander.ping():
