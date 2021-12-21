@@ -47,7 +47,7 @@ class FlaskFollower(threading.Thread):
         self.flask = None
         self.queue = queue
         self.port = port
-        self.ready = False
+        self.flask_pid = 0
         self.log.info(f'FlaskFollower created for port {port}')
 
     def _create_flask(self) -> Process:
@@ -65,8 +65,7 @@ class FlaskFollower(threading.Thread):
         flask_srv.daemon = False
         flask_srv.start()
         self.log.info(f'ResponseListener Flask lives in process {flask_srv.pid}')
-        pstats = psutil.Process(flask_srv.pid)
-        self.log.info(f'Flask process connections: {pstats.connections()}');
+        self.flask_pid = flask_srv.pid
         return flask_srv
 
     def stop(self) -> NoReturn:
@@ -78,7 +77,6 @@ class FlaskFollower(threading.Thread):
     def _create_and_join_flask(self):
         self.flask = self._create_flask()
         self.log.info('ResponseListener: starting to follow Flask!')
-        self.ready = True;
         return_code = self.flask.join()
         if return_code:
             self.log.error(f'ResponseListener: Flask terminated, return code: {return_code}.')
@@ -89,7 +87,12 @@ class FlaskFollower(threading.Thread):
         self._create_and_join_flask()
 
     def is_ready(self):
-        return self.ready
+        if self.flask_pid == 0:
+            return False
+        else:
+            pstats = psutil.Process(self.flask_pid)
+            self.log.info(f'Flask process connections: {pstats.connections()}');
+            return len(pstats.connections()) > 0
 
 class ResponseListener:
     """
@@ -104,6 +107,7 @@ class ResponseListener:
         self.dispatcher = ResponseDispatcher(self)
         self.dispatcher.start()
         while not self.flask_follower.is_ready():
+            self.log.info('Waiting for Flask process startup')
             time.sleep(0.25)
         self.log.info(f'ResponseListener created for port {port}')
 
