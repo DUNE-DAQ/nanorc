@@ -37,7 +37,15 @@ class GroupNode(NodeMixin):
         for pre, _, node in RenderTree(self):
             if isinstance(node, ApplicationNode):
                 sup = node.sup
-                alive = sup.desc.proc.is_alive()
+                if sup.desc.proc.is_alive():
+                    alive = 'alive'
+                else:
+                    try:
+                        exit_code = sup.desc.proc.exit_code
+                    except sh.ErrorReturnCode as e:
+                        exit_code = e.exit_code
+                    alive = f'dead[{exit_code}]'
+
                 ping  = sup.commander.ping()
                 last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
                 table.add_row(
@@ -120,12 +128,20 @@ class GroupNode(NodeMixin):
         ok, failed = {}, {}
 
         for child in self.children:
-            o, f = child._propagate_command(cmd=cmd,
-                                            state_entry = state_entry, state_exit = state_exit,
-                                            cfg_method = cfg_method, overwrite_data = overwrite_data,
-                                            timeout = timeout, force=force)
-            ok.update(o)
-            failed.update(f)
+            try:
+                o, f = child._propagate_command(cmd=cmd,
+                                                state_entry = state_entry, state_exit = state_exit,
+                                                cfg_method = cfg_method, overwrite_data = overwrite_data,
+                                                timeout = timeout, force=force)
+                ok.update(o)
+                failed.update(f)
+            except Exception as e:
+                if force:
+                    self.log.error(f'Command {cmd} failed on {child.name}\nError message: {str(e)}')
+                else:
+                    self.log.error(f'Command {cmd} failed on {child.name}\nError message: {str(e)}')
+                    raise RuntimeError(f'Command {cmd} failed on {child.name}') from e
+                
 
         return (ok, failed)
 
@@ -138,14 +154,14 @@ class GroupNode(NodeMixin):
             child.terminate()
         return 0
 
-    def boot(self) -> int:
+    def boot(self, log=None) -> int:
         self.log.debug(f"Sending boot to {self.name}")
 
         if not self.children:
             return
 
         for child in self.children:
-            child.boot()
+            child.boot(log)
         return 0
 
 
@@ -165,8 +181,9 @@ class ApplicationNode(NodeMixin):
 
 
 class SubsystemNode(NodeMixin):
-    def __init__(self, name:str, cfgmgr, console, parent=None, children=None):
+    def __init__(self, name:str, ssh_conf, cfgmgr, console, parent=None, children=None):
         self.name = name
+        self.ssh_conf = ssh_conf
         self.cfgmgr = cfgmgr
         self.pm = None
         self.listener = None
@@ -176,12 +193,12 @@ class SubsystemNode(NodeMixin):
         if children:
             self.children = children
 
-    def boot(self) -> NoReturn:
+    def boot(self, log=None) -> NoReturn:
         self.log.debug(f"Sending boot to {self.name}")
         try:
             if self.pm is None:
-                self.pm = SSHProcessManager(self.console)
-            self.pm.boot(self.cfgmgr.boot)
+                self.pm = SSHProcessManager(self.console, self.ssh_conf)
+            self.pm.boot(self.cfgmgr.boot, log)
         except Exception as e:
             self.console.print_exception()
             self.return_code = 11
@@ -215,6 +232,10 @@ class SubsystemNode(NodeMixin):
 
         appset = list(self.children)
         ok, failed = {}, {}
+
+        if not self.listener.flask_manager.is_alive():
+            self.log.error('Response listener is not alive, trying to respawn it!!')
+            self.listener.flask_manager = self.listener.create_manager()
 
         for n in appset:
             if not n.sup.desc.proc.is_alive() or not n.sup.commander.ping():

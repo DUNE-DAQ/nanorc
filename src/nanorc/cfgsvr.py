@@ -198,7 +198,7 @@ class DBConfigSaver:
                              "det_id": self.apparatus_id,
                              "run_type": run_type,
                              ## Big hack of the version!
-                             "software_version": "dunedaq-v2.8.2"}
+                             "software_version": "dunedaq-v2.9.0"}
 
                 try:
                     r = requests.post(self.API_SOCKET+"/runregistry/insertRun/",
