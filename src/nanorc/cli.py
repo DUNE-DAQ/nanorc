@@ -102,7 +102,7 @@ def validatePath(ctx, param, prompted_path):
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
-@click.option('--log-path', type=str, default=os.getcwd(), help='Where the log should go (on the host where the app runs)')
+@click.option('--log-path', type=str, default=None, help='Where the log should go (on the host where the app runs)')
 @click.argument('top_cfg', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
