@@ -43,6 +43,7 @@ class NanoRC:
         self.timeout = timeout
         self.return_code = None
         self.logbook = None
+        self.log_path = None
         if logbook_type == "elisa":
             try:
                 from . import confdata

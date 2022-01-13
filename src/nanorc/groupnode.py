@@ -80,7 +80,7 @@ class GroupNode(NodeMixin):
                         continue
                     raise Exception from e
         else:
-            self.log.info(f'Propagating to children nodes simultaneously')
+            self.log.info(f'{self.name} propagating to children nodes ({[c.name for c in self.children]}) simultaneously')
             for child in self.children:
                 still_to_exec.append(child) # a record of which children still need to finish their task
                 all_kwargs = {

@@ -18,12 +18,19 @@ def print_status(topnode, console, apparatus_id='') -> int:
     for pre, _, node in RenderTree(topnode):
         if isinstance(node, ApplicationNode):
             sup = node.sup
-            alive = sup.desc.proc.is_alive()
+            if sup.desc.proc.is_alive():
+                alive = 'alive'
+            else:
+                try:
+                    exit_code = sup.desc.proc.exit_code
+                except sh.ErrorReturnCode as e:
+                    exit_code = e.exit_code
+                alive = f'dead[{exit_code}]'
             ping  = sup.commander.ping()
             last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
             table.add_row(
                 Text(pre)+Text(node.name),
-                Text(f"{node.state}", style=('bold red' if node.is_error() else "")),
+                Text(f"{node.state} - {alive}", style=('bold red' if node.is_error() else "")),
                 sup.desc.host,
                 str(alive),
                 str(ping),

@@ -33,6 +33,7 @@ from .cli import *
 @click.version_option(__version__)
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
+@click.option('--log-path', type=click.Path(exists=True), default='/log', help='Where the logs should go (on localhost of applications)')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
@@ -41,7 +42,7 @@ from .cli import *
 @click.argument('user', type=str)
 @click.pass_obj
 @click.pass_context
-def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, kerberos, cfg_dir, user):
+def np04cli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, dotnanorc, kerberos, cfg_dir, user):
     obj.print_traceback = traceback
     credentials.change_user(user)
     ctx.command.shell.prompt = f"{credentials.user}@np04rc> "
@@ -83,6 +84,7 @@ def np04cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, dotnanorc, kerb
                     logbook_type = "elisa",
                     timeout = timeout,
                     use_kerb = kerberos)
+        rc.log_path = log_path
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()
@@ -129,7 +131,7 @@ def kinit(ctx, obj):
 @click.pass_obj
 def stop(obj, stop_wait:int, force:bool, message:str):
     if not credentials.check_kerberos_credentials():
-        self.log.error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
+        logging.getLogger("cli").error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
         return
     obj.rc.pause(force)
     obj.rc.status()
@@ -143,7 +145,7 @@ def stop(obj, stop_wait:int, force:bool, message:str):
 @click.pass_obj
 def message(obj, message):
     if not credentials.check_kerberos_credentials():
-        self.log.error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
+        logging.getLogger("cli").error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
         return
     obj.rc.message(message)
 
@@ -164,7 +166,7 @@ def start(obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_inte
         disable_data_storage (bool): Flag to disable data writing to storage
     """
     if not credentials.check_kerberos_credentials():
-        self.log.error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
+        logging.getLogger("cli").error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
         return
 
     obj.rc.start(disable_data_storage, run_type, message=message)
