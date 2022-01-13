@@ -12,6 +12,7 @@ from .credmgr import credentials
 from .node_render import *
 from .logbook import ElisaLogbook, FileLogbook
 import importlib
+from . import confdata
 from rich.traceback import Traceback
 
 from datetime import datetime
@@ -30,10 +31,14 @@ class NanoRC:
         ssh_conf = []
         if not use_kerb:
             ssh_conf = ["-o GSSAPIAuthentication=no"]
+        self.fsm_conf = json.loads(importlib.resources.read_text(confdata, "fsm_conf.json"))
 
-        self.cfg = TreeBuilder(top_cfg=top_cfg,
+        self.cfg = TreeBuilder(log=self.log,
+                               top_cfg=top_cfg,
                                console=self.console,
-                               ssh_conf=ssh_conf)
+                               ssh_conf=ssh_conf,
+                               fsm_conf=self.fsm_conf)
+
         self.apparatus_id = self.cfg.apparatus_id
 
         self.run_num_mgr = run_num_mgr
@@ -46,7 +51,6 @@ class NanoRC:
         self.log_path = None
         if logbook_type == "elisa":
             try:
-                from . import confdata
                 elisa_conf = json.loads(importlib.resources.read_text(confdata, "elisa_conf.json"))
                 if elisa_conf.get(self.apparatus_id):
                     self.logbook = ElisaLogbook(configuration = elisa_conf[self.apparatus_id],
@@ -162,7 +166,7 @@ class NanoRC:
                            timeout=self.timeout)
         self.return_code = self.topnode.return_code.value
         if self.return_code == 0:
-            self.log.info(f"[bold magenta]Started run #{self.run}, saving run data in {cfg_save_dir}[/bold magenta]")
+            self.console.log(f"\t[bold magenta]Started run #{self.run}, saving run data in {cfg_save_dir}[/bold magenta]")
         else:
             self.log.error(f"[bold red]There was an error when starting the run #{self.run}[/bold red]:")
             self.log.error(f'Response: {self.topnode.response}')
@@ -196,7 +200,8 @@ class NanoRC:
         self.cfgsvr.save_on_stop(self.run)
         self.topnode.stop(path=None, raise_on_fail=True, timeout=self.timeout, force=force)
         self.return_code = self.topnode.return_code.value
-        self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
+        if self.return_code == 0:
+            self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
 
 
     def pause(self, force:bool=False) -> NoReturn:
