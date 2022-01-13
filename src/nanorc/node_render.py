@@ -10,7 +10,6 @@ def print_status(topnode, console, apparatus_id='') -> int:
     table.add_column("name", style="blue")
     table.add_column("state", style="blue")
     table.add_column("host", style="magenta")
-    table.add_column("alive", style="magenta")
     table.add_column("pings", style="magenta")
     table.add_column("last cmd")
     table.add_column("last succ. cmd", style="green")
@@ -32,7 +31,6 @@ def print_status(topnode, console, apparatus_id='') -> int:
                 Text(pre)+Text(node.name),
                 Text(f"{node.state} - {alive}", style=('bold red' if node.is_error() else "")),
                 sup.desc.host,
-                str(alive),
                 str(ping),
                 Text(str(sup.last_sent_command), style=('bold red' if last_cmd_failed else '')),
                 str(sup.last_ok_command)

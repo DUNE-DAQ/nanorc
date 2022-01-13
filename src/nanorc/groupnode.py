@@ -13,6 +13,7 @@ class ErrorCode(Enum):
     Timeout=10
     Failed=20
     InvalidTransition=30
+    Aborted=40
 
 class GroupNode(NodeMixin):
     def __init__(self, name:str, console, fsm_conf, parent=None, children=None, order=None):
@@ -63,7 +64,7 @@ class GroupNode(NodeMixin):
     def _on_enter_callback(self, event):
         command = event.event.name
         self.log.info(f"{self.name} received command '{command}'")
-
+        source_state = event.transition.source
         still_to_exec = []
         active_thread = []
         force = event.kwargs.get('force')
@@ -93,6 +94,7 @@ class GroupNode(NodeMixin):
 
 
         failed_resp = []
+        aborted = False
         for _ in range(event.kwargs["timeout"]):
             response = self.status_receiver_queue.get()
             if response:
@@ -103,29 +105,33 @@ class GroupNode(NodeMixin):
                         if response["status_code"] != ErrorCode.Success:
                             failed_resp.append(response)
 
-            if len(still_to_exec) == 0 or len(failed_resp)>0: # if all done, continue
+                        if response['status_code'] == ErrorCode.Aborted:
+                            aborted = True
+                            break
+
+            if aborted or len(still_to_exec) == 0 or len(failed_resp)>0: # if all done, continue
                 break
 
             time.sleep(1)
 
         timeout = still_to_exec
 
-        if len(still_to_exec) > 0:
+        if len(still_to_exec) > 0 and not aborted:
             self.log.error(f"{self.name} can't {command} because following children timed out: {[n.name for n in timeout]}")
 
-        ## We still need to do that manually, since they are still in their transitions
-        for node in timeout:
-            response = {
-                "state": self.state,
-                "command": event.event.name,
-                "node": node.name,
-                "failed": [n.name for n in timeout],
-                "error": "Timed out after waiting for too long, or because a sibling went on error",
-            }
-            node.to_error(event=event, response=response)
+            ## We still need to do that manually, since they are still in their transitions
+            for node in timeout:
+                response = {
+                    "state": self.state,
+                    "command": event.event.name,
+                    "node": node.name,
+                    "failed": [n.name for n in timeout],
+                    "error": "Timed out after waiting for too long, or because a sibling went on error",
+                }
+                node.to_error(event=event, response=response)
 
         ## For the failed one, we have gone on error state already
-        if failed_resp:
+        if failed_resp and not aborted:
             self.log.error(f"{self.name} can't {command} because following children had error: {[n['node'] for n in failed_resp]}")
 
         status = ErrorCode.Success
@@ -133,16 +139,24 @@ class GroupNode(NodeMixin):
             status = ErrorCode.Timeout
         if len(failed_resp)>0:
             status = ErrorCode.Failed
+        if aborted:
+            status = ErrorCode.Aborted
 
         response = {
             "status_code" : status,
             "state": self.state,
             "command": event.event.name,
+            # "comment": [n.get('comment') for n in
             "node": self.name,
             "timeouts": [n.name for n in timeout],
-            "failed": [n['node'] for n in failed_resp],
-            "error": [n['error'] for n in failed_resp]
+            "failed": [n.get('node') for n in failed_resp],
+            "error": [n.get('error') for n in failed_resp]
         }
+
+        if aborted:
+            self.log.info(f'Aborting command {command} on node {self.name}\nresponse {response}')
+            self.trigger(f"to_{source_state}", response=response)
+            return
 
         if status != ErrorCode.Success:
             self.to_error(event=event, response=response)
@@ -151,10 +165,12 @@ class GroupNode(NodeMixin):
             self.trigger("end_"+command, response=response)
 
 
+
     def _on_exit_callback(self, event):
         response = event.kwargs.get("response")
         if self.parent:
             self.parent.status_receiver_queue.put(response)
+
         if response:
             self.response = response
             return response['status_code']

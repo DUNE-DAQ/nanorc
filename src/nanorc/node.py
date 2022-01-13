@@ -123,6 +123,7 @@ class SubsystemNode(GroupNode):
 
     def _on_enter_callback(self, event):
         command = event.event.name
+        origin = event.transition.source
         cfg_method = event.kwargs.get("cfg_method")
         timeout = event.kwargs["timeout"]
         force = event.kwargs.get('force')
@@ -153,7 +154,14 @@ class SubsystemNode(GroupNode):
                     self.log.error(text+f"\nBut! '--force' was specified, so I'll ignore '{n.name}'!")
                     appset.remove(n)
                 else:
-                    raise RuntimeError(text+"\nYou may be able to use '--force' if you want to 'stop' or 'scrap' the run.")
+                    self.log.error(text+"\nYou may be able to use '--force' if you want to 'stop' or 'scrap' the run.")
+                    response = {
+                        'node': self.name,
+                        'status_code': ErrorCode.Aborted,
+                        'comment': text+"\nYou may be able to use '--force' if you want to 'stop' or 'scrap' the run."
+                    }
+                    self.trigger("to_"+origin, response=response)
+                    return
 
         if not sequence:
             # Loop over data keys if no sequence is specified or all apps, if data is empty
