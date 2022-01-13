@@ -223,8 +223,9 @@ def stop(obj, stop_wait:int, force:bool, message:str):
     obj.rc.pause(force)
     obj.rc.status()
     time.sleep(stop_wait)
-    obj.rc.stop(force, message=message)
-    obj.rc.status()
+    if obj.rc.return_code == 0:
+        obj.rc.stop(force, message=message)
+        obj.rc.status()
 
 @cli.command('pause')
 @click.pass_obj

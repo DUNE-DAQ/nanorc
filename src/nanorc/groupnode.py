@@ -154,17 +154,18 @@ class GroupNode(NodeMixin):
         }
 
         if aborted:
-            self.log.info(f'Aborting command {command} on node {self.name}\nresponse {response}')
+            self.log.info(f'Aborting command {command} on node {self.name}')
             self.trigger(f"to_{source_state}", response=response)
+            self.return_code = ErrorCode.Aborted
             return
+
+        self.return_code = status
 
         if status != ErrorCode.Success:
             self.to_error(event=event, response=response)
         else:
             # Initiate the transition on this node to say that we have finished
             self.trigger("end_"+command, response=response)
-
-
 
     def _on_exit_callback(self, event):
         response = event.kwargs.get("response")
