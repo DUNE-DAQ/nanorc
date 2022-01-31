@@ -153,6 +153,7 @@ class SubsystemNode(StatefulNode):
                 if force:
                     self.log.error(text+f"\nBut! '--force' was specified, so I'll ignore '{n.name}'!")
                     appset.remove(n)
+                    if sequence and n.name in sequence: sequence.remove(n.name)
                 else:
                     self.log.error(text+"\nYou may be able to use '--force' if you want to 'stop' or 'scrap' the run.")
                     response = {
