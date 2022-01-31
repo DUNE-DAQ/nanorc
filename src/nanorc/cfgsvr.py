@@ -8,7 +8,8 @@ import json
 import copy
 import requests
 import tempfile
-from .node import GroupNode, SubsystemNode
+from .statefulnode import StatefulNode
+from .node import SubsystemNode
 from .cfgmgr import ConfigManager
 from .credmgr import credentials,Authentication
 from distutils.dir_util import copy_tree
@@ -60,12 +61,12 @@ class FileConfigSaver:
 
         return filename+postfix+ext
 
-    def save_on_start(self, apps:GroupNode, run:int, run_type:str,
+    def save_on_start(self, apps:StatefulNode, run:int, run_type:str,
                       overwrite_data:dict, cfg_method:str) -> str:
         """
         Save the configuration runtime start parameter set
         :param      apps:  the application tree
-        :type       apps:  GroupNode
+        :type       apps:  StatefulNode
         :param      run :  run number
         :type       run :  int
         :param      overwrite_data :  the runtime start data
@@ -109,10 +110,10 @@ class FileConfigSaver:
         return self.thisrun_outdir
 
 
-    def save_on_resume(self, topnode:GroupNode, overwrite_data: dict, cfg_method:str) -> dict:
+    def save_on_resume(self, topnode:StatefulNode, overwrite_data: dict, cfg_method:str) -> dict:
         """
         :param      apps:  the application tree
-        :type       apps:  GroupNode
+        :type       apps:  StatefulNode
         :param      overwrite_data :  the runtime start data
         :type       overwrite_data :  dict
         :param      cfg_method :  which config method to call on start

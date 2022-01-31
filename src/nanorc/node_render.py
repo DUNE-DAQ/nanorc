@@ -1,4 +1,4 @@
-from .groupnode import GroupNode
+from .statefulnode import StatefulNode
 from .node import *
 from anytree import RenderTree
 import logging as log

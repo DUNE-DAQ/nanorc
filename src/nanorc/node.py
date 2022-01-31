@@ -12,7 +12,7 @@ from .sshpm import SSHProcessManager
 from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
 from typing import Union, NoReturn
 from .fsm import FSM
-from .groupnode import GroupNode, ErrorCode
+from .statefulnode import StatefulNode, ErrorCode
 from rich.progress import *
 
 log = logging.getLogger("transitions.core")
@@ -20,7 +20,7 @@ log.setLevel(logging.ERROR)
 log = logging.getLogger("transitions")
 log.setLevel(logging.ERROR)
 
-class ApplicationNode(GroupNode):
+class ApplicationNode(StatefulNode):
     def __init__(self, name, sup, console, fsm_conf, parent=None):
         # Absolutely no children for ApplicationNode
         super().__init__(name=name, console=console, fsm_conf=fsm_conf, parent=parent, children=None)
@@ -41,7 +41,7 @@ class ApplicationNode(GroupNode):
         self.sup.terminate()
         self.end_terminate()
 
-class SubsystemNode(GroupNode):
+class SubsystemNode(StatefulNode):
     def __init__(self, name:str, ssh_conf, cfgmgr, fsm_conf, console, parent=None, children=None):
         super().__init__(name=name, console=console, fsm_conf=fsm_conf, parent=parent, children=children)
         self.name = name

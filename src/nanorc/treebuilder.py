@@ -1,4 +1,5 @@
-from .node import GroupNode, SubsystemNode
+from .statefulnode import StatefulNode
+from .node import SubsystemNode
 from .cfgmgr import ConfigManager
 import os
 import json
@@ -16,10 +17,10 @@ def dict_raise_on_duplicates(ordered_pairs):
     return d
 
 class TreeBuilder:
-    def extract_json_to_nodes(self, js, mother, fsm_conf) -> GroupNode:
+    def extract_json_to_nodes(self, js, mother, fsm_conf) -> StatefulNode:
         for n,d in js.items():
             if isinstance(d, dict):
-                child = GroupNode(name=n,
+                child = StatefulNode(name=n,
                                   parent=mother,
                                   console=self.console,
                                   fsm_conf = fsm_conf)
@@ -73,7 +74,7 @@ class TreeBuilder:
         if cmd_order:
             del self.top_cfg['command_order']
 
-        self.topnode = GroupNode(self.apparatus_id, console=self.console, fsm_conf=self.fsm_conf, order=cmd_order)
+        self.topnode = StatefulNode(self.apparatus_id, console=self.console, fsm_conf=self.fsm_conf, order=cmd_order)
         self.extract_json_to_nodes(self.top_cfg, self.topnode, fsm_conf=self.fsm_conf)
 
     # This should get changed so that it copies the node, and strips the config

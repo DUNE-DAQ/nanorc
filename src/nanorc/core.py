@@ -5,7 +5,7 @@ import os
 from rich.console import Console
 from rich.style import Style
 from rich.pretty import Pretty
-from .node import GroupNode
+from .statefulnode import StatefulNode
 from .treebuilder import TreeBuilder
 from .cfgsvr import FileConfigSaver, DBConfigSaver
 from .credmgr import credentials

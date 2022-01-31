@@ -15,7 +15,7 @@ class ErrorCode(Enum):
     InvalidTransition=30
     Aborted=40
 
-class GroupNode(NodeMixin):
+class StatefulNode(NodeMixin):
     def __init__(self, name:str, console, fsm_conf, parent=None, children=None, order=None):
         self.console = console
         self.log = logging.getLogger(self.__class__.__name__+"_"+name)
