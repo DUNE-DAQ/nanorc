@@ -1,0 +1,18 @@
+{
+    "states" : [ "none", "booted", "initialised", "configured", "running", "paused", "error"],
+    "transitions" : [
+        { "trigger": "boot",      "source": "none",        "dest": "booted"     },
+        { "trigger": "init",      "source": "booted",      "dest": "initialised"},
+        { "trigger": "conf",      "source": "initialised", "dest": "configured" },
+        { "trigger": "start",     "source": "configured",  "dest": "running"    },
+        { "trigger": "stop",      "source": "running" ,    "dest": "configured" },
+        { "trigger": "stop",      "source": "paused" ,     "dest": "configured" },
+        { "trigger": "resume",    "source": "running",     "dest": "running"    },
+        { "trigger": "resume",    "source": "paused",      "dest": "running"    },
+        { "trigger": "pause",     "source": "running",     "dest": "paused"     },
+        { "trigger": "pause",     "source": "paused",      "dest": "paused"     },
+        { "trigger": "scrap",     "source": "configured",  "dest": "initialised"},
+        { "trigger": "terminate", "source": "*",           "dest": "none"       },
+        { "trigger": "to_error",  "source": "*",           "dest": "error"      }
+    ]
+}

@@ -209,8 +209,10 @@ def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_
     obj.rc.start(disable_data_storage, "TEST", message=message)
     obj.rc.status()
     time.sleep(resume_wait)
-    obj.rc.resume(trigger_interval_ticks)
-    obj.rc.status()
+    if obj.rc.return_code == 0:
+        time.sleep(resume_wait)
+        obj.rc.resume(trigger_interval_ticks)
+        obj.rc.status()
 
 @cli.command('stop')
 @click.option('--stop-wait', type=int, default=0, help='Seconds to wait between Pause and Stop commands')
@@ -221,8 +223,9 @@ def stop(obj, stop_wait:int, force:bool, message:str):
     obj.rc.pause(force)
     obj.rc.status()
     time.sleep(stop_wait)
-    obj.rc.stop(force, message=message)
-    obj.rc.status()
+    if obj.rc.return_code == 0:
+        obj.rc.stop(force, message=message)
+        obj.rc.status()
 
 @cli.command('pause')
 @click.pass_obj
