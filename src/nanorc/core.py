@@ -87,6 +87,9 @@ class NanoRC:
         """
         Boots applications
         """
+        if not self.topnode.can_boot():
+            self.log.error(f'Cannot boot, as you are is in {self.topnode.state} state.')
+            return
         self.topnode.boot(timeout=self.timeout)
         self.return_code = self.topnode.return_code.value
 
@@ -110,6 +113,9 @@ class NanoRC:
         """
         Initializes the applications.
         """
+        if not self.topnode.can_init():
+            self.log.error(f'Cannot init, as you are is in {self.topnode.state} state.')
+            return
         self.topnode.init(path=path, raise_on_fail=True, timeout=self.timeout)
         self.return_code = self.topnode.return_code.value
 
@@ -118,6 +124,9 @@ class NanoRC:
         """
         Sends configure command to the applications.
         """
+        if not self.topnode.can_conf():
+            self.log.error(f'Cannot conf, as you are is in {self.topnode.state} state.')
+            return
         self.topnode.conf(path=path, raise_on_fail=True, timeout=self.timeout)
         self.return_code = self.topnode.return_code.value
 
@@ -175,7 +184,6 @@ class NanoRC:
         """
         Append the logbook
         """
-
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
             try:
@@ -188,6 +196,10 @@ class NanoRC:
         """
         Sends stop command
         """
+
+        if not self.topnode.can_stop():
+            self.log.error(f'Cannot stop, as you are is in {self.topnode.state} state.')
+            return
 
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
@@ -208,6 +220,10 @@ class NanoRC:
         """
         Sends pause command
         """
+        if not self.topnode.can_pause():
+            self.log.error(f'Cannot pause, as you are is in {self.topnode.state} state.')
+            return
+
         self.topnode.pause(path=None, raise_on_fail=True, timeout=self.timeout, force=force)
         self.return_code = self.topnode.return_code.value
 
@@ -220,6 +236,9 @@ class NanoRC:
         :type       trigger_interval_ticks:  int
         """
         runtime_resume_data = {}
+        if not self.topnode.can_resume():
+            self.log.error(f'Cannot resume, as you are is in {self.topnode.state} state.')
+            return
 
         if not trigger_interval_ticks is None:
             runtime_resume_data["trigger_interval_ticks"] = trigger_interval_ticks
@@ -239,5 +258,9 @@ class NanoRC:
         """
         Send scrap command
         """
+        if not self.topnode.can_scrap():
+            self.log.error(f'Cannot scrap, as you are is in {self.topnode.state} state.')
+            return
+
         self.topnode.scrap(path=None, raise_on_fail=True, timeout=self.timeout, force=force)
         self.return_code = self.topnode.return_code.value
