@@ -34,7 +34,7 @@ class ConfigManager:
         super().__init__()
 
         cfg_dir = os.path.expandvars(cfg_dir)
-        
+
         if not (os.path.exists(cfg_dir) and os.path.isdir(cfg_dir)):
             raise RuntimeError(f"'{cfg_dir}' does not exist or is not a directory")
 
@@ -99,7 +99,7 @@ class ConfigManager:
                     self.boot["env"][k] = v[v.find(":") + 1:]
                 else:
                     raise ValueError("Key " + k + " is not in environment and no default specified!")
-               
+
         for exec_spec in self.boot["exec"].values():
             for k, v in exec_spec["env"].items():
                 if str(v).find("getenv") == 0:
@@ -109,13 +109,23 @@ class ConfigManager:
                         exec_spec["env"][k] = v[v.find(":") + 1:]
                     else:
                         raise ValueError("Key " + k + " is not in environment and no default specified!")
-            
+
         # Conf:
         ips = {n: socket.gethostbyname(h) for n, h in self.boot["hosts"].items()}
         # Set addresses to ips for networkmanager
         for connections in json_extract(self.init, "nwconnections"):
-            for c in connections: c["address"] = c["address"].format(**ips) 
-            
+            for c in connections:
+                from string import Formatter
+                fieldnames = [fname for _, fname, _, _ in Formatter().parse(c['address']) if fname]
+                if len(fieldnames)>1:
+                    raise RuntimeError(f"Too many fields in connection {c['address']}")
+                for fieldname in fieldnames:
+                    if fieldname in ips:
+                        c["address"] = c["address"].format(**ips)
+                    else:
+                        c['address'] = c['address'].format(**{fieldname:socket.gethostbyname(fieldname)})
+
+
 
     def runtime_start(self, data: dict) -> dict:
         """
