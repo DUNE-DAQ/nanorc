@@ -23,7 +23,7 @@ class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
     def __init__(self, console: Console, top_cfg: str, run_num_mgr, run_registry, logbook_type:str, timeout: int,
-                 use_kerb=True, logbook_prefix=""):
+                 use_kerb=True, logbook_prefix="", fsm_cfg="partition_fsm.json"):
         super(NanoRC, self).__init__()
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
@@ -31,7 +31,7 @@ class NanoRC:
         ssh_conf = []
         if not use_kerb:
             ssh_conf = ["-o GSSAPIAuthentication=no"]
-        self.fsm_conf = json.loads(importlib.resources.read_text(confdata, "fsm_conf.json"))
+        self.fsm_conf = json.loads(importlib.resources.read_text(confdata, fsm_cfg))
 
         self.cfg = TreeBuilder(log=self.log,
                                top_cfg=top_cfg,
@@ -67,7 +67,6 @@ class NanoRC:
         self.topnode = self.cfg.get_tree_structure()
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
 
-        self.listener = None
 
 
     def status(self) -> NoReturn:
