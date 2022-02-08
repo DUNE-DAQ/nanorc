@@ -11,6 +11,7 @@ setup(
         "sh",
         "graphviz",
         "anytree",
+        "transitions"
     ],
     extras_require={"develop": [
         "ipdb",
