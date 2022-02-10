@@ -123,7 +123,10 @@ class ConfigManager:
                     if fieldname in ips:
                         c["address"] = c["address"].format(**ips)
                     else:
-                        c['address'] = c['address'].format(**{fieldname:socket.gethostbyname(fieldname)})
+                        try:
+                            c['address'] = c['address'].format(**{fieldname:socket.gethostbyname(fieldname)})
+                        except Exception as e:
+                            raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
 
 
 
