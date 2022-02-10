@@ -124,7 +124,8 @@ class ConfigManager:
                         c["address"] = c["address"].format(**ips)
                     else:
                         try:
-                            c['address'] = c['address'].format(**{fieldname:socket.gethostbyname(fieldname)})
+                            dico = {"HOST_IP":socket.gethostbyname(fieldname)}
+                            c['address'] = c['address'].replace(fieldname, "HOST_IP").format(**dico)
                         except Exception as e:
                             raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
 
