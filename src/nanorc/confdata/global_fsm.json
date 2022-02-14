@@ -1,5 +1,5 @@
 {
-    "states" : [ "none", "booted", "initialised", "configured", "error"],
+    "states" : [ "none", "booted", "initialised", "configured", "error", "running"],
     "transitions" : [
         { "trigger": "boot",      "source": "none",        "dest": "booted"     },
         { "trigger": "init",      "source": "booted",      "dest": "initialised"},
