@@ -91,6 +91,18 @@ globalnp04cli.add_command(scrap, 'scrap')
 globalnp04cli.add_command(wait, 'wait')
 globalnp04cli.add_command(terminate, 'terminate')
 
+@globalnp04cli.command('start')
+@click.argument('run', type=int)
+def start(ctx, obj, run):
+    obj.rc.run_num_mgr.set_run_number(run)
+    obj.rc.start(disable_data_storage=True, run_type="TEST")
+
+
+@globalnp04cli.command('stop')
+def start(ctx, obj, run):
+    obj.rc.stop()
+
+
 @globalnp04cli.command('change_user')
 @click.argument('user', type=str, default=None)
 @click.pass_obj

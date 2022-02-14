@@ -4,6 +4,8 @@
         { "trigger": "boot",      "source": "none",        "dest": "booted"     },
         { "trigger": "init",      "source": "booted",      "dest": "initialised"},
         { "trigger": "conf",      "source": "initialised", "dest": "configured" },
+        { "trigger": "start",     "source": "configured",  "dest": "running"    },
+        { "trigger": "stop",      "source": "running",     "dest": "configured" },
         { "trigger": "scrap",     "source": "configured",  "dest": "initialised"},
         { "trigger": "terminate", "source": "*",           "dest": "none"       },
         { "trigger": "to_error",  "source": "*",           "dest": "error"      }
