@@ -62,9 +62,9 @@ def globalnp04cli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir,
         rc = NanoRC(console = obj.console,
                     fsm_cfg = "global_fsm.json",
                     top_cfg = cfg_dir,
-                    run_num_mgr = SimpleRunNumberManager(),
-                    run_registry = FileConfigSaver(cfg_dumpdir),
-                    logbook_type = "file",
+                    run_num_mgr = None,
+                    run_registry = None,
+                    logbook_type = None,
                     timeout = timeout,
                     use_kerb = kerberos)
         rc.log_path = log_path
@@ -92,11 +92,9 @@ globalnp04cli.add_command(wait, 'wait')
 globalnp04cli.add_command(terminate, 'terminate')
 
 @globalnp04cli.command('start')
-@click.argument('run', type=int)
 @click.pass_obj
 @click.pass_context
-def start(ctx, obj, run):
-    obj.rc.run_num_mgr.set_run_number(run)
+def start(ctx, obj):
     obj.rc.start(disable_data_storage=True, run_type="TEST")
     obj.rc.status()
 
