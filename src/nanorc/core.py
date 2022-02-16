@@ -23,7 +23,7 @@ class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
     def __init__(self, console: Console, top_cfg: str, run_num_mgr, run_registry, logbook_type:str, timeout: int,
-                 use_kerb=True, logbook_prefix=""):
+                 use_kerb=True, logbook_prefix="", fsm_cfg="partition_fsm.json"):
         super(NanoRC, self).__init__()
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
@@ -31,7 +31,7 @@ class NanoRC:
         ssh_conf = []
         if not use_kerb:
             ssh_conf = ["-o GSSAPIAuthentication=no"]
-        self.fsm_conf = json.loads(importlib.resources.read_text(confdata, "fsm_conf.json"))
+        self.fsm_conf = json.loads(importlib.resources.read_text(confdata, fsm_cfg))
 
         self.cfg = TreeBuilder(log=self.log,
                                top_cfg=top_cfg,
@@ -43,8 +43,9 @@ class NanoRC:
 
         self.run_num_mgr = run_num_mgr
         self.cfgsvr = run_registry
-        self.cfgsvr.cfgmgr = self.cfg
-        self.cfgsvr.apparatus_id = self.apparatus_id
+        if self.cfgsvr:
+            self.cfgsvr.cfgmgr = self.cfg
+            self.cfgsvr.apparatus_id = self.apparatus_id
         self.timeout = timeout
         self.return_code = None
         self.logbook = None
@@ -67,7 +68,6 @@ class NanoRC:
         self.topnode = self.cfg.get_tree_structure()
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
 
-        self.listener = None
 
 
     def status(self) -> NoReturn:
@@ -144,15 +144,20 @@ class NanoRC:
             self.console.log(f"I cannot start now! {self.topnode.name} is {self.topnode.state}!")
             self.return_code = 1
             return
-        self.run = self.run_num_mgr.get_run_number()
+
+        if self.run_num_mgr:
+            self.run = self.run_num_mgr.get_run_number()
+        else:
+            self.run = 1
 
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
 
-        try:
-            self.logbook.message_on_start(message, self.run, run_type)
-        except Exception as e:
-            self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
+        if self.logbook:
+            try:
+                self.logbook.message_on_start(message, self.run, run_type)
+            except Exception as e:
+                self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
 
         runtime_start_data = {
@@ -160,22 +165,33 @@ class NanoRC:
             "run": self.run,
         }
 
-        try:
-            cfg_save_dir = self.cfgsvr.save_on_start(self.topnode, run=self.run, run_type=run_type,
-                                                     overwrite_data=runtime_start_data,
-                                                     cfg_method="runtime_start")
-        except Exception as e:
-            self.log.error(f'Couldn\'t save the configuration so not starting a run!\n{str(e)}')
-            self.return_code = 1
-            return
+        if self.cfgsvr:
+            try:
+                cfg_save_dir = self.cfgsvr.save_on_start(self.topnode, run=self.run, run_type=run_type,
+                                                         overwrite_data=runtime_start_data,
+                                                         cfg_method="runtime_start")
+            except Exception as e:
+                self.log.error(f'Couldn\'t save the configuration so not starting a run!\n{str(e)}')
+                self.return_code = 1
+                return
 
         self.topnode.start(path=None, raise_on_fail=True,
                            cfg_method="runtime_start",
                            overwrite_data=runtime_start_data,
                            timeout=self.timeout)
+
         self.return_code = self.topnode.return_code.value
         if self.return_code == 0:
-            self.console.log(f"\t[bold magenta]Started run #{self.run}, saving run data in {cfg_save_dir}[/bold magenta]")
+            text = ""
+            if self.run_num_mgr:
+                text += f"Started run #{self.run}"
+            else:
+                text += "Started running"
+
+            if self.cfgsvr:
+                text+=f", saving run data in {cfg_save_dir}"
+
+            self.console.rule(f"[bold magenta]{text}[/bold magenta]")
         else:
             self.log.error(f"[bold red]There was an error when starting the run #{self.run}[/bold red]:")
             self.log.error(f'Response: {self.topnode.response}')
@@ -208,12 +224,17 @@ class NanoRC:
             except Exception as e:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
+        if self.cfgsvr:
+            self.cfgsvr.save_on_stop(self.run)
 
-        self.cfgsvr.save_on_stop(self.run)
         self.topnode.stop(path=None, raise_on_fail=True, timeout=self.timeout, force=force)
         self.return_code = self.topnode.return_code.value
+
         if self.return_code == 0:
-            self.console.log(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
+            if self.run_num_mgr:
+                self.console.rule(f"[bold magenta]Stopped run #{self.run}[/bold magenta]")
+            else:
+                self.console.rule(f"[bold magenta]Stopped running[/bold magenta]")
 
 
     def pause(self, force:bool=False) -> NoReturn:
