@@ -61,7 +61,7 @@ class NanoRC:
             except Exception as e:
                 self.log.error(f"Can't find confdata/elisa_conf.json, reverting to file logbook! {str(e)}")
 
-        if not self.logbook:
+        if not self.logbook and logbook_type:
             self.log.info("Using filelogbook")
             self.logbook = FileLogbook(logbook_prefix, self.console)
 
