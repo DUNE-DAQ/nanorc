@@ -10,6 +10,7 @@ import cmd
 import click
 import click_shell
 import os.path
+import os
 import logging
 import importlib.resources as resources
 
@@ -33,7 +34,7 @@ from .cli import *
 @click.version_option(__version__)
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
-@click.option('--log-path', type=click.Path(exists=True), default='/log', help='Where the logs should go (on localhost of applications)')
+@click.option('--log-path', type=click.Path(exists=True), default=os.getcwd(), help='Where the logs should go (on localhost of applications)')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
@@ -66,7 +67,8 @@ def timingcli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, ker
                     logbook_type = None,
                     timeout = timeout,
                     use_kerb = kerberos)
-        rc.log_path = log_path
+
+        rc.log_path = os.path.abspath(log_path)
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()

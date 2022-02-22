@@ -90,7 +90,7 @@ class NanoRC:
         if not self.topnode.can_boot():
             self.log.error(f'Cannot boot, as you are is in {self.topnode.state} state.')
             return
-        self.topnode.boot(timeout=self.timeout)
+        self.topnode.boot(timeout=self.timeout, log=self.log_path)
         self.return_code = self.topnode.return_code.value
 
 
