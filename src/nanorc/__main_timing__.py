@@ -60,7 +60,7 @@ def timingcli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, ker
 
     try:
         rc = NanoRC(console = obj.console,
-                    fsm_cfg = "timing_fsm.json",
+                    fsm_cfg = "timing",
                     top_cfg = cfg_dir,
                     run_num_mgr = None,
                     run_registry = None,

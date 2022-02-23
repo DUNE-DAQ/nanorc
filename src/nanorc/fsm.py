@@ -2,9 +2,44 @@ from transitions import Machine
 from functools import partial
 
 class FSM(Machine):
-    def __init__(self, cfg):
-        self.states_cfg = cfg["states"]
-        self.transitions_cfg= cfg["transitions"]
+    def __init__(self,console, fsm_type, verbose=False):
+        if fsm_type == 'timing':
+            self.states_cfg = [ "none", "booted", "initialised", "configured", "error", "running" ]
+            self.transitions_cfg = [
+                { "trigger": "boot",      "source": "none",        "dest": "booted"     },
+                { "trigger": "init",      "source": "booted",      "dest": "initialised"},
+                { "trigger": "conf",      "source": "initialised", "dest": "configured" },
+                { "trigger": "start",     "source": "configured",  "dest": "running"    },
+                { "trigger": "stop",      "source": "running",     "dest": "configured" },
+                { "trigger": "scrap",     "source": "configured",  "dest": "initialised"},
+                { "trigger": "terminate", "source": "*",           "dest": "none"       },
+                { "trigger": "to_error",  "source": "*",           "dest": "error"      }
+            ]
+
+        else:
+            self.states_cfg = [ "none", "booted", "initialised", "configured", "running", "paused", "error"]
+            self.transitions_cfg = [
+                { "trigger": "boot",      "source": "none",        "dest": "booted"     },
+                { "trigger": "init",      "source": "booted",      "dest": "initialised"},
+                { "trigger": "conf",      "source": "initialised", "dest": "configured" },
+                { "trigger": "start",     "source": "configured",  "dest": "running"    },
+                { "trigger": "stop",      "source": "running" ,    "dest": "configured" },
+                { "trigger": "stop",      "source": "paused" ,     "dest": "configured" },
+                { "trigger": "resume",    "source": "running",     "dest": "running"    },
+                { "trigger": "resume",    "source": "paused",      "dest": "running"    },
+                { "trigger": "pause",     "source": "running",     "dest": "paused"     },
+                { "trigger": "pause",     "source": "paused",      "dest": "paused"     },
+                { "trigger": "scrap",     "source": "configured",  "dest": "initialised"},
+                { "trigger": "terminate", "source": "*",           "dest": "none"       },
+                { "trigger": "to_error",  "source": "*",           "dest": "error"      }
+            ]
+        if verbose:
+            print_friendly_transitions = set()
+            for tr in self.transitions_cfg:
+                if tr['trigger'] == 'to_error': continue
+                print_friendly_transitions.add(tr['trigger'])
+            console.print(f'FSM available states: {self.states_cfg}')
+            console.print(f'FSM available transitions: {print_friendly_transitions}')
         self.acting_transitions = []
         self.finalisor_transitions = []
 
