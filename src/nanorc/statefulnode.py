@@ -16,7 +16,7 @@ class ErrorCode(Enum):
     Aborted=40
 
 class StatefulNode(NodeMixin):
-    def __init__(self, name:str, console, fsm_conf, parent=None, children=None, order=None):
+    def __init__(self, name:str, console, fsm_conf, parent=None, children=None, order=None, verbose=False):
         self.console = console
         self.log = logging.getLogger(self.__class__.__name__+"_"+name)
 
@@ -27,7 +27,7 @@ class StatefulNode(NodeMixin):
             self.children = children
 
         self.fsm_conf = fsm_conf
-        self.fsm = FSM(fsm_conf)
+        self.fsm = FSM(self.console, fsm_conf, verbose)
         self.fsm.make_node_fsm(self)
         self.return_code = ErrorCode.Success
         self.status_receiver_queue = Queue()

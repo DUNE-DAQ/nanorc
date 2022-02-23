@@ -24,14 +24,14 @@ class TreeBuilder:
                                   parent=mother,
                                   console=self.console,
                                   fsm_conf = fsm_conf)
-                self.extract_json_to_nodes(d, child, fsm_conf=fsm_conf)
+                self.extract_json_to_nodes(d, child, fsm_conf = fsm_conf)
             elif isinstance(d, str):
                 node = SubsystemNode(name=n,
                                      ssh_conf=self.ssh_conf,
                                      cfgmgr=ConfigManager(d),
                                      console=self.console,
                                      fsm_conf = fsm_conf,
-                                     parent=mother)
+                                     parent = mother)
             else:
                 self.log.error(f"ERROR processing the tree {n}: {d} I don't know what that's supposed to mean?")
                 exit(1)
@@ -74,7 +74,8 @@ class TreeBuilder:
         if cmd_order:
             del self.top_cfg['command_order']
 
-        self.topnode = StatefulNode(self.apparatus_id, console=self.console, fsm_conf=self.fsm_conf, order=cmd_order)
+        self.topnode = StatefulNode(self.apparatus_id, console=self.console,
+                                    fsm_conf=self.fsm_conf, order=cmd_order, verbose=True)
         self.extract_json_to_nodes(self.top_cfg, self.topnode, fsm_conf=self.fsm_conf)
 
     # This should get changed so that it copies the node, and strips the config

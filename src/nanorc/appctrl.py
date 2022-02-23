@@ -67,9 +67,17 @@ class FlaskManager(threading.Thread):
         flask_srv = Process(target=app.run, kwargs={"host": "0.0.0.0", "port": self.port}, name=thread_name)
         flask_srv.daemon = False
         flask_srv.start()
-        self.log.info(f'ResponseListener Flask lives on {flask_srv.pid}')
+        self.log.info(f'ResponseListener Flask lives on PID: {flask_srv.pid}')
         ## app.is_ready() would be good here, rather horrible polling inside a try
+        tries=0
         while True:
+            if tries>20:
+                self.log.error('Cannot ping the ResponseListener\nNothing will work!!')
+                self.log.error('This can happen if the web proxy is on at NP04.'+
+                               '\nExit NanoRC and try again after executing:'+
+                               '\nsource ~np04daq/bin/web_proxy.sh -u')
+                break
+            tries += 1
             try:
                 resp = requests.get(f"http://0.0.0.0:{self.port}/")
                 if resp.text == "ready":
