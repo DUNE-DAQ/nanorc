@@ -7,6 +7,7 @@ import atexit
 import signal
 import threading
 import queue
+from datetime import datetime
 import signal
 import logging
 from rich.console import Console
@@ -137,7 +138,7 @@ class SSHProcessManager(object):
         self.log.debug(name+str(exc))
         self.event_queue.put((name, exc))
 
-    def boot(self, boot_info):
+    def boot(self, boot_info, log=None):
 
         if self.apps:
             raise RuntimeError(
@@ -164,9 +165,16 @@ class SSHProcessManager(object):
                 "APP_PORT": app_conf["port"],
                 "APP_WD": os.getcwd()
                 })
-            cmd=';'.join([ f"export {n}=\"{v}\"" for n,v in app_vars.items()] + boot_info['exec'][app_conf['exec']]['cmd'])
 
             log_file = f'log_{app_name}_{app_conf["port"]}.txt'
+
+            cmd=';'.join([ f"export {n}=\"{v}\"" for n,v in app_vars.items()] + boot_info['exec'][app_conf['exec']]['cmd'])
+
+            if log:
+                now = datetime.now() # current date and time
+                date_time = now.strftime("%Y-%m-%d_%H:%M:%S")
+                log_file_localhost = f'log_{date_time}_{app_name}_{app_conf["port"]}.txt'
+                cmd = "{ "+cmd+"; } &> "+ log+"/"+log_file_localhost
 
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"]
             # if not self.can_use_kerb:
@@ -188,7 +196,7 @@ class SSHProcessManager(object):
                 apps_running += [name]
         if apps_running:
             raise RuntimeError(f"ERROR: apps already running? {apps_running}")
-
+                
         for name, desc in self.apps.items():
             proc = sh.ssh(
                 *desc.ssh_args,
@@ -196,7 +204,7 @@ class SSHProcessManager(object):
                 _bg=True,
                 _bg_exc=False,
                 _new_session=True,
-                _preexec_fn=on_parent_exit(signal.SIGTERM),
+                # _preexec_fn=on_parent_exit(signal.SIGTERM),
             )
             self.watch(name, proc)
             desc.proc = proc
@@ -220,13 +228,15 @@ class SSHProcessManager(object):
             for _ in range(timeout):
                 progress.update(waiting, advance=1)
 
-                alive, resp = self.check_apps()
-                # progress.log(alive, resp)
+                alive, failed, resp = self.check_apps()
+
                 for a, t in apps_tasks.items():
                     if a in resp:
                         progress.update(t, completed=1)
+
                 progress.update(total, completed=len(resp))
-                if resp == list(self.apps.keys()):
+                
+                if set.union(set(resp), set(failed.keys())) == set(self.apps.keys()):
                     progress.update(waiting, visible=False)
                     break
                 time.sleep(1)
@@ -234,27 +244,43 @@ class SSHProcessManager(object):
     def check_apps(self):
         responding = []
         alive = []
+        failed = {}
+
         for name, desc in self.apps.items():
 
-            if desc.proc is not None and desc.proc.is_alive():
+            if desc.proc is None:
+                # Should I throw an error here?
+                continue
+
+            # Process status
+            if not desc.proc.is_alive():
+                try:
+                    exit_code = desc.proc.exit_code
+                except sh.ErrorReturnCode as e:
+                    exit_code = e.exit_code
+                failed[name] = exit_code
+            else:
                 alive += [name]
-            if desc.proc is not None and is_port_open(
-                desc.host, desc.conf["port"]
-            ):
-                responding += [name]
-        return alive, responding
+    
+                # Command port status
+                if is_port_open(
+                        desc.host, desc.conf["port"]
+                    ):
+                    responding += [name]
+
+        return alive, failed, responding
 
     def status_apps(self):
-        table = Table(title="Apps (process")
+        table = Table(title="Apps (process)")
         table.add_column("name", style="magenta")
         table.add_column("is alive", style="magenta")
         table.add_column("open port", style="magenta")
         table.add_column("host", style="magenta")
 
-        alive, resp = self.check_apps()
+        alive, failed, resp = self.check_apps()
 
         for app, desc in self.apps.items():
-            table.add_row(app, str(app in alive), str(app in resp), desc.host)
+            table.add_row(app, "alive" if (app in alive) else f"dead[{failed[app]}]", str(app in resp), desc.host)
         self.console.print(table)
 
 

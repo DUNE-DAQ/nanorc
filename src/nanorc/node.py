@@ -7,197 +7,109 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 from rich.panel import Panel
-
 import logging
 from .sshpm import SSHProcessManager
 from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
 from typing import Union, NoReturn
+from .fsm import FSM
+from .statefulnode import StatefulNode, ErrorCode
+from rich.progress import *
 
-class GroupNode(NodeMixin):
-    def __init__(self, name:str, parent=None, children=None):
-        self.name = name
-        self.parent = parent
-        self.log = logging.getLogger(self.__class__.__name__+"_"+self.name)
-        if children:
-            self.children = children
+log = logging.getLogger("transitions.core")
+log.setLevel(logging.ERROR)
+log = logging.getLogger("transitions")
+log.setLevel(logging.ERROR)
 
-
-    def print_status(self, apparatus_id:str=None, console:Console=None) -> int:
-        if apparatus_id:
-            table = Table(title=f"{apparatus_id} apps")
-        else:
-            table = Table(title=f"{apparatus_id} apps")
-        table.add_column("name", style="blue")
-        table.add_column("host", style="magenta")
-        table.add_column("alive", style="magenta")
-        table.add_column("pings", style="magenta")
-        table.add_column("last cmd")
-        table.add_column("last succ. cmd", style="green")
-
-        for pre, _, node in RenderTree(self):
-            if isinstance(node, ApplicationNode):
-                sup = node.sup
-                alive = sup.desc.proc.is_alive()
-                ping  = sup.commander.ping()
-                last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
-                table.add_row(
-                    pre+node.name,
-                    sup.desc.host,
-                    str(alive),
-                    str(ping),
-                    Text(str(sup.last_sent_command), style=('bold red' if last_cmd_failed else '')),
-                    str(sup.last_ok_command)
-                )
-
-            else:
-                table.add_row(pre+node.name)
-
-        console.print(table)
-
-    def print(self, leg:bool=False, console:Console=None) -> int:
-        if console:
-            print_func = console.print
-        else:
-            print_func = print
-
-        rows = []
-        try:
-            for pre, _, node in RenderTree(self):
-                if node == self:
-                    # print_func(f"{pre}[red]{node.name}[/red]")
-                    rows.append(f"{pre}[red]{node.name}[/red]")
-                elif isinstance(node, SubsystemNode):
-                    # print_func(f"{pre}[yellow]{node.name}[/yellow]")
-                    rows.append(f"{pre}[yellow]{node.name}[/yellow]")
-                elif isinstance(node, ApplicationNode):
-                    # print_func(f"{pre}[blue]{node.name}[/blue]")
-                    rows.append(f"{pre}[blue]{node.name}[/blue]")
-                else:
-                    rows.append(f"{pre}{node.name}")
-
-            print_func(Panel.fit('\n'.join(rows)))
-
-            if leg:
-                print_func("\nLegend:")
-                print_func(" - [red]top node[/red]")
-                print_func(" - [yellow]subsystems[/yellow]")
-                print_func(" - [blue]applications[/blue]\n")
-
-        except Exception as ex:
-            self.log.error(f"Tree is corrupted!")
-            self.return_code = 14
-            raise RuntimeError(f"Tree is corrupted")
-        return 0
-
-    def send_command(self, path:[str], cmd:str, state_entry:str, state_exit:str, cfg_method:str=None, overwrite_data:dict={}, raise_on_fail:bool=True, timeout:int=None, force:bool=False) -> int:
-
-        if path:
-            r = Resolver('name')
-            prompted_path = "/".join(path)
-            self.log.info(f"node.send_command prompted path {prompted_path}")
-            node = r.get(self, prompted_path)
-        else:
-            node = self
-
-        self.log.debug(f"Sending {cmd} to {node.name}")
-
-        if not node: return
-
-        ok, failed = node._propagate_command(cmd=cmd, state_entry=state_entry, state_exit=state_exit, cfg_method=cfg_method, overwrite_data=overwrite_data, timeout=timeout, force=force)
-
-        if raise_on_fail and len(failed)>0:
-            self.log.error(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
-            self.return_code = 13
-            for a,r in failed.items():
-                self.log.error(f"{a}: {r}")
-            raise RuntimeError(f"ERROR: Failed to execute '{cmd}' on {', '.join(failed.keys())} applications")
-
-        return 0
-
-
-    def _propagate_command(self, cmd:str, state_entry:str, state_exit:str, cfg_method:str=None, overwrite_data:dict={}, timeout:int=None, force:bool=False) -> tuple:
-
-        ok, failed = {}, {}
-
-        for child in self.children:
-            o, f = child._propagate_command(cmd=cmd,
-                                            state_entry = state_entry, state_exit = state_exit,
-                                            cfg_method = cfg_method, overwrite_data = overwrite_data,
-                                            timeout = timeout, force=force)
-            ok.update(o)
-            failed.update(f)
-
-        return (ok, failed)
-
-    def terminate(self) -> int:
-        self.log.debug(f"Sending terminate to {self.name}")
-        if not self.children:
-            return
-
-        for child in self.children:
-            child.terminate()
-        return 0
-
-    def boot(self) -> int:
-        self.log.debug(f"Sending boot to {self.name}")
-
-        if not self.children:
-            return
-
-        for child in self.children:
-            child.boot()
-        return 0
-
-
-# Now on to useful stuff
-class ApplicationNode(NodeMixin):
-    def __init__(self, name, sup, parent=None):
+class ApplicationNode(StatefulNode):
+    def __init__(self, name, sup, console, fsm_conf, parent=None):
+        # Absolutely no children for ApplicationNode
+        super().__init__(name=name, console=console, fsm_conf=fsm_conf, parent=parent, children=None)
         self.name = name
         self.sup = sup
-        self.parent = parent
-        # Absolutely no children for applicationnode
 
-    def _propagate_command(self, *args, **kwargs):
-        raise RuntimeError("ERROR: You can't send a command directly to an application! Send it to the parent subsystem!")
+    def on_enter_boot_ing(self, _):
+        # all this is delegated to the subsystem
+        self.log.info(f"Application {self.name} booted")
 
-    def send_command(self, *args, **kwargs):
-        raise RuntimeError("ERROR: You can't send a command directly to an application! Send it to the parent subsystem!")
+    def _on_enter_callback(self, event):
+        pass
 
+    def _on_exit_callback(self, event):
+        pass
 
-class SubsystemNode(NodeMixin):
-    def __init__(self, name:str, ssh_conf, cfgmgr, console, parent=None, children=None):
+    def on_enter_terminate_ing(self, _):
+        self.sup.terminate()
+        self.end_terminate()
+
+class SubsystemNode(StatefulNode):
+    def __init__(self, name:str, ssh_conf, cfgmgr, fsm_conf, console, parent=None, children=None):
+        super().__init__(name=name, console=console, fsm_conf=fsm_conf, parent=parent, children=children)
         self.name = name
         self.ssh_conf = ssh_conf
+
         self.cfgmgr = cfgmgr
         self.pm = None
         self.listener = None
-        self.parent = parent
-        self.console = console
-        self.log = logging.getLogger(self.__class__.__name__+"_"+self.name)
-        if children:
-            self.children = children
 
-    def boot(self) -> NoReturn:
-        self.log.debug(f"Sending boot to {self.name}")
+
+    def on_enter_boot_ing(self, event) -> NoReturn:
+        self.log.info(f'Subsystem {self.name} is booting')
         try:
             self.pm = SSHProcessManager(self.console, self.ssh_conf)
-            self.pm.boot(self.cfgmgr.boot)
+            self.pm.boot(self.cfgmgr.boot, event.kwargs.get('log'))
         except Exception as e:
             self.console.print_exception()
-            self.return_code = 11
-            return
 
         self.listener = ResponseListener(self.cfgmgr.boot["response_listener"]["port"])
-        children = [ ApplicationNode(name=n,
-                                     sup=AppSupervisor(self.console, d, self.listener),
-                                     parent=self)
-                     for n,d in self.pm.apps.items() ]
+
+        children = []
+        failed = []
+        for n,d in self.pm.apps.items():
+            child = ApplicationNode(name=n,
+                                    console=self.console,
+                                    sup=AppSupervisor(self.console, d, self.listener),
+                                    parent=self,
+                                    fsm_conf=self.fsm_conf)
+
+            if child.sup.desc.proc.is_alive() and child.sup.commander.ping():
+                # nothing really happens in these 2:
+                child.boot()
+                child.end_boot()
+                # ... but now the application is booted
+            else:
+                failed.append({
+                    "node": child.name,
+                    "status_code": 1,## I don't know
+                    "command": "boot",
+                    "error": "Not bootable",
+                })
+                child.to_error(event=event, command='boot')
+            children.append(child)
+
         self.children = children
 
-    def terminate(self) -> NoReturn:
+        status_code = ErrorCode.Success
+        if failed:
+           status_code = ErrorCode.Failed
+
+        response = {
+            "node": self.name,
+            "status_code": status_code,
+            "command": "boot",
+            "failed": [f['node'] for f in failed],
+            "error": failed,
+        }
+
+        if response['status_code'] != ErrorCode.Success:
+            self.to_error(event=event, response=response)
+        else:
+            self.end_boot(response=response)
+
+
+    def on_enter_terminate_ing(self, _) -> NoReturn:
         if self.children:
             for child in self.children:
-                child.sup.terminate()
+                child.terminate()
                 if child.parent.listener:
                     child.parent.listener.unregister(child.name)
                 child.parent = None
@@ -206,80 +118,153 @@ class SubsystemNode(NodeMixin):
             self.listener.terminate()
         if self.pm:
             self.pm.terminate()
+        self.end_terminate()
 
 
-    def _propagate_command(self, cmd:str, state_entry:str, state_exit:str, cfg_method:str=None, overwrite_data:dict={}, timeout:int=None, force:bool=False) -> tuple:
-        self.log.debug(f"Sending {cmd} to {self.name}")
+    def _on_enter_callback(self, event):
+        command = event.event.name
+        origin = event.transition.source
+        cfg_method = event.kwargs.get("cfg_method")
+        timeout = event.kwargs["timeout"]
+        force = event.kwargs.get('force')
+        appfwk_state_dictionnary = { # !@#%&:(+_&||&!!!! (swears in raaawwww bits)
+            "BOOTED": "NONE",
+            "INITIALISED": "INITIAL",
+        }
 
-        sequence = getattr(self.cfgmgr, cmd+'_order', None)
+        exit_state = self.get_destination(command).upper()
+        if exit_state  in appfwk_state_dictionnary: exit_state  = appfwk_state_dictionnary[exit_state]
 
+
+        sequence = getattr(self.cfgmgr, command+'_order', None)
+        log = f"Sending {command} to the subsystem {self.name}"
+        if sequence: log+=f", in the order: {sequence}"
+        self.log.info(log)
         appset = list(self.children)
-        ok, failed = {}, {}
+        failed = []
+
+        if not self.listener.flask_manager.is_alive():
+            self.log.error('Response listener is not alive, trying to respawn it!!')
+            self.listener.flask_manager = self.listener.create_manager()
 
         for n in appset:
             if not n.sup.desc.proc.is_alive() or not n.sup.commander.ping():
-                text = f"'{n.name}' seems to be dead. So I cannot initiate transition '{state_entry}' -> '{state_exit}'."
+                text = f"'{n.name}' seems to be dead. So I cannot initiate transition '{command}'"
                 if force:
                     self.log.error(text+f"\nBut! '--force' was specified, so I'll ignore '{n.name}'!")
                     appset.remove(n)
+                    if sequence and n.name in sequence: sequence.remove(n.name)
                 else:
-                    raise RuntimeError(text+"\nYou may be able to use '--force' if you want to 'stop' or 'scrap' the run.")
+                    self.log.error(text+"\nYou may be able to use '--force' if you want to 'stop' or 'scrap' the run.")
+                    response = {
+                        'node': self.name,
+                        'status_code': ErrorCode.Aborted,
+                        'comment': text+"\nYou may be able to use '--force' if you want to 'stop' or 'scrap' the run."
+                    }
+                    self.trigger("to_"+origin, response=response)
+                    return
 
         if not sequence:
             # Loop over data keys if no sequence is specified or all apps, if data is empty
 
-            for n in appset:
+            for child_node in appset:
                 # BERK I don't know how to sort this.
                 # This is essntially calling cfgmgr.runtime_start(runtime_start_data)
                 if cfg_method:
                     f=getattr(self.cfgmgr,cfg_method)
-                    data = f(overwrite_data)
+                    data = f(event.kwargs['overwrite_data'])
                 else:
-                    data = getattr(self.cfgmgr, cmd)
+                    data = getattr(self.cfgmgr, command)
+                entry_state = child_node.state.upper()
+                if entry_state in appfwk_state_dictionnary: entry_state = appfwk_state_dictionnary[entry_state]
 
-                n.sup.send_command(cmd, data[n.name] if data else {}, state_entry, state_exit)
+                child_node.trigger(command)
+                ## APP now in *_ing
+
+                child_node.sup.send_command(command, cmd_data=data[child_node.name] if data else {}, entry_state=entry_state, exit_state=exit_state)
 
 
             start = datetime.now()
 
-            while(appset):
+            for _ in range(timeout*10):
+                if len(appset)==0: break
                 done = []
-                for n in appset:
+                for child_node in appset:
                     try:
-                        r = n.sup.check_response()
+                        r = child_node.sup.check_response()
                     except NoResponse:
                         continue
 
-                    done += [n]
-
-                    (ok if r['success'] else failed)[n.name] = r
+                    done += [child_node]
+                    if r['success']:
+                        child_node.trigger("end_"+command) # this is all dummy
+                    else:
+                        response = {
+                            "node": child_node.name,
+                            "status_code" : r,
+                            "state": child_node.state,
+                            "command": command,
+                            "error": r,
+                        }
+                        failed.append(response)
+                        child_node.to_error(event=event)
 
                 for d in done:
                     appset.remove(d)
 
-                now = datetime.now()
-                elapsed = (now - start).total_seconds()
-
-                if elapsed > timeout:
-                    raise RuntimeError("Send multicommand failed")
-
                 time.sleep(0.1)
-                self.log.debug("tic toc")
 
         else:
-            # There probably is a way to do that in a much nicer, pythonesque, way
             for n in sequence:
-                for child_node in appset:
-                    if n == child_node.name:
-                        if cfg_method:
-                            f=getattr(self.cfgmgr,cfg_method)
-                            data = f(overwrite_data)
-                        else:
-                            data = getattr(self.cfgmgr, cmd)
-
-                        r = child_node.sup.send_command_and_wait(cmd, data[n] if data else {},
-                                                                 state_entry, state_exit, timeout)
-                        (ok if r['success'] else failed)[n] = r
+                if n not in [cn.name for cn in appset]:
+                    self.log.error(f'node \'{n}\' is not a child of the subprocess "{self.name}", check the order list for command "{command}"')
+                    continue
+                child_node = [cn for cn in appset if cn.name == n][0] # YUK
+                entry_state = child_node.state.upper()
+                if entry_state in appfwk_state_dictionnary: entry_state = appfwk_state_dictionnary[entry_state]
 
 
-        return (ok, failed)
+                if cfg_method:
+                    f=getattr(self.cfgmgr,cfg_method)
+                    data = f(event.kwargs['overwrite_data'])
+                else:
+                    data = getattr(self.cfgmgr, command)
+
+                kwargs = {'wait': False,
+                          'cmd_data': data}
+                event.kwargs.update(kwargs)
+                child_node.trigger(command)
+                r = child_node.sup.send_command_and_wait(command, cmd_data=data[child_node.name] if data else {},
+                                                         timeout=event.kwargs['timeout'],
+                                                         entry_state=entry_state, exit_state=exit_state)
+                if r['success']:
+                    child_node.trigger("end_"+command)
+                else:
+                    response = {
+                        "node":child_node.name,
+                        "status_code" : r,
+                        "state": child_node.state,
+                        "command": command,
+                        "error": r,
+                    }
+                    failed.append(response)
+                    child_node.to_error(event=event, response=response)
+
+        if failed:
+            response = {
+                "node":self.name,
+                "status_code" : ErrorCode.Failed,
+                "state": self.state,
+                "command": command,
+                "failed": [r['node'] for r in failed],
+                "error": failed,
+            }
+            self.to_error(response=response, event=event)
+        else:
+            response = {
+                "node":self.name,
+                "status_code" : ErrorCode.Success,
+                "state": self.state,
+                "command": command,
+            }
+            self.trigger("end_"+command, response=response)

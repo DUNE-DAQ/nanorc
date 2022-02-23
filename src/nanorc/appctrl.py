@@ -2,6 +2,7 @@ import logging
 import requests
 import queue
 import json
+import time
 import socket
 import threading
 
@@ -38,6 +39,65 @@ class ResponseDispatcher(threading.Thread):
         self.listener.response_queue.put_nowait(self.STOP)
         self.join()
 
+class FlaskManager(threading.Thread):
+    def __init__(self, logger, queue, port):
+        threading.Thread.__init__(self)
+        self.log = logger
+        self.flask = None
+        self.queue = queue
+        self.port = port
+        self.ready_lock = threading.Lock()
+        self.ready_lock.acquire()
+
+    def _create_flask(self) -> Process:
+        app = Flask(__name__)
+
+        def index():
+            json = request.get_json(force=True)
+            # enqueue command reply
+            self.queue.put(json)
+            return "Response received"
+
+        def get():
+            return "ready"
+
+        app.add_url_rule("/response", "index", index, methods=["POST"])
+        app.add_url_rule("/", "get", get, methods=["GET"])
+        thread_name = f'listener'
+        flask_srv = Process(target=app.run, kwargs={"host": "0.0.0.0", "port": self.port}, name=thread_name)
+        flask_srv.daemon = False
+        flask_srv.start()
+        self.log.info(f'ResponseListener Flask lives on {flask_srv.pid}')
+        ## app.is_ready() would be good here, rather horrible polling inside a try
+        while True:
+            try:
+                resp = requests.get(f"http://0.0.0.0:{self.port}/")
+                if resp.text == "ready":
+                    break
+            except Exception as e:
+                pass
+                # print(e)
+            time.sleep(0.5)
+
+        # We don't release that lock before we have received a "ready" from the listener
+        self.ready_lock.release()
+        return flask_srv
+
+    def stop(self) -> NoReturn:
+        self.flask.terminate()
+        self.flask.join()
+        self.join()
+
+
+    def _create_and_join_flask(self):
+        if not self.ready_lock.locked:
+            self.ready_lock.acquire()
+        self.flask = self._create_flask()
+        self.flask.join()
+        self.log.info(f'ResponseListener: Flask joined')
+
+    def run(self) -> NoReturn:
+        self._create_and_join_flask()
 
 class ResponseListener:
     """
@@ -48,64 +108,55 @@ class ResponseListener:
         self.port = port
         self.response_queue = Queue()
         self.handlers = {}
-        self.flask = self._create()
+        self.flask_manager = self.create_manager()
         self.dispatcher = ResponseDispatcher(self)
         self.dispatcher.start()
 
+    def create_manager(self):
+        fm = FlaskManager(self.log, self.response_queue, self.port) # locked
+        fm.start() # should unlock
+        fm.ready_lock.acquire() # make sure that everything is ready
+        fm.ready_lock.release()
+        return fm
+
     def __del__(self):
         self.terminate()
-
-    def _create(self) -> Process:
-        app = Flask(__name__)
-
-        # @app.route('/response', methods = ['POST'])
-        def index():
-            json = request.get_json(force=True)
-            # enqueue command reply
-            self.response_queue.put(json)
-            return "Response received"
-
-        app.add_url_rule("/response", "index", index, methods=["POST"])
-
-        flask_srv = Process(target=app.run, kwargs={"host": "0.0.0.0", "port": self.port})
-        flask_srv.start()
-        return flask_srv
 
     def terminate(self):
         """
         Terminate the listener
         """
-        if self.flask:
-            self.flask.terminate()
-            self.flask.join()
-        self.flask = None
+        if self.flask_manager:
+            self.flask_manager.stop()
+
+        self.flask_manager = None
         self.dispatcher.stop()
 
     def register(self, app: str, handler):
         """
         Register a new notification handler
-        
+
         :param      app:           The application
         :type       app:           str
         :param      handler:       The handler
         :type       handler:       { type_description }
-        
+
         :rtype:     None
-        
+
         :raises     RuntimeError:  { exception_description }
         """
         if app in self.handlers:
             raise RuntimeError(f"Handler already registered with notification listerner for app {app}")
-        
+
         self.handlers[app] = handler
 
     def unregister(self, app: str) -> NoReturn:
         """
         De-register a notification handler
-        
+
         Args:
             app (str): application name
-        
+
         """
         if not app in self.handlers:
             return RuntimeError(f"No handler registered for app {app}")
@@ -160,13 +211,11 @@ class AppCommander:
         except:
             return False
 
-    def send_command(
-        self,
-        cmd_id: str,
-        cmd_data: dict,
-        entry_state: str = "ANY",
-        exit_state: str = "ANY",
-    ):
+    def send_command(self,
+                     cmd_id: str,
+                     cmd_data: dict,
+                     entry_state="ANY",
+                     exit_state="ANY"):
         # Use moo schema here?
         cmd = {
             "id": cmd_id,
@@ -174,7 +223,7 @@ class AppCommander:
             "entry_state": entry_state,
             "exit_state": exit_state,
         }
-        self.log.info(f"Sending {cmd_id} to {self.app} ({self.app_url})")
+        self.log.info(f"Sending {cmd_id} to {self.app} (http://{self.app_host}:{str(self.app_port)})")
         self.log.debug(json.dumps(cmd, sort_keys=True, indent=2))
 
         headers = {
@@ -185,27 +234,23 @@ class AppCommander:
         self.log.info(f"Ack: {ack}")
         self.sent_cmd = cmd_id
 
-        # return await_response(timeout)
 
     def check_response(self, timeout: int = 0) -> dict:
         """Check if a response is present in the queue
-        
+
         Args:
             timeout (int, optional): Timeout in seconds
-        
+
         Returns:
             dict: Command response is json
-        
+
         Raises:
             NoResponse: Description
             ResponseTimeout: Description
-        
-        
         """
         try:
             r = self.response_queue.get(block=(timeout>0), timeout=timeout)
             self.log.info(f"Received reply from {self.app} to {self.sent_cmd}")
-            self.log.debug(json.dumps(r, sort_keys=True, indent=2))
             self.sent_cmd = None
 
         except queue.Empty:
@@ -221,7 +266,8 @@ class AppCommander:
 
 
 class AppSupervisor:
-    """Lightweight application wrapper
+    """
+    Lightweight application wrapper
 
     Tracks the last executed and successful commands
     """
@@ -244,18 +290,13 @@ class AppSupervisor:
             entry_state: str = "ANY",
             exit_state: str = "ANY",
             ):
+        self.listener.flask_manager.ready_lock.acquire()
+        self.listener.flask_manager.ready_lock.release()
         self.last_sent_command = cmd_id
-        self.commander.send_command(
-            cmd_id, cmd_data, entry_state, exit_state
-        )
+        self.commander.send_command(cmd_id, cmd_data, entry_state, exit_state)
 
-    def check_response(
-            self,
-            timeout: int = 0,
-        ):
-        r = self.commander.check_response(
-            timeout
-        )
+    def check_response(self, timeout: int = 0):
+        r = self.commander.check_response(timeout)
 
         if r["result"] == "OK":
             self.last_ok_command = self.last_sent_command
@@ -270,6 +311,8 @@ class AppSupervisor:
             exit_state: str = "ANY",
             timeout: int = 10,
         ):
+        self.listener.flask_manager.ready_lock.acquire()
+        self.listener.flask_manager.ready_lock.release()
         self.send_command(cmd_id, cmd_data, entry_state, exit_state)
         return self.check_response(timeout)
 
@@ -295,7 +338,7 @@ def test_listener():
     import time
     class DummyApp(object):
         """docstring for Dummy"""
-        
+
         def notify(self, reply):
             print(f"Received response: {reply}")
 
@@ -316,4 +359,3 @@ def test_listener():
 
 if __name__ == '__main__':
     test_listener()
-    

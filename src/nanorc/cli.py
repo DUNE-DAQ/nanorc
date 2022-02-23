@@ -100,12 +100,13 @@ def validatePath(ctx, param, prompted_path):
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
-@click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
+@click.option('--log-path', type=click.Path(exists=True), default=None, help='Where the logs should go (on localhost of applications)')
+@click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
 @click.argument('top_cfg', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, kerberos, top_cfg):
+def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, top_cfg):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f'{credentials.user}@rc> '
@@ -132,6 +133,9 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, logbook_prefix, ker
                     timeout = timeout,
                     use_kerb = kerberos,
                     logbook_prefix = logbook_prefix)
+
+        if log_path:
+            rc.log_path = os.path.abspath(log_path)
 
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
@@ -209,8 +213,10 @@ def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_
     obj.rc.start(disable_data_storage, "TEST", message=message)
     obj.rc.status()
     time.sleep(resume_wait)
-    obj.rc.resume(trigger_interval_ticks)
-    obj.rc.status()
+    if obj.rc.return_code == 0:
+        time.sleep(resume_wait)
+        obj.rc.resume(trigger_interval_ticks)
+        obj.rc.status()
 
 @cli.command('stop')
 @click.option('--stop-wait', type=int, default=0, help='Seconds to wait between Pause and Stop commands')
@@ -221,8 +227,9 @@ def stop(obj, stop_wait:int, force:bool, message:str):
     obj.rc.pause(force)
     obj.rc.status()
     time.sleep(stop_wait)
-    obj.rc.stop(force, message=message)
-    obj.rc.status()
+    if obj.rc.return_code == 0:
+        obj.rc.stop(force, message=message)
+        obj.rc.status()
 
 @cli.command('pause')
 @click.pass_obj
