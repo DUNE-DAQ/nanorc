@@ -61,7 +61,7 @@ class NanoRC:
             except Exception as e:
                 self.log.error(f"Can't find confdata/elisa_conf.json, reverting to file logbook! {str(e)}")
 
-        if not self.logbook:
+        if not self.logbook and logbook_type:
             self.log.info("Using filelogbook")
             self.logbook = FileLogbook(logbook_prefix, self.console)
 
@@ -90,7 +90,7 @@ class NanoRC:
         if not self.topnode.can_boot():
             self.log.error(f'Cannot boot, as you are is in {self.topnode.state} state.')
             return
-        self.topnode.boot(timeout=self.timeout)
+        self.topnode.boot(timeout=self.timeout, log=self.log_path)
         self.return_code = self.topnode.return_code.value
 
 
