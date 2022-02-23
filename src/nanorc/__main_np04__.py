@@ -35,6 +35,7 @@ from .cli import *
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--log-path', type=click.Path(exists=True), default='/log', help='Where the logs should go (on localhost of applications)')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
+@click.option('--elisa-conf', type=click.Path(exists=True), default=None, help='ELisA configuration (by default, use the one in src/nanorc/confdata)')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
 @click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
@@ -42,7 +43,12 @@ from .cli import *
 @click.argument('user', type=str)
 @click.pass_obj
 @click.pass_context
-def np04cli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, dotnanorc, kerberos, cfg_dir, user):
+def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, timeout, cfg_dumpdir, dotnanorc, kerberos, cfg_dir, user):
+
+    if not elisa_conf:
+        with resources.path(confdata, "elisa_conf.json") as p:
+            elisa_conf = p
+
     obj.print_traceback = traceback
     credentials.change_user(user)
     ctx.command.shell.prompt = f"{credentials.user}@np04rc> "
@@ -54,7 +60,6 @@ def np04cli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, dotna
     grid.add_row(f"Use it with care, {credentials.user}!")
 
     obj.console.print(Panel.fit(grid))
-
 
     if loglevel:
         updateLogLevel(loglevel)
@@ -81,7 +86,7 @@ def np04cli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, dotna
                     top_cfg = cfg_dir,
                     run_num_mgr = DBRunNumberManager(rundb_socket),
                     run_registry = DBConfigSaver(runreg_socket),
-                    logbook_type = "elisa",
+                    logbook_type = elisa_conf,
                     timeout = timeout,
                     use_kerb = kerberos)
 

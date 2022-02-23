@@ -23,11 +23,11 @@ class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
     def __init__(self, console: Console, top_cfg: str, run_num_mgr, run_registry, logbook_type:str, timeout: int,
-                 use_kerb=True, logbook_prefix="", fsm_cfg="partition_fsm.json"):
+                 use_kerb=True, logbook_prefix="",
+                 fsm_cfg="partition_fsm.json"):
         super(NanoRC, self).__init__()
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
-
         ssh_conf = []
         if not use_kerb:
             ssh_conf = ["-o GSSAPIAuthentication=no"]
@@ -50,18 +50,19 @@ class NanoRC:
         self.return_code = None
         self.logbook = None
         self.log_path = None
-        if logbook_type == "elisa":
+
+        if logbook_type != 'file' and logbook_type != '':
             try:
-                elisa_conf = json.loads(importlib.resources.read_text(confdata, "elisa_conf.json"))
+                elisa_conf = json.load(open(logbook_type,'r'))
                 if elisa_conf.get(self.apparatus_id):
                     self.logbook = ElisaLogbook(configuration = elisa_conf[self.apparatus_id],
                                                 console = console)
                 else:
-                    self.log.error(f"Can't find config {self.apparatus_id} confdata/elisa_conf.json, reverting to file logbook!")
+                    self.log.error(f"Can't find config {self.apparatus_id} in {logbook_type}, reverting to file logbook!")
             except Exception as e:
-                self.log.error(f"Can't find confdata/elisa_conf.json, reverting to file logbook! {str(e)}")
+                self.log.error(f"Can't find {logbook_type}, reverting to file logbook! {str(e)}")
 
-        if not self.logbook and logbook_type:
+        elif logbook_type == 'file':
             self.log.info("Using filelogbook")
             self.logbook = FileLogbook(logbook_prefix, self.console)
 
