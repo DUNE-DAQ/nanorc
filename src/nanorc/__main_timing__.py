@@ -37,7 +37,7 @@ from .cli import *
 @click.option('--log-path', type=click.Path(exists=True), default=os.getcwd(), help='Where the logs should go (on localhost of applications)')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
-@click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
+@click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
