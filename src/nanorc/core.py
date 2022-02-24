@@ -49,7 +49,7 @@ class NanoRC:
         self.logbook = None
         self.log_path = None
 
-        if logbook_type != 'file' and logbook_type != '':
+        if logbook_type != 'file' and logbook_type != None and logbook_type != '':
             try:
                 elisa_conf = json.load(open(logbook_type,'r'))
                 if elisa_conf.get(self.apparatus_id):
