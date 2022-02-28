@@ -89,6 +89,7 @@ class NanoRC:
         if not self.topnode.can_boot():
             self.log.error(f'Cannot boot, as you are in {self.topnode.state} state.')
             self.topnode.return_code = ErrorCode.InvalidTransition
+            self.return_code = self.topnode.return_code.value
             return
         self.topnode.boot(timeout=self.timeout, log=self.log_path)
         self.return_code = self.topnode.return_code.value
@@ -116,6 +117,7 @@ class NanoRC:
         if not self.topnode.can_init():
             self.log.error(f'Cannot init, as you are in {self.topnode.state} state.')
             self.topnode.return_code = ErrorCode.InvalidTransition
+            self.return_code = self.topnode.return_code.value
             return
         self.topnode.init(path=path, raise_on_fail=True, timeout=self.timeout)
         self.return_code = self.topnode.return_code.value
@@ -128,6 +130,7 @@ class NanoRC:
         if not self.topnode.can_conf():
             self.log.error(f'Cannot conf, as you are in {self.topnode.state} state.')
             self.topnode.return_code = ErrorCode.InvalidTransition
+            self.return_code = self.topnode.return_code.value
             return
         self.topnode.conf(path=path, raise_on_fail=True, timeout=self.timeout)
         self.return_code = self.topnode.return_code.value
@@ -145,6 +148,7 @@ class NanoRC:
         if not self.topnode.can_start():
             self.console.log(f"I cannot start now! {self.topnode.name} is {self.topnode.state}!")
             self.topnode.return_code = ErrorCode.InvalidTransition
+            self.return_code = self.topnode.return_code.value
             self.return_code = 1
             return
 
@@ -219,6 +223,7 @@ class NanoRC:
         if not self.topnode.can_stop():
             self.log.error(f'Cannot stop, as you are in {self.topnode.state} state.')
             self.topnode.return_code = ErrorCode.InvalidTransition
+            self.return_code = self.topnode.return_code.value
             return
 
         if message != "":
@@ -248,6 +253,7 @@ class NanoRC:
         if not self.topnode.can_pause():
             self.log.error(f'Cannot pause, as you are in {self.topnode.state} state.')
             self.topnode.return_code = ErrorCode.InvalidTransition
+            self.return_code = self.topnode.return_code.value
             return
 
         self.topnode.pause(path=None, raise_on_fail=True, timeout=self.timeout, force=force)
@@ -265,6 +271,7 @@ class NanoRC:
         if not self.topnode.can_resume():
             self.log.error(f'Cannot resume, as you are in {self.topnode.state} state.')
             self.topnode.return_code = ErrorCode.InvalidTransition
+            self.return_code = self.topnode.return_code.value
             return
 
         if not trigger_interval_ticks is None:
@@ -288,6 +295,7 @@ class NanoRC:
         if not self.topnode.can_scrap():
             self.log.error(f'Cannot scrap, as you are in {self.topnode.state} state.')
             self.topnode.return_code = ErrorCode.InvalidTransition
+            self.return_code = self.topnode.return_code.value
             return
 
         self.topnode.scrap(path=None, raise_on_fail=True, timeout=self.timeout, force=force)
