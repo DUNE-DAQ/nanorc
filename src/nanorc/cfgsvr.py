@@ -8,7 +8,8 @@ import json
 import copy
 import requests
 import tempfile
-from .node import GroupNode, SubsystemNode
+from .statefulnode import StatefulNode
+from .node import SubsystemNode
 from .cfgmgr import ConfigManager
 from .credmgr import credentials,Authentication
 from distutils.dir_util import copy_tree
@@ -40,7 +41,7 @@ class FileConfigSaver:
         outdir = self.outdir+prefix+str(run)
         if os.path.exists(outdir):
             raise RuntimeError(f"Folder containing the run {run} already exists!")
-            
+
         return outdir+"/"
 
     def _get_new_resume_file_name(self, path:str) -> str:
@@ -60,12 +61,12 @@ class FileConfigSaver:
 
         return filename+postfix+ext
 
-    def save_on_start(self, apps:GroupNode, run:int, run_type:str,
+    def save_on_start(self, apps:StatefulNode, run:int, run_type:str,
                       overwrite_data:dict, cfg_method:str) -> str:
         """
         Save the configuration runtime start parameter set
         :param      apps:  the application tree
-        :type       apps:  GroupNode
+        :type       apps:  StatefulNode
         :param      run :  run number
         :type       run :  int
         :param      overwrite_data :  the runtime start data
@@ -80,8 +81,10 @@ class FileConfigSaver:
         """
         if not self.cfgmgr:
             raise RuntimeError(f"{__name__}: ERROR : You need to set the cfgmgr of this ConfigSaver")
-        
-        self.thisrun_outdir = self._get_new_out_dir_name(run)
+        try:
+            self.thisrun_outdir = self._get_new_out_dir_name(run)
+        except Exception as e:
+            raise RuntimeError(str(e))
 
         for node in PreOrderIter(apps):
             if isinstance(node, SubsystemNode):
@@ -107,10 +110,10 @@ class FileConfigSaver:
         return self.thisrun_outdir
 
 
-    def save_on_resume(self, topnode:GroupNode, overwrite_data: dict, cfg_method:str) -> dict:
+    def save_on_resume(self, topnode:StatefulNode, overwrite_data: dict, cfg_method:str) -> dict:
         """
         :param      apps:  the application tree
-        :type       apps:  GroupNode
+        :type       apps:  StatefulNode
         :param      overwrite_data :  the runtime start data
         :type       overwrite_data :  dict
         :param      cfg_method :  which config method to call on start
@@ -194,11 +197,15 @@ class DBConfigSaver:
 
             with open(fname, "rb") as f:
                 files = {'file': f}
+                version = os.getenv("DUNEDAQ_RELEASE")
+                if not version:
+                    raise RuntimeError('RunRegistryDB: dunedaq version not in the variable env DUNEDAQ_RELEASE! Exit nanorc and\nexport DUNEDAQ_RELEASE=dunedaq-vX.XX.XX\n')
+
                 post_data = {"run_num": run,
                              "det_id": self.apparatus_id,
                              "run_type": run_type,
-                             ## Big hack of the version!
-                             "software_version": "dunedaq-v2.9.0"}
+                             "software_version": version}
+
 
                 try:
                     r = requests.post(self.API_SOCKET+"/runregistry/insertRun/",

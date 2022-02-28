@@ -67,9 +67,17 @@ class FlaskManager(threading.Thread):
         flask_srv = Process(target=app.run, kwargs={"host": "0.0.0.0", "port": self.port}, name=thread_name)
         flask_srv.daemon = False
         flask_srv.start()
-        self.log.info(f'ResponseListener Flask lives on {flask_srv.pid}')
+        self.log.info(f'ResponseListener Flask lives on PID: {flask_srv.pid}')
         ## app.is_ready() would be good here, rather horrible polling inside a try
+        tries=0
         while True:
+            if tries>20:
+                self.log.error('Cannot ping the ResponseListener\nNothing will work!!')
+                self.log.error('This can happen if the web proxy is on at NP04.'+
+                               '\nExit NanoRC and try again after executing:'+
+                               '\nsource ~np04daq/bin/web_proxy.sh -u')
+                break
+            tries += 1
             try:
                 resp = requests.get(f"http://0.0.0.0:{self.port}/")
                 if resp.text == "ready":
@@ -211,13 +219,11 @@ class AppCommander:
         except:
             return False
 
-    def send_command(
-        self,
-        cmd_id: str,
-        cmd_data: dict,
-        entry_state: str = "ANY",
-        exit_state: str = "ANY",
-    ):
+    def send_command(self,
+                     cmd_id: str,
+                     cmd_data: dict,
+                     entry_state="ANY",
+                     exit_state="ANY"):
         # Use moo schema here?
         cmd = {
             "id": cmd_id,
@@ -225,7 +231,7 @@ class AppCommander:
             "entry_state": entry_state,
             "exit_state": exit_state,
         }
-        self.log.info(f"Sending {cmd_id} to {self.app} ({self.app_url})")
+        self.log.info(f"Sending {cmd_id} to {self.app} (http://{self.app_host}:{str(self.app_port)})")
         self.log.debug(json.dumps(cmd, sort_keys=True, indent=2))
 
         headers = {
@@ -236,7 +242,6 @@ class AppCommander:
         self.log.info(f"Ack: {ack}")
         self.sent_cmd = cmd_id
 
-        # return await_response(timeout)
 
     def check_response(self, timeout: int = 0) -> dict:
         """Check if a response is present in the queue
@@ -254,7 +259,6 @@ class AppCommander:
         try:
             r = self.response_queue.get(block=(timeout>0), timeout=timeout)
             self.log.info(f"Received reply from {self.app} to {self.sent_cmd}")
-            self.log.debug(json.dumps(r, sort_keys=True, indent=2))
             self.sent_cmd = None
 
         except queue.Empty:
@@ -270,7 +274,8 @@ class AppCommander:
 
 
 class AppSupervisor:
-    """Lightweight application wrapper
+    """
+    Lightweight application wrapper
 
     Tracks the last executed and successful commands
     """
@@ -296,17 +301,10 @@ class AppSupervisor:
         self.listener.flask_manager.ready_lock.acquire()
         self.listener.flask_manager.ready_lock.release()
         self.last_sent_command = cmd_id
-        self.commander.send_command(
-            cmd_id, cmd_data, entry_state, exit_state
-        )
+        self.commander.send_command(cmd_id, cmd_data, entry_state, exit_state)
 
-    def check_response(
-            self,
-            timeout: int = 0,
-        ):
-        r = self.commander.check_response(
-            timeout
-        )
+    def check_response(self, timeout: int = 0):
+        r = self.commander.check_response(timeout)
 
         if r["result"] == "OK":
             self.last_ok_command = self.last_sent_command
