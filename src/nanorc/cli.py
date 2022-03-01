@@ -92,6 +92,11 @@ def validatePath(ctx, param, prompted_path):
 
     return hierarchy
 
+def check_rc(ctx, obj):
+    if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
+        ctx.exit(obj.rc.return_code)
+    #elif obj.rc.return_code:
+    #    logging.getLogger("cli").warning("NanoRC could not execute command. Interactive mode: please try again")
 
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
@@ -151,8 +156,6 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
     obj.rc = rc
     rc.ls(False)
 
-
-
 @cli.command('status')
 @click.pass_obj
 def status(obj: NanoContext):
@@ -160,15 +163,19 @@ def status(obj: NanoContext):
 
 @cli.command('boot')
 @click.pass_obj
-def boot(obj):
+@click.pass_context
+def boot(ctx, obj):
     obj.rc.boot()
+    check_rc(ctx,obj)
     obj.rc.status()
 
 @cli.command('init')
 @click.option('--path', type=str, default=None, callback=validatePath)
 @click.pass_obj
-def init(obj, path):
+@click.pass_context
+def init(ctx, obj, path):
     obj.rc.init(path)
+    check_rc(ctx,obj)
     obj.rc.status()
 
 @cli.command('ls')
@@ -180,8 +187,10 @@ def ls(obj):
 @cli.command('conf')
 @click.option('--path', type=str, default=None, callback=validatePath)
 @click.pass_obj
-def conf(obj, path):
+@click.pass_context
+def conf(ctx, obj, path):
     obj.rc.conf(path)
+    check_rc(ctx,obj)
     obj.rc.status()
 
 
@@ -198,7 +207,8 @@ def message(obj, message):
 @click.option('--resume-wait', type=int, default=0, help='Seconds to wait between Start and Resume commands')
 @click.option('--message', type=str, default="")
 @click.pass_obj
-def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str):
+@click.pass_context
+def start(ctx, obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str):
     """
     Start Command
 
@@ -211,6 +221,7 @@ def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_
 
     obj.rc.run_num_mgr.set_run_number(run)
     obj.rc.start(disable_data_storage, "TEST", message=message)
+    check_rc(ctx,obj)
     obj.rc.status()
     time.sleep(resume_wait)
     if obj.rc.return_code == 0:
@@ -223,8 +234,10 @@ def start(obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_
 @click.option('--force', default=False, is_flag=True)
 @click.option('--message', type=str, default="")
 @click.pass_obj
-def stop(obj, stop_wait:int, force:bool, message:str):
+@click.pass_context
+def stop(ctx, obj, stop_wait:int, force:bool, message:str):
     obj.rc.pause(force)
+    check_rc(ctx,obj)
     obj.rc.status()
     time.sleep(stop_wait)
     if obj.rc.return_code == 0:
@@ -233,14 +246,17 @@ def stop(obj, stop_wait:int, force:bool, message:str):
 
 @cli.command('pause')
 @click.pass_obj
-def pause(obj):
+@click.pass_context
+def pause(ctx, obj):
     obj.rc.pause()
+    check_rc(ctx,obj)
     obj.rc.status()
 
 @cli.command('resume')
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.pass_obj
-def resume(obj:NanoContext, trigger_interval_ticks:int):
+@click.pass_context
+def resume(ctx, obj:NanoContext, trigger_interval_ticks:int):
     """Resume Command
 
     Args:
@@ -248,6 +264,7 @@ def resume(obj:NanoContext, trigger_interval_ticks:int):
         trigger_interval_ticks (int): Trigger separation in ticks
     """
     obj.rc.resume(trigger_interval_ticks)
+    check_rc(ctx,obj)
     obj.rc.status()
 
 
@@ -255,8 +272,10 @@ def resume(obj:NanoContext, trigger_interval_ticks:int):
 @click.option('--path', type=str, default=None, callback=validatePath)
 @click.option('--force', default=False, is_flag=True)
 @click.pass_obj
-def scrap(obj, path, force):
+@click.pass_context
+def scrap(ctx, obj, path, force):
     obj.rc.scrap(path, force)
+    check_rc(ctx,obj)
     obj.rc.status()
 
 @cli.command('terminate')
