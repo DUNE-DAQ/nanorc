@@ -23,6 +23,7 @@ from nanorc.core import *
 from nanorc.cli import loglevels, updateLogLevel
 from nanorc.runmgr import SimpleRunNumberManager
 from nanorc.cfgsvr import FileConfigSaver
+from nanorc.node_render import status_data
 
 class NanoContext:
     """docstring for NanoContext"""
@@ -69,16 +70,17 @@ class status(Resource):
     def get(self):
         if rc_context.worker_thread and rc_context.worker_thread.is_alive():
             return "I'm busy!"
-        else:
-            data = rc_context.rc.status_data()
-            resp = make_response(jsonify(data))
-            return resp
+        data = status_data(rc_context.rc.topnode)
+        resp = make_response(jsonify(data))
+        return resp
 
 @api.resource('/nanorcrest/node/<path>', methods=['GET'])
 class node(Resource):
     @auth.login_required
     def get(self, path):
-        path = "/"+path.replace(".", "/")
+        if rc_context.worker_thread and rc_context.worker_thread.is_alive():
+            return "I'm busy!"
+        path = path.replace(".", "/")
         try:
             path = validatePath(rc_context.rc, path)
         except Exception as ex:
@@ -88,7 +90,7 @@ class node(Resource):
         r = Resolver('name')
         path = "/".join(path)
         node = r.get(rc_context.rc.topnode, path)
-        data = node.node_status_data()
+        data = status_data(node, False)
         resp = make_response(data, 200)
         return resp
 
@@ -96,6 +98,8 @@ class node(Resource):
 class tree(Resource):
     @auth.login_required
     def get(self):
+        if rc_context.worker_thread and rc_context.worker_thread.is_alive():
+            return "I'm busy!"
         if rc_context.rc.topnode:
             exporter = DictExporter(attriter=lambda attrs: [(k, v) for k, v in attrs if k == "name"])
             json_tree = exporter.export(rc_context.rc.topnode)
@@ -107,6 +111,8 @@ class tree(Resource):
 class fsm(Resource):
     @auth.login_required
     def get(self):
+        if rc_context.worker_thread and rc_context.worker_thread.is_alive():
+            return "I'm busy!"
         topnode = rc_context.rc.topnode
         if topnode:
             fsm_data = {'states': topnode.fsm.states_cfg,
@@ -150,7 +156,7 @@ class command(Resource):
                 rc_context.worker_thread = threading.Thread(target=target,
                                                             name="command-worker")
 
-            elif cmd == 'START':
+            elif cmd == 'start':
                 run_type = request.form['run_type']
                 rc_context.rc.run_num_mgr.set_run_number(int(request.form['run_num']))
 
@@ -166,7 +172,7 @@ class command(Resource):
                                                             name="command-worker",
                                                             args=args)
 
-            elif cmd == 'RESUME':
+            elif cmd == 'resume':
                 args = []
 
                 if request.form.get('trigger_interval_ticks'):

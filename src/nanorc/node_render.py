@@ -1,8 +1,34 @@
 from .statefulnode import StatefulNode
 from .node import *
-from anytree import RenderTree
+from anytree import RenderTree, PreOrderIter
 import logging as log
 from rich.console import Console
+
+def status_data(node, get_children=True) -> dict:
+    ret = {}
+    if isinstance(node, ApplicationNode):
+        sup = node.sup
+        if sup.desc.proc.is_alive():
+            ret['process_state'] = 'alive'
+        else:
+            try:
+                exit_code = sup.desc.proc.exit_code
+            except sh.ErrorReturnCode as e:
+                exit_code = e.exit_code
+            ret['process_state'] = f'dead[{exit_code}]'
+        ret['ping'] = sup.commander.ping()
+        ret['last_cmd_failed'] = (sup.last_sent_command != sup.last_ok_command)
+        ret['name'] = node.name
+        ret['state'] = node.state
+        ret['host'] = sup.desc.host,
+        ret['last_sent_command'] = sup.last_sent_command
+        ret['last_ok_command'] = sup.last_ok_command
+    else:
+        ret['name'] = node.name
+        ret['state'] = node.state
+        if get_children:
+            ret['children'] = [status_data(child) for child in node.children]
+    return ret
 
 
 def print_status(topnode, console, apparatus_id='') -> int:
