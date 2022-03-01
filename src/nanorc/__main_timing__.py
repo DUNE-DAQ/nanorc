@@ -97,6 +97,8 @@ timingcli.add_command(terminate, 'terminate')
 @click.pass_context
 def start(ctx, obj):
     obj.rc.start(disable_data_storage=True, run_type="TEST")
+    if obj.rc.return_code:
+        ctx.exit(obj.rc.return_code)
     obj.rc.status()
 
 
@@ -105,6 +107,8 @@ def start(ctx, obj):
 @click.pass_context
 def start(ctx, obj):
     obj.rc.stop()
+    if obj.rc.return_code:
+        ctx.exit(obj.rc.return_code)
     obj.rc.status()
 
 
