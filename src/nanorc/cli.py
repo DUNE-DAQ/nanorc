@@ -92,6 +92,11 @@ def validatePath(ctx, param, prompted_path):
 
     return hierarchy
 
+def check_rc(ctx, obj):
+    if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
+        ctx.exit(obj.rc.return_code)
+    #elif obj.rc.return_code:
+    #    logging.getLogger("cli").warning("NanoRC could not execute command. Interactive mode: please try again")
 
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
@@ -161,8 +166,7 @@ def status(obj: NanoContext):
 @click.pass_context
 def boot(ctx, obj):
     obj.rc.boot()
-    if obj.rc.return_code:
-        ctx.exit(obj.rc.return_code)
+    check_rc(ctx,obj)
     obj.rc.status()
 
 @cli.command('init')
@@ -171,8 +175,7 @@ def boot(ctx, obj):
 @click.pass_context
 def init(ctx, obj, path):
     obj.rc.init(path)
-    if obj.rc.return_code:
-        ctx.exit(obj.rc.return_code)
+    check_rc(ctx,obj)
     obj.rc.status()
 
 @cli.command('ls')
@@ -187,8 +190,7 @@ def ls(obj):
 @click.pass_context
 def conf(ctx, obj, path):
     obj.rc.conf(path)
-    if obj.rc.return_code:
-        ctx.exit(obj.rc.return_code)
+    check_rc(ctx,obj)
     obj.rc.status()
 
 
@@ -219,8 +221,7 @@ def start(ctx, obj:NanoContext, run:int, disable_data_storage:bool, trigger_inte
 
     obj.rc.run_num_mgr.set_run_number(run)
     obj.rc.start(disable_data_storage, "TEST", message=message)
-    if obj.rc.return_code:
-        ctx.exit(obj.rc.return_code)
+    check_rc(ctx,obj)
     obj.rc.status()
     time.sleep(resume_wait)
     if obj.rc.return_code == 0:
@@ -236,8 +237,7 @@ def start(ctx, obj:NanoContext, run:int, disable_data_storage:bool, trigger_inte
 @click.pass_context
 def stop(ctx, obj, stop_wait:int, force:bool, message:str):
     obj.rc.pause(force)
-    if obj.rc.return_code:
-        ctx.exit(obj.rc.return_code)
+    check_rc(ctx,obj)
     obj.rc.status()
     time.sleep(stop_wait)
     if obj.rc.return_code == 0:
@@ -249,8 +249,7 @@ def stop(ctx, obj, stop_wait:int, force:bool, message:str):
 @click.pass_context
 def pause(ctx, obj):
     obj.rc.pause()
-    if obj.rc.return_code:
-        ctx.exit(obj.rc.return_code)
+    check_rc(ctx,obj)
     obj.rc.status()
 
 @cli.command('resume')
@@ -265,8 +264,7 @@ def resume(ctx, obj:NanoContext, trigger_interval_ticks:int):
         trigger_interval_ticks (int): Trigger separation in ticks
     """
     obj.rc.resume(trigger_interval_ticks)
-    if obj.rc.return_code:
-        ctx.exit(obj.rc.return_code)
+    check_rc(ctx,obj)
     obj.rc.status()
 
 
@@ -277,8 +275,7 @@ def resume(ctx, obj:NanoContext, trigger_interval_ticks:int):
 @click.pass_context
 def scrap(ctx, obj, path, force):
     obj.rc.scrap(path, force)
-    if obj.rc.return_code:
-        ctx.exit(obj.rc.return_code)
+    check_rc(ctx,obj)
     obj.rc.status()
 
 @cli.command('terminate')

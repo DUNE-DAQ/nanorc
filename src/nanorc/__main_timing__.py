@@ -92,13 +92,17 @@ timingcli.add_command(scrap, 'scrap')
 timingcli.add_command(wait, 'wait')
 timingcli.add_command(terminate, 'terminate')
 
+def check_rc(ctx, obj):
+    if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
+        ctx.exit(obj.rc.return_code)
+
+
 @timingcli.command('start')
 @click.pass_obj
 @click.pass_context
 def start(ctx, obj):
     obj.rc.start(disable_data_storage=True, run_type="TEST")
-    if obj.rc.return_code:
-        ctx.exit(obj.rc.return_code)
+    check_rc(ctx,obj)
     obj.rc.status()
 
 
@@ -107,8 +111,7 @@ def start(ctx, obj):
 @click.pass_context
 def start(ctx, obj):
     obj.rc.stop()
-    if obj.rc.return_code:
-        ctx.exit(obj.rc.return_code)
+    check_rc(ctx,obj)
     obj.rc.status()
 
 
