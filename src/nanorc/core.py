@@ -149,7 +149,6 @@ class NanoRC:
             self.console.log(f"I cannot start now! {self.topnode.name} is {self.topnode.state}!")
             self.topnode.return_code = ErrorCode.InvalidTransition
             self.return_code = self.topnode.return_code.value
-            self.return_code = 1
             return
 
         if self.run_num_mgr:

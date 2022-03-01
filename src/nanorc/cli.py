@@ -95,8 +95,6 @@ def validatePath(ctx, param, prompted_path):
 def check_rc(ctx, obj):
     if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
         ctx.exit(obj.rc.return_code)
-    #elif obj.rc.return_code:
-    #    logging.getLogger("cli").warning("NanoRC could not execute command. Interactive mode: please try again")
 
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
