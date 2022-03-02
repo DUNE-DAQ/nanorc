@@ -1,0 +1,22 @@
+{
+  "displayedName": "DAQling webinterface demo",
+  "states":
+    {
+    "default":"/static/pics/gray.png",
+    "not_added":"/static/pics/gray.png",
+    "added":"/static/pics/question.png",
+    "booted":"/static/pics/blue.png",
+    "ready":"/static/pics/yellow.png",
+    "running":"/static/pics/green.png",
+    "paused":"/static/pics/orange.png",
+    "error":"/static/pics/red.png"
+    },
+  "SSO_enabled":0,
+  "serverlog_location_name":"/log/webintefaceserver.log",
+  "callbackUri":"http://localhost:32768/login/callback",
+  "ALLOWED_EXTENSIONS":["json", "txt"],
+  "timeout_for_requests_secs": 5,
+  "timeout_session_expiration_mins" : 120,
+  "timeout_control_expiration_mins" : 30,
+  "LOGOUT_URL":"https://auth.cern.ch/auth/realms/cern/protocol/openid-connect/logout"
+}

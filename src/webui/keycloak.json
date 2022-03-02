@@ -1,0 +1,16 @@
+{
+  "realm": "cern",
+  "resource": "protoduneccmweb",
+  "client_id": "protoduneccmweb",
+  "client_secret": "714a204a-f21a-4990-851e-d862e80c8116",
+  "credentials": {"secret": "714a204a-f21a-4990-851e-d862e80c8116"},
+  "redirect_uri": "http://localhost:32768/login/callback",
+  "auth_server_url": "https://auth.cern.ch/auth",
+  "issuer":"https://auth.cern.ch/auth/realms/cern",
+  "authorization_endpoint":"https://auth.cern.ch/auth/realms/cern/protocol/openid-connect/auth",
+  "token_endpoint":"https://auth.cern.ch/auth/realms/cern/protocol/openid-connect/token",
+  "token_introspection_endpoint":"https://auth.cern.ch/auth/realms/cern/protocol/openid-connect/token/introspect",
+  "userinfo_endpoint":"https://auth.cern.ch/auth/realms/cern/protocol/openid-connect/userinfo",
+  "end_session_endpoint":"https://auth.cern.ch/auth/realms/cern/protocol/openid-connect/logout",
+  "jwks_uri":"https://auth.cern.ch/auth/realms/cern/protocol/openid-connect/certs"
+}
