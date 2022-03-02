@@ -89,7 +89,7 @@ class FSM(Machine):
         for t in self.acting_transitions:
             if t["trigger"] != transition:
                 continue
-            if cls.state == t["source"]:
+            if cls.state == t["source"] or t['source'] == "*":
                 return True
 
         return False

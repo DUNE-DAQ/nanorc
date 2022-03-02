@@ -105,10 +105,6 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, timeout, cfg_du
     obj.rc = rc
     rc.ls(False)
 
-def check_rc(ctx, obj):
-    if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
-        ctx.exit(obj.rc.return_code)
-
 np04cli.add_command(status, 'status')
 np04cli.add_command(boot, 'boot')
 np04cli.add_command(init, 'init')

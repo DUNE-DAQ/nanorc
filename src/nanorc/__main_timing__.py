@@ -92,11 +92,6 @@ timingcli.add_command(scrap, 'scrap')
 timingcli.add_command(wait, 'wait')
 timingcli.add_command(terminate, 'terminate')
 
-def check_rc(ctx, obj):
-    if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
-        ctx.exit(obj.rc.return_code)
-
-
 @timingcli.command('start')
 @click.pass_obj
 @click.pass_context
