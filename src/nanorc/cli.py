@@ -280,6 +280,7 @@ def scrap(ctx, obj, path, force):
 @click.pass_obj
 def terminate(obj):
     obj.rc.terminate()
+    time.sleep(1)
     obj.rc.status()
 
 
