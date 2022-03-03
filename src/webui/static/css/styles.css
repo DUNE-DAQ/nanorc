@@ -47,6 +47,11 @@
   box-sizing: border-box;
 }
 
+input:invalid {
+  border: 3px solid red;
+}
+
+
 html {
   font-family: sans-serif;
   line-height: 1.15;

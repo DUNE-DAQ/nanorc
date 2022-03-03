@@ -9,7 +9,7 @@
                     <div id="tree">
                         <div class="treetop">Control tree</div>
                             <div id="treecontainer">
-                                <div id="ajax" class="demo"></div>
+                                <div id="controlTree" class="demo"></div>
                             </div>
 
                     <!-- <div id="logArea" class="sb-sidenav-light  " style="width: 100%; position:relative; height:0px;">
@@ -72,17 +72,28 @@
                                 <div class="col-sm-6 float-left">
                                         <h4> State control buttons:</h4>
                                         <div id="stateButtonsDiv" class="stateButtons button-group">
-                                            <button id='but' class='green button control' style='margin:5px;'>Do something</button>
+
                                         </div>
                                 </div>
-                                <div class="col-sm-6 float-left" style="display:none;">
+                                <div class="col-sm-4 float-left">
                                         <h4> Present state: </h4>
-                                        <input type="text" id="state" class="" value="" readonly>
+                                        <input type="text" id="state" class="form-control" value="" readonly>
+                                        <h4> Runnumber: </h4>
+                                        <input type="number" id="runnumber" class="form-control">
+                                        <h4> Run type: </h4>
+                                        <select id="runtype" class="form-control">
+                                            <option value="test">Test</option>
+                                            <option value="test2">Test2</option>
+                                        </select>
                                 </div>
                             </div>
                             <hr class="mt-2 mb-3"/>
                             <br>
                             <div id="iframesector" class="row">
+                                <h4 id="selected"> Selected: </h4>
+                                <div class="col-md-12 bs-linebreak">
+                                </div>
+                                <pre id="json-renderer"></pre>
                             </div>
                         </div>
                     </div>
