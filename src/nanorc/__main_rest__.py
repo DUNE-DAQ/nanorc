@@ -64,6 +64,16 @@ def validatePath(rc, prompted_path):
 
     return hierarchy
 
+def get_argument(form, arg_name, default_val=None, required=True):
+    if required:
+        return form[arg_name]
+
+    if not form.get(arg_name):
+        return default_val
+
+    return form.get(arg_name)
+
+
 @api.resource('/nanorcrest/status', methods=['GET'])
 class status(Resource):
     @auth.login_required
@@ -106,7 +116,7 @@ class tree(Resource):
             resp = make_response(jsonify(json_tree))
             return resp
         return "No tree initialised!"
-    
+
 @api.resource('/nanorcrest/fsm', methods=['GET'])
 class fsm(Resource):
     @auth.login_required
@@ -130,7 +140,6 @@ class command(Resource):
             "command": rc_context.last_command,
             "path"   : rc_context.last_path,
         }
-        print(f"nanorcrest.command.get {jsonify(resp_data)}")
         return make_response(jsonify(resp_data))
 
     @auth.login_required
@@ -138,65 +147,98 @@ class command(Resource):
         if rc_context.worker_thread and rc_context.worker_thread.is_alive():
             return "busy!"
         try:
-            cmd  = request.form['command'].lower()
-            path = request.form.get('path')
-            data = request.form.get('data')
-            
+            form = request.form
+            cmd  = form['command'].lower()
+            path = get_argument(form, 'path', default_val=None, required=False)
+
             target=getattr(rc_context.rc, cmd) # anyway to makethis clean??
             if not target:
                 raise RuntimeError(f'I don\'t know of command {cmd}')
-            
+
             logger = logging.getLogger()
             if os.path.isfile('rest_command.log'):
                 os.remove('rest_command.log')
             log_handle = logging.FileHandler("rest_command.log")
             logger.addHandler(log_handle)
-            
-            if cmd == 'boot' or cmd == 'terminate' or cmd == 'stop':
+
+            if cmd == 'boot' or cmd == 'terminate':
                 rc_context.worker_thread = threading.Thread(target=target,
                                                             name="command-worker")
+            elif cmd == 'scrap':
+                force     = get_argument(form, 'force',     default_val=True, required=False)
+
+                args=[force]
+
+                rc_context.worker_thread = threading.Thread(target=target,
+                                                            name="command-worker",
+                                                            args=args)
+
+            elif cmd == 'stop':
+                stop_wait = get_argument(form, 'stop_wait', default_val=0   , required=False)
+                force     = get_argument(form, 'force',     default_val=True, required=False)
+                message   = get_argument(form, 'message',   default_val=""  , required=False)
+
+                def pause_sleep_stop(force, stop_wait, message):
+                    rc_context.rc.pause(force)
+                    time.sleep(stop_wait)
+                    if rc_context.rc.return_code == 0:
+                        rc_context.rc.stop(force, message=message)
+
+                args=[stop_wait, force, message]
+
+                rc_context.worker_thread = threading.Thread(target=pause_sleep_stop,
+                                                            name="command-worker",
+                                                            args=args)
+
 
             elif cmd == 'start':
-                run_type = request.form['run_type']
-                rc_context.rc.run_num_mgr.set_run_number(int(request.form['run_num']))
+                run_type               =     get_argument(form, 'run_type'              , default_val='TEST', required=False)
+                run_num                = int(get_argument(form, 'run_num'               , default_val=None  , required=True ))
+                disable_data_storage   =     get_argument(form, 'disable_data_storage'  , default_val=True  , required=False)
+                trigger_interval_ticks =     get_argument(form, 'trigger_interval_ticks', default_val=None  , required=False)
+                message                =     get_argument(form, 'message'               , default_val=''    , required=False)
+                resume_wait            =     get_argument(form, 'resume_wait'           , default_val=0     , required=False)
 
-                disable_data_storage = False
-                if request.form.get('disable_data_storage'):
-                    disable_data_storage = request.form.get('disable_data_storage')
-                args = [disable_data_storage, run_type]
+                def start_sleep_resume(disable_data_storage, run_type, trigger_interval_ticks, resume_wait, message):
+                    rc = rc_context.rc
+                    rc.start(disable_data_storage, run_type, message)
+                    time.sleep(resume_wait)
+                    if rc.return_code==0:
+                        rc.resume(trigger_interval_ticks)
 
-                if request.form.get('trigger_interval_ticks'):
-                    args.append(request.form['trigger_interval_ticks'])
+                rc_context.rc.run_num_mgr.set_run_number(run_num)
 
-                rc_context.worker_thread = threading.Thread(target=target,
+                args = [disable_data_storage, run_type, trigger_interval_ticks, resume_wait, message]
+
+                rc_context.worker_thread = threading.Thread(target=start_sleep_resume,
                                                             name="command-worker",
                                                             args=args)
+
 
             elif cmd == 'resume':
-                args = []
+                trigger_interval_ticks = get_argument(form, 'trigger_interval_ticks', default_val=None  , required=False)
 
-                if request.form.get('trigger_interval_ticks'):
-                    args.append(request.form['trigger_interval_ticks'])
+                args=[trigger_interval_ticks]
 
                 rc_context.worker_thread = threading.Thread(target=target,
                                                             name="command-worker",
                                                             args=args)
-                
+
             else:
                 if not path:
                     path = rc_context.rc.topnode.name
                 path = validatePath(rc_context.rc, path)
-                
+
                 rc_context.worker_thread = threading.Thread(target=target, name="command-worker", args=[path])
             rc_context.worker_thread.start()
-            
+
             rc_context.worker_thread.join()
             rc_context.last_command = cmd
             rc_context.last_path = path
 
             logger.removeHandler(log_handle)
             logs = open('rest_command.log').read()
-            
+
             resp_data = {
                 "command"    : cmd,
                 "path"       : path,
@@ -205,13 +247,13 @@ class command(Resource):
             }
             resp = make_response(resp_data)
             return resp
-        
+
         except Exception as e:
             print(e)
             resp = make_response(jsonify({"Exception": str(e)}))
             return resp
-        
-    
+
+
 @app.route('/')
 @auth.login_required
 def index():
@@ -233,13 +275,14 @@ def index():
 def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, host, port, top_cfg):
 
     obj.print_traceback = traceback
+    credentials.user = 'user'
 
-    grid = Table(title='Shonky API NanoRC', show_header=False, show_edge=False)
+    grid = Table(title='Shonky REST-API NanoRC', show_header=False, show_edge=False)
     grid.add_column()
     grid.add_row("This is an admittedly shonky nano RC to control DUNE-DAQ applications.")
     grid.add_row("  Give it a command and it will do your biddings,")
     grid.add_row("  but trust it and it will betray you!")
-    grid.add_row("Use it with care!")
+    grid.add_row(f"Use it with care, {credentials.user}!")
 
     obj.console.print(Panel.fit(grid))
 
@@ -271,10 +314,10 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
         ctx.exit(rc.return_code)
 
     ctx.call_on_close(cleanup_rc)
-    
+
 def main():
     global rc_context
-    
+
     from rich.logging import RichHandler
 
     logging.basicConfig(
@@ -289,7 +332,7 @@ def main():
 
     try:
         cli(obj=rc_context, show_default=True)
-        
+
     except Exception as e:
         console.log("[bold red]Exception caught[/bold red]")
         if not obj.print_traceback:
