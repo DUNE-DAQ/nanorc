@@ -11,6 +11,7 @@ from flask import Flask, render_template, request, make_response, stream_with_co
 from flask_restful import Api, Resource
 from anytree.exporter import DictExporter
 from anytree.resolver import Resolver
+from flask_cors import CORS, cross_origin
 
 from nanorc.auth import auth
 from threading import Thread
@@ -45,6 +46,7 @@ rc_context = None
 
 app = Flask("nanorc_rest_api")
 api = Api(app)
+CORS(app, support_credentials=True)
 
 def convert_nanorc_return_code(return_code:int):
     return 200 if return_code == 0 else 500
@@ -78,6 +80,7 @@ def get_argument(form, arg_name, default_val=None, required=True):
 class status(Resource):
     @auth.login_required
     def get(self):
+        print("status request")
         if rc_context.worker_thread and rc_context.worker_thread.is_alive():
             return "I'm busy!"
         data = status_data(rc_context.rc.topnode)
