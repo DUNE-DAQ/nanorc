@@ -202,6 +202,9 @@ class command(Resource):
                 message                =     get_argument(form, 'message'               , default_val=''    , required=False)
                 resume_wait            =     get_argument(form, 'resume_wait'           , default_val=0     , required=False)
 
+                if not (run_type=="TEST" or run_type=="PROD"):
+                    raise RuntimeError(f"Wrong run_type (can be either TEST or PROD), yours was: \"{run_type}\"")
+
                 def start_sleep_resume(disable_data_storage, run_type, trigger_interval_ticks, resume_wait, message):
                     rc = rc_context.rc
                     rc.start(disable_data_storage, run_type, message)
