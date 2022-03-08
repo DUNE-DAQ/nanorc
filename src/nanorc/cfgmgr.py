@@ -91,8 +91,14 @@ class ConfigManager:
             for n, h in self.boot["hosts"].items()
         }
 
-        for k, v in self.boot["env"].items():
-            if str(v).find("getenv") == 0:
+        ll = { **self.boot["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration
+        for k, v in ll.items():
+            if v == "getenv_ifset":
+                if k in os.environ.keys():
+                    self.boot["env"][k] = os.environ[k]
+                else:
+                    self.boot["env"].pop(k)
+            elif str(v).find("getenv") == 0:
                 if k in os.environ.keys():
                     self.boot["env"][k] = os.environ[k]
                 elif str(v).find(":") > 0:
@@ -101,8 +107,14 @@ class ConfigManager:
                     raise ValueError("Key " + k + " is not in environment and no default specified!")
 
         for exec_spec in self.boot["exec"].values():
-            for k, v in exec_spec["env"].items():
-                if str(v).find("getenv") == 0:
+            ll = { **exec_spec["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration
+            for k, v in ll.items():
+                if v == "getenv_ifset":
+                    if k in os.environ.keys():
+                        exec_spec["env"][k] = os.environ[k]
+                    else:
+                        exec_spec["env"].pop(k)
+                elif str(v).find("getenv") == 0:
                     if k in os.environ.keys():
                         exec_spec["env"][k] = os.environ[k]
                     elif str(v).find(":") > 0:
