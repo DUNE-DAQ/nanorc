@@ -19,7 +19,7 @@ $(".control").click(function() {
 }
 function getTree(){
 $.ajax({
-  url: "http://localhost:5001/nanorcrest/tree",
+  url: "http://"+serverhost+"/nanorcrest/tree",
   beforeSend: function(xhr) { 
     xhr.setRequestHeader("Authorization", "Basic " + btoa("fooUsr:barPass")); 
   },
@@ -32,27 +32,9 @@ $.ajax({
   crossOrigin: true,
   success: function (d) {
     //d = JSON.stringify(d);
-    console.log(d)
     d = d.replace(/name/g, "text");
     d = JSON.parse(d)
     root = d.text
-    $('#controlTree').jstree({
-      'plugins': ['types'],
-      'types' : {
-              'default' : {
-              'icon' : '/static/pics/gray.png'
-              }
-          },
-      //'contextmenu': {
-      //   'select_node': false,
-      //   'items' : customMenu
-      //},
-      'core' : {
-          'multiple': false,
-          'data' : d,
-
-      }
-  });
   $('#controlTree').jstree(true).settings.core.data = d;
   $('#controlTree').jstree(true).refresh();
   },
@@ -70,7 +52,7 @@ function sendComm(command,runnumber, runtype){
     dataload= "command="+command
   }
   $.ajax({
-      url: "http://localhost:5001/nanorcrest/command",
+      url: "http://"+serverhost+"/nanorcrest/command",
       beforeSend: function(xhr) { 
         xhr.setRequestHeader("Authorization", "Basic " + btoa("fooUsr:barPass")); 
       },
@@ -88,15 +70,15 @@ function sendComm(command,runnumber, runtype){
 }
   function getStatus(){
     if(selectedNode==null){
-        url = "http://localhost:5001/nanorcrest/status"
+        url = "http://"+serverhost+"/nanorcrest/status"
     }else{
       if(selectedNode.text==root){
-        url = "http://localhost:5001/nanorcrest/status"
+        url = "http://"+serverhost+"/nanorcrest/status"
       }else{
         selText= selectedNode
         path=$('#controlTree').jstree(true).get_path(selText,".")
         path = path.replace(root+".", "");
-        url = "http://localhost:5001/nanorcrest/node/"+path
+        url = "http://"+serverhost+"/nanorcrest/node/"+path
       }
     }
     console.log(url)
@@ -109,7 +91,6 @@ function sendComm(command,runnumber, runtype){
         dataType: "text",
         success: function (d) {
           d = JSON.parse(d)
-          console.log(d)
           $("#state:text").val(d.state)
           state = d.state
           populateButtons()
@@ -121,7 +102,7 @@ function sendComm(command,runnumber, runtype){
     });}
   function getFsm(){
   $.ajax({
-      url: "http://localhost:5001/nanorcrest/fsm",
+      url: "http://"+serverhost+"/nanorcrest/fsm",
       beforeSend: function(xhr) { 
         xhr.setRequestHeader("Authorization", "Basic " + btoa("fooUsr:barPass")); 
       },
@@ -155,7 +136,45 @@ function sendComm(command,runnumber, runtype){
 	}).resize();
     $(document).ready(function() {
       getFsm()
-      getTree()
+      $.ajax({
+        url: "http://localhost:5001/nanorcrest/tree",
+        beforeSend: function(xhr) { 
+          xhr.setRequestHeader("Authorization", "Basic " + btoa("fooUsr:barPass")); 
+        },
+        type: 'GET',
+        crossOrigin: true,
+        crossDomain: true,
+        dataType: "text",
+        contentType:'text/plain',
+        cors: true ,
+        crossOrigin: true,
+        success: function (d) {
+          //d = JSON.stringify(d);
+          d = d.replace(/name/g, "text");
+          d = JSON.parse(d)
+          root = d.text
+          $('#controlTree').jstree({
+            'plugins': ['types'],
+            'types' : {
+                    'default' : {
+                    'icon' : '/static/pics/gray.png'
+                    }
+                },
+            //'contextmenu': {
+            //   'select_node': false,
+            //   'items' : customMenu
+            //},
+            'core' : {
+                'multiple': false,
+                'data' : d,
+      
+            }
+        });
+        },
+        error: function(e){
+          alert(JSON.stringify(e));
+        }
+      });
       getStatus()
       $("#selected").text('Selected: '+root)
     })
