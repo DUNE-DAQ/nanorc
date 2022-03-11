@@ -9,6 +9,7 @@ import json
 import cmd
 import click
 import click_shell
+from click_shell import make_click_shell
 import os.path
 import os
 import logging
@@ -81,6 +82,7 @@ def timingcli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, ker
 
     ctx.call_on_close(cleanup_rc)
     obj.rc = rc
+    obj.shell = ctx.command
     rc.ls(False)
 
 
@@ -91,6 +93,7 @@ timingcli.add_command(conf, 'conf')
 timingcli.add_command(scrap, 'scrap')
 timingcli.add_command(wait, 'wait')
 timingcli.add_command(terminate, 'terminate')
+timingcli.add_command(start_shell, 'shell')
 
 @timingcli.command('start')
 @click.pass_obj
