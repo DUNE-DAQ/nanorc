@@ -327,6 +327,7 @@ def runsrvr():
     p = subprocess.Popen(["python3", os.path.join(dirname, '/webui/server.py')])
     print(p)
     print(p.poll())
+    print(os.path.join(dirname, '/webui/server.py'))
 
 def main():
     global rc_context
@@ -342,8 +343,6 @@ def main():
 
     console = Console(record=True)
     rc_context = NanoContext(console)
-    p = subprocess.Popen(["python3", "../webui/server.py"])
-    print(p)
     try:
         cli(obj=rc_context, show_default=True)
 
