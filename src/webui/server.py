@@ -11,15 +11,10 @@ args = parser.parse_args()
 
 app = Flask(__name__)
 CORS(app, support_credentials=True)
-def runsrvr():
-    p = subprocess.Popen(["python3", "../test/server.py"])
-    print(p)
-    print(p.poll())
 @app.route('/')
 @cross_origin(supports_credentials=True)
 def index():
     global args
-    runsrvr()
     if args.serverhost:
         return render_template('index.html',serverhost=args.serverhost)
     else:

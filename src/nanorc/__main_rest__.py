@@ -7,6 +7,7 @@ NanoRC's REST API
 import click
 import time
 import re
+import os
 import subprocess
 from flask import Flask, render_template, request, make_response, stream_with_context, render_template_string, url_for, redirect, jsonify, Markup
 from flask_restful import Api, Resource
@@ -322,7 +323,8 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
 
     ctx.call_on_close(cleanup_rc)
 def runsrvr():
-    p = subprocess.Popen(["python3", "../test/server.py"])
+    dirname = os.path.dirname(__file__)
+    p = subprocess.Popen(["python3", os.path.join(dirname, '../test/server.py')])
     print(p)
     print(p.poll())
 
