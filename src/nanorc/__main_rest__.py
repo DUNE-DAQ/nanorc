@@ -346,7 +346,7 @@ def main():
             console.log(e)
         else:
             console.print_exception()
-    subprocess.Popen(["python3", "../webui/server.py"])
-
+    p = subprocess.Popen(["python3", "../webui/server.py"])
+    print(p)
 if __name__ == '__main__':
     main()
