@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>jQuery-Machine Demo</title>
+    <script src="http://code.jquery.com/jquery-latest.js"></script>
+    <script type="text/javascript" src="../src/jquery-machine.js"></script>
+    <style type="text/css">
+      html {
+        font-family: Helvetica, Arial, sans-serif;
+      }
+      body {
+        padding: 0 20px;
+      }
+      #statelog {
+        font-family: "Courier new", Courier, monospace;
+        color: #555;
+        background: #ffe;
+        list-style: none;
+        width: 500px;
+        padding: 1em;
+        border: 1px solid #ccc;
+      }
+      #state {
+        font-size: 20px;
+        border: 1px solid #999;
+        background: #99CCCC;
+      }
+      #statelog h3 {
+        margin: 0 0 1em 0;
+      }
+      button {
+        font-size: 20px;
+        border: 1px solid #999;
+        background: #99CC99;
+      }
+    </style>
+    <script type="text/javascript">
+      $(document).ready(function() {
+        $("#buttonup").click(function(){
+            $("#statemachine").trigger("up");
+            $("#statemachine").trigger("stateChange");
+        });
+        $("#buttondown").click(function(){
+            $("#statemachine").trigger("down");
+        });
+        $("input").change(function(){
+            alert("The text has been changed.");
+        });
+        // Define the state machine:
+        $("#statemachine").machine({
+          unknown: {
+            defaultState: true,
+            onEnter: function() {
+              $("#state:text").val($("#statemachine").data("state"));
+              $("#statelog").append("<li>I'm in state &quot;unknown&quot;</li>");
+            },
+            onExit: function() {
+              $("#statelog").append("<li>I'm exiting state &quot;unknown&quot;</li>");
+            },
+            exits: {
+              up: "booted",
+              down: function(){ alert("Can't go down");},
+              stateChange: function(){ $("#state:text").val($("#statemachine").data("state"));}
+            }
+          },
+          booted: {
+            onEnter: function() {
+              $("#state:text").val($("#statemachine").data("state"));
+              $("#statelog").append("<li>I'm in state &quot;booted&quot;</li>");
+            },
+            onExit: function() {
+              $("#statelog").append("<li>I'm exiting state &quot;booted&quot;</li>");
+            },
+            events: {
+              up: "configured",
+              down: "unknown",
+              stateChange: function(){ $("#state:text").val($("#statemachine").data("state"));}
+            }
+          },
+          configured: {
+            onEnter: function() {
+              $("#state:text").val($("#statemachine").data("state"));
+              timeout = setTimeout(function() { $("#statemachine").trigger("timeout") }, 5000);
+              $("#statelog").append("<li>I'm in state &quot;configured&quot;</li>");
+            },
+            onExit: function() {
+              $("#statelog").append("<li>I'm exiting state &quot;configured&quot;</li>");
+            },
+            events: {
+              timeout: function(){ alert("Oh, timeout hapen");$("#statemachine").trigger("shutdown")},
+              shutdown: "unknown",
+              up: "running",
+              down: "booted",
+              stateChange: function(){ $("#state:text").val($("#statemachine").data("state"));}
+            }
+          },
+          running: {
+            onEnter: function() {
+              $("#statelog").append("<li>I'm in state &quot;running&quot;</li>");
+            },
+            onExit: function() {
+              $("#statelog").append("<li>I'm exiting state &quot;running&quot;</li>");
+            },
+            events: {
+              up: function(){ alert("Can't go up");},
+              down: "configured",
+              stateChange: function(){ $("#state:text").val($("#statemachine").data("state"));}
+            }
+          }
+        });
+        $("#state:text").val($("#statemachine").data("state"));
+      });
+    </script>
+  </head>
+  <body>
+    <h1>jQuery-Machine Demo</h1>
+    <h3>Click on the button and watch it transition to different states:</h3>
+    <button id="buttonup">Up</button>
+    <button id="buttondown">Down</button>
+    <input type="text" id="state" value="" readonly>
+    <div id="statemachine"></div>
+    <ul id="statelog">
+      <h3>State Log:</h3>
+    </ul>
+
+  </body>
+</html>

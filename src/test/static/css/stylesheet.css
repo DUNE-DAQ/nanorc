@@ -1,0 +1,88 @@
+#container {margin:0px auto 0 auto; background:white;
+	border-radius:0px; padding:0px; overflow:hidden; border: #0a6aa1 2px solid}
+#tree { float:left; padding:5px; margin-right: 10px;}
+#treecontainer {overflow: scroll; height: 570px }
+		#data, #code {
+		}
+.jstree-themeicon-custom{
+	  border-radius:50% ;
+}
+		#statelog {
+			font-family: "Courier new", Courier, monospace;
+			/*color: #555;*/
+			background: #ffe;
+			list-style: none;
+			width: 500px;
+			padding: 1em;
+			border: 1px solid #ccc;
+		}
+
+		.treetop{
+			border-bottom: 2px solid;
+			font-size: 25px;
+		}
+
+		#state {
+			font-size: 20px;
+
+			border: 1px solid #999;
+			background: #99CCCC;
+			text-align: center;
+		}
+		#shutdown {
+			background: #FF0000;
+		}
+		#statelabel {
+			font-size: 22px;
+			padding: 5px;
+			text-align: center;
+		}
+		#statelog h3 {
+			margin: 0 0 1em 0;
+		}
+		button {
+			font-size: 20px;
+			border: 1px solid #999;
+			background: #99CC99;
+		}
+
+		.content{
+			padding-left: 10px;
+		}
+
+		.stateButtons{
+			padding: 10px;
+		}
+
+		.statesInfo{
+			padding: 10px;
+		}
+
+		li {
+			width: 200px;
+		}
+		 ul {
+			list-style-type: none;
+		}
+		.nav li {
+			display: inline-block;
+		}
+
+		.control{
+			font-size: 1.5em;
+		}
+
+		.monitoring{
+			background-color: lightyellow;
+			text-align: center;
+			margin-top: 8px;
+			margin-bottom: 26px;
+		}
+
+		.lockButtonContainer{
+			margin: 5px;
+		}
+
+		.childItemList{
+			padding: 5px;
+		}

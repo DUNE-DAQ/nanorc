@@ -321,10 +321,14 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
         ctx.exit(rc.return_code)
 
     ctx.call_on_close(cleanup_rc)
+def runsrvr():
+    p = subprocess.Popen(["python3", "../test/server.py"])
+    print(p)
+    print(p.poll())
 
 def main():
     global rc_context
-
+    runsrvr()
     from rich.logging import RichHandler
 
     logging.basicConfig(
@@ -336,7 +340,8 @@ def main():
 
     console = Console(record=True)
     rc_context = NanoContext(console)
-
+    p = subprocess.Popen(["python3", "../webui/server.py"])
+    print(p)
     try:
         cli(obj=rc_context, show_default=True)
 
@@ -346,7 +351,6 @@ def main():
             console.log(e)
         else:
             console.print_exception()
-    p = subprocess.Popen(["python3", "../webui/server.py"])
-    print(p)
+    
 if __name__ == '__main__':
     main()
