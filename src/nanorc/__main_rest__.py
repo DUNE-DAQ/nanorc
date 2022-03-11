@@ -7,7 +7,7 @@ NanoRC's REST API
 import click
 import time
 import re
-import os
+import subprocess
 from flask import Flask, render_template, request, make_response, stream_with_context, render_template_string, url_for, redirect, jsonify, Markup
 from flask_restful import Api, Resource
 from anytree.exporter import DictExporter
@@ -346,7 +346,7 @@ def main():
             console.log(e)
         else:
             console.print_exception()
-    os.system('python3 ../webui/server.py')
+    subprocess.Popen(["python3", "../webui/server.py"])
 
 if __name__ == '__main__':
     main()
