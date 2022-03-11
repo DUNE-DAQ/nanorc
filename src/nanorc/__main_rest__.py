@@ -324,7 +324,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
     ctx.call_on_close(cleanup_rc)
 def runsrvr():
     dirname = os.path.dirname(__file__)
-    p = subprocess.Popen(["python3", os.path.join(dirname, '../test/server.py')])
+    p = subprocess.Popen(["python3", os.path.join(dirname, '../webui/server.py')])
     print(p)
     print(p.poll())
 
