@@ -9,7 +9,6 @@ import json
 import cmd
 import click
 import click_shell
-from click_shell import make_click_shell
 import os.path
 import os
 import logging
