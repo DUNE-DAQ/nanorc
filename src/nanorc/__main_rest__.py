@@ -327,6 +327,7 @@ def runsrvr():
     p = subprocess.Popen(["python3", os.path.join(dirname, '/webui/server.py')])
     print(p)
     print(p.poll())
+    print(dirname)
     print(os.path.join(dirname, '/webui/server.py'))
 
 def main():
