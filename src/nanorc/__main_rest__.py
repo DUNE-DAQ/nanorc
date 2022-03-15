@@ -329,7 +329,7 @@ def cli(ctx, obj, traceback, serveraddress, loglevel, timeout, cfg_dumpdir, log_
 def runsrvr(serveraddress,port):
     dirname = os.path.dirname(__file__)
     file = os.path.join(dirname, 'webui/server.py')
-    print(serveraddress+":"+port)
+    print(serveraddress+":"+str(port))
     p = subprocess.Popen(["python3", file, "-s",serveraddress+":"+port])
     print(p)
     print(p.poll())
