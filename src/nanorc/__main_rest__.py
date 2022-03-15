@@ -283,9 +283,9 @@ def index():
 @click.argument('top_cfg', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, host, port, top_cfg):
+def cli(ctx, obj, traceback, serveraddress, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, host, port, top_cfg):
     global args
-
+    runsrvr(serveraddress)
     obj.print_traceback = traceback
     credentials.user = 'user'
 
@@ -326,7 +326,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
         ctx.exit(rc.return_code)
 
     ctx.call_on_close(cleanup_rc)
-def runsrvr():
+def runsrvr(serveraddress):
     dirname = os.path.dirname(__file__)
     file = os.path.join(dirname, 'webui/server.py')
     print(serveraddress)
@@ -338,7 +338,6 @@ def runsrvr():
 
 def main():
     global rc_context
-    runsrvr()
     from rich.logging import RichHandler
 
     logging.basicConfig(
