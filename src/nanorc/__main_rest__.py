@@ -285,7 +285,7 @@ def index():
 @click.pass_context
 def cli(ctx, obj, traceback, serveraddress, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, host, port, top_cfg):
     global args
-    runsrvr(serveraddress)
+    runsrvr(serveraddress, port)
     obj.print_traceback = traceback
     credentials.user = 'user'
 
@@ -326,11 +326,11 @@ def cli(ctx, obj, traceback, serveraddress, loglevel, timeout, cfg_dumpdir, log_
         ctx.exit(rc.return_code)
 
     ctx.call_on_close(cleanup_rc)
-def runsrvr(serveraddress):
+def runsrvr(serveraddress,port):
     dirname = os.path.dirname(__file__)
     file = os.path.join(dirname, 'webui/server.py')
-    print(serveraddress)
-    p = subprocess.Popen(["python3", file, "-s","localhost:5001"])
+    print(serveraddress+":"+port)
+    p = subprocess.Popen(["python3", file, "-s",serveraddress+":"+port])
     print(p)
     print(p.poll())
     print(dirname)
