@@ -9,6 +9,7 @@ import time
 import re
 import os
 import subprocess
+import argparse
 from flask import Flask, render_template, request, make_response, stream_with_context, render_template_string, url_for, redirect, jsonify, Markup
 from flask_restful import Api, Resource
 from anytree.exporter import DictExporter
@@ -27,6 +28,10 @@ from nanorc.cli import loglevels, updateLogLevel
 from nanorc.runmgr import SimpleRunNumberManager
 from nanorc.cfgsvr import FileConfigSaver
 from nanorc.node_render import status_data
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-s","--serverhost", help="address of the server for webui")
+args = parser.parse_args()
 
 class NanoContext:
     """docstring for NanoContext"""
@@ -281,6 +286,7 @@ def index():
 @click.pass_obj
 @click.pass_context
 def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, host, port, top_cfg):
+    global args
 
     obj.print_traceback = traceback
     credentials.user = 'user'
@@ -325,7 +331,11 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
 def runsrvr():
     dirname = os.path.dirname(__file__)
     file = os.path.join(dirname, 'webui/server.py')
-    p = subprocess.Popen(["python3", file, "-s","10.73.138.26:5001"])
+    if args.serverhost:
+        p = subprocess.Popen(["python3", file, "-s",args.serverhost])
+        return render_template('index.html',serverhost=args.serverhost)
+    else:
+        p = subprocess.Popen(["python3", file, "-s","localhost:5001"])
     print(p)
     print(p.poll())
     print(dirname)
