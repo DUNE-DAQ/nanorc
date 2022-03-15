@@ -26,7 +26,6 @@ $.ajax({
   },
   type: 'GET',
   dataType: "text",
-  crossOrigin: true,
   success: function (d) {
     //d = JSON.stringify(d);
     d = d.replace(/name/g, "text");
