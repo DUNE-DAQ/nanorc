@@ -333,7 +333,6 @@ def runsrvr():
     file = os.path.join(dirname, 'webui/server.py')
     if args.serverhost:
         p = subprocess.Popen(["python3", file, "-s",args.serverhost])
-        return render_template('index.html',serverhost=args.serverhost)
     else:
         p = subprocess.Popen(["python3", file, "-s","localhost:5001"])
     print(p)
