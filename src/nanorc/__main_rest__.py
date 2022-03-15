@@ -4,6 +4,7 @@
 NanoRC's REST API
 """
 
+from http import server
 import click
 import time
 import re
@@ -28,10 +29,6 @@ from nanorc.cli import loglevels, updateLogLevel
 from nanorc.runmgr import SimpleRunNumberManager
 from nanorc.cfgsvr import FileConfigSaver
 from nanorc.node_render import status_data
-
-parser = argparse.ArgumentParser()
-parser.add_argument("-s","--serverhost", help="address of the server for webui")
-args = parser.parse_args()
 
 class NanoContext:
     """docstring for NanoContext"""
@@ -274,6 +271,7 @@ def index():
 
 @click.command()
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
+@click.option('-s', '--serveraddress', type=str, default="localhost", help='Address of the server for the webui')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
@@ -285,7 +283,7 @@ def index():
 @click.argument('top_cfg', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, host, port, top_cfg):
+def cli(ctx, obj, traceback, serveraddress, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, host, port, top_cfg):
     global args
 
     obj.print_traceback = traceback
@@ -331,10 +329,8 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
 def runsrvr():
     dirname = os.path.dirname(__file__)
     file = os.path.join(dirname, 'webui/server.py')
-    if args.serverhost:
-        p = subprocess.Popen(["python3", file, "-s",args.serverhost])
-    else:
-        p = subprocess.Popen(["python3", file, "-s","localhost:5001"])
+    print(args.serveraddress)
+    p = subprocess.Popen(["python3", file, "-s","localhost:5001"])
     print(p)
     print(p.poll())
     print(dirname)
