@@ -133,7 +133,7 @@ function sendComm(command,runnumber, runtype){
     $(document).ready(function() {
       getFsm()
       $.ajax({
-        url: "http://localhost:5001/nanorcrest/tree",
+        url: "http://"+serverhost+"/nanorcrest/tree",
         beforeSend: function(xhr) { 
           xhr.setRequestHeader("Authorization", "Basic " + btoa("fooUsr:barPass")); 
         },
