@@ -18,6 +18,7 @@ $(".control").click(function() {
 }); 
 }
 function getTree(){
+  print("http://"+serverhost+"/nanorcrest/tree")
 $.ajax({
   url: "http://"+serverhost+"/nanorcrest/tree",
   beforeSend: function(xhr) { 
