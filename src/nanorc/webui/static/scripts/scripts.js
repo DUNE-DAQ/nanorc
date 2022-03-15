@@ -18,18 +18,14 @@ $(".control").click(function() {
 }); 
 }
 function getTree(){
-  print("http://"+serverhost+"/nanorcrest/tree")
+  console.log("http://"+serverhost+"/nanorcrest/tree")
 $.ajax({
   url: "http://"+serverhost+"/nanorcrest/tree",
   beforeSend: function(xhr) { 
     xhr.setRequestHeader("Authorization", "Basic " + btoa("fooUsr:barPass")); 
   },
   type: 'GET',
-  crossOrigin: true,
-  crossDomain: true,
   dataType: "text",
-  contentType:'text/plain',
-  cors: true ,
   crossOrigin: true,
   success: function (d) {
     //d = JSON.stringify(d);
