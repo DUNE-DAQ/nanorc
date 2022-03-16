@@ -1,44 +1,22 @@
-#!/usr/bin/env python3
-
-"""
-NanoRC's REST API
-"""
-
-from http import server
-import click
-import time
-import re
-import os
-import subprocess
-import argparse
-from flask import Flask, render_template, request, make_response, stream_with_context, render_template_string, url_for, redirect, jsonify, Markup
+from flask import Flask, request, make_response, jsonify
 from flask_restful import Api, Resource
-from anytree.exporter import DictExporter
-from anytree.resolver import Resolver
 from flask_cors import CORS, cross_origin
-
+import os
+import logging
 from nanorc.auth import auth
-from threading import Thread
 import threading
-
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from nanorc.core import *
-from nanorc.cli import loglevels, updateLogLevel
-from nanorc.runmgr import SimpleRunNumberManager
-from nanorc.cfgsvr import FileConfigSaver
 from nanorc.node_render import status_data
+from rich.console import Console
+from anytree.resolver import Resolver
+from anytree.exporter import DictExporter
 
-class NanoContext:
-    """docstring for NanoContext"""
+class NanoWebContext:
     def __init__(self, console: Console):
-        """Nanorc Context for click use.
-
-        Args:
-            console (Console): rich console for messages and logging
         """
-        super(NanoContext, self).__init__()
+        Nanorc Context for rest api use.
+        Args: console (Console): rich console for messages and logging
+        """
+        super(NanoWebContext, self).__init__()
         self.console = console
         self.print_traceback = False
         self.rc = None
@@ -46,14 +24,21 @@ class NanoContext:
         self.last_path = None
         self.worker_thread = None
 
-rc_context = None
-
-app = Flask("nanorc_rest_api")
-api = Api(app)
-CORS(app, support_credentials=True)
+## PL:
+## I don't know how else to do this, if this is None, the variable isn't global
+rc_context = NanoWebContext(Console())
 
 def convert_nanorc_return_code(return_code:int):
     return 200 if return_code == 0 else 500
+
+def get_argument(form, arg_name, default_val=None, required=True):
+    if required:
+        return form[arg_name]
+
+    if not form.get(arg_name):
+        return default_val
+
+    return form.get(arg_name)
 
 def validatePath(rc, prompted_path):
     hierarchy = []
@@ -70,28 +55,16 @@ def validatePath(rc, prompted_path):
 
     return hierarchy
 
-def get_argument(form, arg_name, default_val=None, required=True):
-    if required:
-        return form[arg_name]
 
-    if not form.get(arg_name):
-        return default_val
-
-    return form.get(arg_name)
-
-
-@api.resource('/nanorcrest/status', methods=['GET'])
 class status(Resource):
     @auth.login_required
     def get(self):
-        print("status request")
         if rc_context.worker_thread and rc_context.worker_thread.is_alive():
             return "I'm busy!"
         data = status_data(rc_context.rc.topnode)
         resp = make_response(jsonify(data))
         return resp
 
-@api.resource('/nanorcrest/node/<path>', methods=['GET'])
 class node(Resource):
     @auth.login_required
     def get(self, path):
@@ -111,7 +84,6 @@ class node(Resource):
         resp = make_response(data, 200)
         return resp
 
-@api.resource('/nanorcrest/tree', methods=['GET'])
 class tree(Resource):
     @auth.login_required
     def get(self):
@@ -124,7 +96,7 @@ class tree(Resource):
             return resp
         return "No tree initialised!"
 
-@api.resource('/nanorcrest/fsm', methods=['GET'])
+# @api.resource('/nanorcrest/fsm', methods=['GET'])
 class fsm(Resource):
     @auth.login_required
     def get(self):
@@ -139,7 +111,6 @@ class fsm(Resource):
             return resp
         return "No FSM initiated!"
 
-@api.resource('/nanorcrest/command', methods=['POST', 'GET'])
 class command(Resource):
     @auth.login_required
     def get(self):
@@ -264,100 +235,31 @@ class command(Resource):
             return resp
 
 
-@app.route('/')
 @auth.login_required
 def index():
     return "Best thing since light saber"
 
-@click.command()
-@click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
-@click.option('-s', '--serveraddress', type=str, default="localhost", help='Address of the server for the webui')
-@click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
-@click.option('--timeout', type=int, default=60, help='Application commands timeout')
-@click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
-@click.option('--log-path', type=click.Path(exists=True), default=None, help='Where the logs should go (on localhost of applications)')
-@click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
-@click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
-@click.option('--host', type=str, default="0.0.0.0", help='Which host the rest API should run')
-@click.option('--port', type=int, default=5001, help='which port to use')
-@click.argument('top_cfg', type=click.Path(exists=True))
-@click.pass_obj
-@click.pass_context
-def cli(ctx, obj, traceback, serveraddress, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, host, port, top_cfg):
-    global args
-    runsrvr(serveraddress, port)
-    obj.print_traceback = traceback
-    credentials.user = 'user'
 
-    grid = Table(title='Shonky REST-API NanoRC', show_header=False, show_edge=False)
-    grid.add_column()
-    grid.add_row("This is an admittedly shonky nano RC to control DUNE-DAQ applications.")
-    grid.add_row("  Give it a command and it will do your biddings,")
-    grid.add_row("  but trust it and it will betray you!")
-    grid.add_row(f"Use it with care, {credentials.user}!")
+class RestApi:
+    def __init__(self, rc_context, host, port):
+        self.nanorc = rc_context.rc
+        self.host = host
+        self.port = port
+        self.app = Flask("nanorc_rest_api")
+        self.api = Api(self.app)
+        CORS(self.app)
+        
+        self.api.add_resource(status,  '/nanorcrest/status')
+        self.api.add_resource(node,    '/nanorcrest/node/<path>')
+        self.api.add_resource(tree,    '/nanorcrest/tree')
+        self.api.add_resource(fsm,     '/nanorcrest/fsm')
+        self.api.add_resource(command, '/nanorcrest/command')
+        self.app.add_url_rule('/', view_func=index)
 
-    obj.console.print(Panel.fit(grid))
-
-    if loglevel:
-        updateLogLevel(loglevel)
-
-    try:
-        rc = NanoRC(console = obj.console,
-                    top_cfg = top_cfg,
-                    run_num_mgr = SimpleRunNumberManager(),
-                    run_registry = FileConfigSaver(cfg_dumpdir),
-                    logbook_type = 'file',
-                    timeout = timeout,
-                    use_kerb = kerberos,
-                    logbook_prefix = logbook_prefix)
-        rc_context = obj
-        rc_context.top_json = top_cfg
-        rc_context.rc = rc
-        obj.console.log(f"Starting up on {host}:{port}")
-        app.run(host=host, port=port, debug=True, use_reloader=False)
-
-    except Exception as e:
-        logging.getLogger("cli").exception("Failed to build NanoRC, or start the API")
-        raise click.Abort()
-
-    def cleanup_rc():
-        logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
-        rc.terminate()
-        ctx.exit(rc.return_code)
-
-    ctx.call_on_close(cleanup_rc)
-def runsrvr(serveraddress,port):
-    dirname = os.path.dirname(__file__)
-    file = os.path.join(dirname, 'webui/server.py')
-    print(serveraddress+":"+str(port))
-    p = subprocess.Popen(["python3", file, "-s",serveraddress+":"+str(port)])
-    print(p)
-    print(p.poll())
-    print(dirname)
-    print(file)
-
-def main():
-    global rc_context
-    from rich.logging import RichHandler
-
-    logging.basicConfig(
-        level="INFO",
-        format="%(message)s",
-        datefmt="[%X]",
-        handlers=[RichHandler(rich_tracebacks=True)]
-    )
-
-    console = Console(record=True)
-    rc_context = NanoContext(console)
-    try:
-        cli(obj=rc_context, show_default=True)
-
-    except Exception as e:
-        console.log("[bold red]Exception caught[/bold red]")
-        if not obj.print_traceback:
-            console.log(e)
-        else:
-            console.print_exception()
-    
-if __name__ == '__main__':
-    main()
+    def run(self):
+        if not self.host or not self.port:
+            raise RuntimeError('RestAPI: no host or port specified!')
+        
+        self.app.run(host=self.host, port=self.port,
+                     debug=True, use_reloader=False,
+                     threaded=True)
