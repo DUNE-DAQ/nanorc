@@ -56,6 +56,9 @@ def cli(ctx, obj,
 
     obj.console.print(Panel.fit(grid))
     rest_thread=None
+    rest_host  = socket.gethostname() if rest_host  == 'localhost' else rest_host
+    webui_host = socket.gethostname() if webui_host == 'localhost' else webui_host
+
     if rest:
         obj.console.log('Spawning REST API')
 
@@ -74,8 +77,7 @@ def cli(ctx, obj,
             rc_context = obj
             rc_context.top_json = top_cfg
             rc_context.rc = rc
-            rest_host = socket.gethostname() if rest_host == 'localhost'  else rest_host
-        
+
             obj.console.log(f"Starting up RESTAPI on {rest_host}:{rest_port}")
             rest = RestApi(rc_context, rest_host, rest_port)
             rest_thread = threading.Thread(target=rest.run,
@@ -96,16 +98,17 @@ def cli(ctx, obj,
 
     webui_thread = None
     if webui:
-        webui_host = socket.gethostname() if webui_host == 'localhost'  else webui_host
         obj.console.log(f'Starting up Web UI on {webui_host}:{webui_port}')
         webui = WebServer(webui_host, webui_port, rest_host, rest_port)
         webui_thread = threading.Thread(target = webui.run,
                                         name='WebUI')
         webui_thread.start()
         obj.console.log(f"Started Web UI")
-    
+
     if rest:
         rest_thread.join()
+    if webui:
+        webui_thread.join()
 
 
 def main():
