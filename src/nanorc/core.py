@@ -105,11 +105,12 @@ class NanoRC:
         self.return_code = print_node(node=self.topnode, console=self.console, leg=leg)
 
 
-    def boot(self) -> NoReturn:
+    def boot(self, timeout:int=0) -> NoReturn:
         """
         Boots applications
         """
-        self.execute_command("boot", timeout=self.timeout, log=self.log_path)
+        cmd_timeout = timeout if timeout != 0 else self.timeout
+        self.execute_command("boot", timeout=cmd_timeout, log=self.log_path)
 
 
     def terminate(self) -> NoReturn:
@@ -119,35 +120,39 @@ class NanoRC:
         self.execute_command("terminate")
 
 
-    def init(self, path) -> NoReturn:
+    def init(self, path, timeout:int=0) -> NoReturn:
         """
         Initializes the applications.
         """
-        self.execute_command("init", path=path, raise_on_fail=True, timeout=self.timeout)
+        cmd_timeout = timeout if timeout != 0 else self.timeout
+        self.execute_command("init", path=path, raise_on_fail=True, timeout=cmd_timeout)
 
 
-    def conf(self, path) -> NoReturn:
+    def conf(self, path, timeout:int=0) -> NoReturn:
         """
         Sends configure command to the applications.
         """
-        self.execute_command("conf", path=path, raise_on_fail=True, timeout=self.timeout)
+        cmd_timeout = timeout if timeout != 0 else self.timeout
+        self.execute_command("conf", path=path, raise_on_fail=True, timeout=cmd_timeout)
 
 
-    def pause(self, force:bool=False) -> NoReturn:
+    def pause(self, force:bool=False, timeout:int=0) -> NoReturn:
         """
         Sends pause command
         """
-        self.execute_command("pause", path=None, raise_on_fail=True, timeout=self.timeout, force=force)
+        cmd_timeout = timeout if timeout != 0 else self.timeout
+        self.execute_command("pause", path=None, raise_on_fail=True, timeout=cmd_timeout, force=force)
 
 
-    def scrap(self, path, force:bool=False) -> NoReturn:
+    def scrap(self, path, force:bool=False, timeout:int=0) -> NoReturn:
         """
         Send scrap command
         """
-        self.execute_command("scrap", path=None, raise_on_fail=True, timeout=self.timeout, force=force)
+        cmd_timeout = timeout if timeout != 0 else self.timeout
+        self.execute_command("scrap", path=None, raise_on_fail=True, timeout=cmd_timeout, force=force)
 
 
-    def start(self, disable_data_storage: bool, run_type:str, message:str="") -> NoReturn:
+    def start(self, disable_data_storage: bool, run_type:str, message:str="", timeout:int=0) -> NoReturn:
         """
         Sends start command to the applications
 
@@ -189,10 +194,11 @@ class NanoRC:
                 self.return_code = 1
                 return
 
+        cmd_timeout = timeout if timeout != 0 else self.timeout
         self.topnode.start(path=None, raise_on_fail=True,
                            cfg_method="runtime_start",
                            overwrite_data=runtime_start_data,
-                           timeout=self.timeout)
+                           timeout=cmd_timeout)
 
         self.return_code = self.topnode.return_code.value
         if self.return_code == 0:
@@ -222,7 +228,7 @@ class NanoRC:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
 
-    def stop(self, force:bool=False, message:str="") -> NoReturn:
+    def stop(self, force:bool=False, message:str="", timeout:int=0) -> NoReturn:
         """
         Sends stop command
         """
@@ -240,7 +246,8 @@ class NanoRC:
         if self.cfgsvr:
             self.cfgsvr.save_on_stop(self.run)
 
-        self.topnode.stop(path=None, raise_on_fail=True, timeout=self.timeout, force=force)
+        cmd_timeout = timeout if timeout != 0 else self.timeout
+        self.topnode.stop(path=None, raise_on_fail=True, timeout=cmd_timeout, force=force)
         self.return_code = self.topnode.return_code.value
 
         if self.return_code == 0:
@@ -252,7 +259,7 @@ class NanoRC:
 
 
 
-    def resume(self, trigger_interval_ticks: Union[int, None]) -> NoReturn:
+    def resume(self, trigger_interval_ticks: Union[int, None], timeout:int=0) -> NoReturn:
         """
         Sends resume command
 
@@ -271,8 +278,9 @@ class NanoRC:
                                    overwrite_data=runtime_resume_data,
                                    cfg_method="runtime_resume")
 
+        cmd_timeout = timeout if timeout != 0 else self.timeout
         self.topnode.resume(path=None, raise_on_fail=True,
                             cfg_method="runtime_resume",
                             overwrite_data=runtime_resume_data,
-                            timeout=self.timeout)
+                            timeout=cmd_timeout)
         self.return_code = self.topnode.return_code.value

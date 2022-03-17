@@ -93,20 +93,22 @@ timingcli.add_command(wait, 'wait')
 timingcli.add_command(terminate, 'terminate')
 
 @timingcli.command('start')
+@click.option('--timeout', type=int, default=0, help='start timeout')
 @click.pass_obj
 @click.pass_context
-def start(ctx, obj):
-    obj.rc.start(disable_data_storage=True, run_type="TEST")
+def start(ctx, obj, timeout:int):
+    obj.rc.start(disable_data_storage=True, run_type="TEST", timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
 
 
 @timingcli.command('stop')
+@click.option('--timeout', type=int, default=0, help='stop timeout')
 @click.pass_obj
 @click.pass_context
-def start(ctx, obj):
+def start(ctx, obj, timeout:int):
     obj.rc.stop()
-    check_rc(ctx,obj)
+    check_rc(ctx,obj, timeout=timeout)
     obj.rc.status()
 
 
