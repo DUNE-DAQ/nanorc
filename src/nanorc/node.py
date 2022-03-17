@@ -57,7 +57,8 @@ class SubsystemNode(StatefulNode):
         try:
             if self.pm is None:
                 self.pm = SSHProcessManager(self.console, self.ssh_conf)
-            self.pm.boot(self.cfgmgr.boot, event.kwargs.get('log'))
+            timeout = event.kwargs["timeout"]
+            self.pm.boot(self.cfgmgr.boot, event.kwargs.get('log'), timeout)
         except Exception as e:
             self.console.print_exception()
 
