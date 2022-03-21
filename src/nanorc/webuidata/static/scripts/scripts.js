@@ -2,6 +2,37 @@ var fsm = {};
 var root = "";
 var state = "";
 var selectedNode = null;
+var icons = {"none":"question.png",
+            "booted":"gray.png",
+            "initialised":"orange.png",
+            "configured":"yellow.png",
+            "running":"green.png",
+            "paused":"blue.png",
+            "error":"red.png"
+            }
+
+  function childrenTree(json, lId){
+    $.each( json, function(key, item ){
+        $(lId).append("<li id="+item.text+"_a class='childItemList w-100'><span style='width: 10px;'><img style='width: 20px;' src="+returnIcon(idList[findIdByName(item.text)].state)+">&nbsp;</img></span>"+item.text+" - "+idList[findIdByName(item.text)].state+"&nbsp;</li>");
+            if (item.hasOwnProperty('children')) {
+            $(lId).append("<ul id="+item.text+"_list>");
+            childrenTree(item.children, "#"+item.text+"_list")
+            $(lId).append("</ul>");
+        }
+    })
+}
+function refreshIcons(states){
+  $.each( states, function(key, item ){
+    $('#controlTree').jstree("set_icon",'#'+key,item.state);
+    if (item.hasOwnProperty('children')) {
+        childrenTree(item.children)
+    }
+})
+  $.each(idList, function (key,value){
+      $('#controlTree').jstree("set_icon",'#'+key,returnIcon(idList[key].state));
+  })
+}
+
 function populateButtons(){
 $( "#stateButtonsDiv" ).empty()
 console.log(fsm)
@@ -148,12 +179,19 @@ function sendComm(command,runnumber, runtype){
           //d = JSON.stringify(d);
           d = d.replace(/name/g, "text");
           d = JSON.parse(d)
+          $.each( d, function(key, item ){
+            item.id = item.text
+            if (item.hasOwnProperty('children')) {
+                childrenTree(item.children)
+            }
+          })
+          console.log(d)
           root = d.text
           $('#controlTree').jstree({
             'plugins': ['types'],
             'types' : {
                     'default' : {
-                    'icon' : '/static/pics/gray.png'
+                    'icon' : '/static/pics/question.png'
                     }
                 },
             //'contextmenu': {
