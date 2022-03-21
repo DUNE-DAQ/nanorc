@@ -181,7 +181,7 @@ function sendComm(command,runnumber, runtype){
           d = JSON.parse(d)
           console.log(d)
           $.each( d, function(key, item ){
-            console.log(d)
+            console.log(item)
             item.id = item.text
             if (item.hasOwnProperty('children')) {
                 childrenTree(item.children)
