@@ -21,6 +21,16 @@ var icons = {"none":"question.png",
         }
     })
 }
+function addId(json){
+$.each( json, function(key, item ){
+    console.log(item)
+    item.id = item.text
+    if (item.hasOwnProperty('children')) {
+        addId(item.children)
+    }
+  })
+return json
+}
 function refreshIcons(states){
   $.each( states, function(key, item ){
     $('#controlTree').jstree("set_icon",'#'+key,item.state);
@@ -180,13 +190,7 @@ function sendComm(command,runnumber, runtype){
           d = d.replace(/name/g, "text");
           d = JSON.parse(d)
           console.log(d)
-          $.each( d, function(key, item ){
-            console.log(item)
-            item.id = item.text
-            if (item.hasOwnProperty('children')) {
-                childrenTree(item.children)
-            }
-          })
+          d = addId(json)
           console.log(d)
           root = d.text
           $('#controlTree').jstree({
