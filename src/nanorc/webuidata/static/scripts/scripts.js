@@ -23,8 +23,9 @@ var icons = {"none":"question.png",
 }
 function addId(json){
 $.each( json, function(key, item ){
+    console.log(item.name)
     console.log(item)
-    item.id = item.text
+    item.id = item.name
     if (item.hasOwnProperty('children')) {
         addId(item.children)
     }
@@ -45,7 +46,6 @@ function refreshIcons(states){
 
 function populateButtons(){
 $( "#stateButtonsDiv" ).empty()
-console.log(fsm)
   for(var key in fsm.transitions) {   
       if(fsm.transitions[key]['source']==state || fsm.transitions[key]['source']== '*'){
         if(fsm.transitions[key]['dest'] != 'error'){
