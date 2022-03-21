@@ -190,7 +190,7 @@ function sendComm(command,runnumber, runtype){
           d = d.replace(/name/g, "text");
           d = JSON.parse(d)
           console.log(d)
-          d = addId(json)
+          d = addId(d)
           console.log(d)
           root = d.text
           $('#controlTree').jstree({
