@@ -215,4 +215,5 @@ It should be pointed out that some substitutions are made when nanorc uses a fil
 ## How to run WebUI
 
 WebUI running is handled by `nanocrestrc` command. WebUI needs you to provide only one parameter in addition.
-* `-s` - serveraddress - as your browser is running on your side, it needs the information where to find REST endpoints. Simply provide address of the interface of the computer you are running the server on. Default value is `localhost`
+* `-s` - serveraddress - as your browser is running on your side, it needs the information where to find REST endpoints. Simply provide address of the interface of the computer you are running the server on, or the DNS record if DNS is available. Default value is `localhost`
+So if you are running the nanorc on `np04-srv-010` you just `-s np04-srv-010`, or `-s 10.73.138.26` (address of `eno1` interface on `np04-srv-010`)
