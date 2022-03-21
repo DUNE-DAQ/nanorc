@@ -23,9 +23,9 @@ var icons = {"none":"question.png",
 }
 function addId(json){
 $.each( json, function(key, item ){
-    console.log(item.name)
+    console.log(item.text)
     console.log(item)
-    item.id = item.name
+    item.id = item.text
     if (item.hasOwnProperty('children')) {
         addId(item.children)
     }
