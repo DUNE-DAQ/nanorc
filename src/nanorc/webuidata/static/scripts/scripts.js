@@ -22,7 +22,8 @@ var icons = {"none":"question.png",
     })
 }
 function addId(json){
-$.each( json, function(key, item ){
+json.id = json.text
+$.each( json, function(item ){
     console.log(item.text)
     console.log(item)
     item.id = item.text
