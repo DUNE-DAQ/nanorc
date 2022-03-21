@@ -35,6 +35,7 @@ function refreshIcons(states){
 
 function populateButtons(){
 $( "#stateButtonsDiv" ).empty()
+console.log(fsm)
   for(var key in fsm.transitions) {   
       if(fsm.transitions[key]['source']==state || fsm.transitions[key]['source']== '*'){
         if(fsm.transitions[key]['dest'] != 'error'){
@@ -180,7 +181,7 @@ function sendComm(command,runnumber, runtype){
           d = JSON.parse(d)
           console.log(d)
           $.each( d, function(key, item ){
-            console.log(item)
+            console.log(d)
             item.id = item.text
             if (item.hasOwnProperty('children')) {
                 childrenTree(item.children)
