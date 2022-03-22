@@ -11,16 +11,6 @@ var icons = {"none":"/static/pics/question.png",
             "error":"/static/pics/red.png"
             }
 
-  function childrenTree(json, lId){
-    $.each( json, function(key, item ){
-        $(lId).append("<li id="+item.text+"_a class='childItemList w-100'><span style='width: 10px;'><img style='width: 20px;' src="+returnIcon(idList[findIdByName(item.text)].state)+">&nbsp;</img></span>"+item.text+" - "+idList[findIdByName(item.text)].state+"&nbsp;</li>");
-            if (item.hasOwnProperty('children')) {
-            $(lId).append("<ul id="+item.text+"_list>");
-            childrenTree(item.children, "#"+item.text+"_list")
-            $(lId).append("</ul>");
-        }
-    })
-}
 function addId(json){
   $.each( json, function(key,item ){
     if (item.hasOwnProperty('text')) {
