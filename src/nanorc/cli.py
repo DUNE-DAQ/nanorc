@@ -11,6 +11,7 @@ import json
 import cmd
 import click
 import click_shell
+from click_shell import make_click_shell
 import os.path
 import logging
 
@@ -152,6 +153,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
 
     ctx.call_on_close(cleanup_rc)
     obj.rc = rc
+    obj.shell = ctx.command
     rc.ls(False)
 
 @cli.command('status')
@@ -304,3 +306,11 @@ def wait(obj, seconds):
             progress.update(waiting, advance=1)
 
             time.sleep(1)
+
+@cli.command('shell')
+@click.pass_obj
+@click.pass_context
+def start_shell(ctx, obj):
+    ctx.command = obj.shell
+    shell = make_click_shell(ctx,prompt=ctx.command.shell.prompt)
+    shell.cmdloop()
