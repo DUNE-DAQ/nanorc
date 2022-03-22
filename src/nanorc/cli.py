@@ -312,5 +312,5 @@ def wait(obj, seconds):
 @click.pass_context
 def start_shell(ctx, obj):
     ctx.command = obj.shell
-    shell = make_click_shell(ctx,prompt=f'{credentials.user}@rc> ')
+    shell = make_click_shell(ctx,prompt=ctx.command.shell.prompt)
     shell.cmdloop()
