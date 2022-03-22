@@ -160,7 +160,7 @@ def status(obj: NanoContext):
     obj.rc.status()
 
 @cli.command('boot')
-@click.option('--timeout', type=int, default=0, help='boot timeout')
+@click.option('--timeout', type=int, default=None, help='boot timeout')
 @click.pass_obj
 @click.pass_context
 def boot(ctx, obj, timeout:int):
@@ -170,7 +170,7 @@ def boot(ctx, obj, timeout:int):
 
 @cli.command('init')
 @click.option('--path', type=str, default=None, callback=validatePath)
-@click.option('--timeout', type=int, default=0, help='init timeout')
+@click.option('--timeout', type=int, default=None, help='init timeout')
 @click.pass_obj
 @click.pass_context
 def init(ctx, obj, path, timeout:int):
@@ -186,7 +186,7 @@ def ls(obj):
 
 @cli.command('conf')
 @click.option('--path', type=str, default=None, callback=validatePath)
-@click.option('--timeout', type=int, default=0, help='conf timeout')
+@click.option('--timeout', type=int, default=None, help='conf timeout')
 @click.pass_obj
 @click.pass_context
 def conf(ctx, obj, path, timeout:int):
@@ -207,7 +207,7 @@ def message(obj, message):
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.option('--resume-wait', type=int, default=0, help='Seconds to wait between Start and Resume commands')
 @click.option('--message', type=str, default="")
-@click.option('--timeout', type=int, default=0, help='start timeout')
+@click.option('--timeout', type=int, default=None, help='start timeout')
 @click.pass_obj
 @click.pass_context
 def start(ctx, obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str, timeout:int):
@@ -235,7 +235,7 @@ def start(ctx, obj:NanoContext, run:int, disable_data_storage:bool, trigger_inte
 @click.option('--stop-wait', type=int, default=0, help='Seconds to wait between Pause and Stop commands')
 @click.option('--force', default=False, is_flag=True)
 @click.option('--message', type=str, default="")
-@click.option('--timeout', type=int, default=0, help='stop timeout')
+@click.option('--timeout', type=int, default=None, help='stop timeout')
 @click.pass_obj
 @click.pass_context
 def stop(ctx, obj, stop_wait:int, force:bool, message:str, timeout:int):
@@ -248,7 +248,7 @@ def stop(ctx, obj, stop_wait:int, force:bool, message:str, timeout:int):
         obj.rc.status()
 
 @cli.command('pause')
-@click.option('--timeout', type=int, default=0, help='pause timeout')
+@click.option('--timeout', type=int, default=None, help='pause timeout')
 @click.pass_obj
 @click.pass_context
 def pause(ctx, obj, timeout:int):
@@ -258,7 +258,7 @@ def pause(ctx, obj, timeout:int):
 
 @cli.command('resume')
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
-@click.option('--timeout', type=int, default=0, help='resume timeout')
+@click.option('--timeout', type=int, default=None, help='resume timeout')
 @click.pass_obj
 @click.pass_context
 def resume(ctx, obj:NanoContext, trigger_interval_ticks:int, timeout:int):
@@ -276,7 +276,7 @@ def resume(ctx, obj:NanoContext, trigger_interval_ticks:int, timeout:int):
 @cli.command('scrap')
 @click.option('--path', type=str, default=None, callback=validatePath)
 @click.option('--force', default=False, is_flag=True)
-@click.option('--timeout', type=int, default=0, help='scrap timeout')
+@click.option('--timeout', type=int, default=None, help='scrap timeout')
 @click.pass_obj
 @click.pass_context
 def scrap(ctx, obj, path, force, timeout):

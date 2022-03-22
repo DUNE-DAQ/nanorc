@@ -133,7 +133,7 @@ def kinit(ctx, obj):
 @click.option('--stop-wait', type=int, default=0, help='Seconds to wait between Pause and Stop commands')
 @click.option('--force', default=False, is_flag=True)
 @click.option('--message', type=str, default="")
-@click.option('--timeout', type=int, default=0, help='stop timeout')
+@click.option('--timeout', type=int, default=None, help='stop timeout')
 @click.pass_obj
 @click.pass_context
 def stop(ctx, obj, stop_wait:int, force:bool, message:str, timeout:int):
@@ -165,7 +165,7 @@ def message(obj, message):
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.option('--resume-wait', type=int, default=0, help='Seconds to wait between Start and Resume commands')
 @click.option('--message', type=str, default="")
-@click.option('--timeout', type=int, default=0, help='start timeout')
+@click.option('--timeout', type=int, default=None, help='start timeout')
 @click.pass_obj
 @click.pass_context
 def start(ctx, obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str, timeout:int):
