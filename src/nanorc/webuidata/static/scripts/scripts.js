@@ -2,13 +2,13 @@ var fsm = {};
 var root = "";
 var state = "";
 var selectedNode = null;
-var icons = {"none":"question.png",
-            "booted":"gray.png",
-            "initialised":"orange.png",
-            "configured":"yellow.png",
-            "running":"green.png",
-            "paused":"blue.png",
-            "error":"red.png"
+var icons = {"none":"/static/pics/question.png",
+            "booted":"/static/pics/gray.png",
+            "initialised":"/static/pics/orange.png",
+            "configured":"/static/pics/yellow.png",
+            "running":"/static/pics/green.png",
+            "paused":"/static/pics/blue.png",
+            "error":"/static/pics/red.png"
             }
 
   function childrenTree(json, lId){
@@ -22,27 +22,23 @@ var icons = {"none":"question.png",
     })
 }
 function addId(json){
-json.id = json.text
-$.each( json, function(item ){
-    console.log(item.text)
-    console.log(item)
-    item.id = item.text
-    if (item.hasOwnProperty('children')) {
-        addId(item.children)
+  $.each( json, function(key,item ){
+    if (item.hasOwnProperty('text')) {
+      item.id = item.text
     }
-  })
+    if (item.hasOwnProperty('children')) {
+      item.children = addId(item.children)
+    }
+    })
 return json
 }
 function refreshIcons(states){
   $.each( states, function(key, item ){
-    $('#controlTree').jstree("set_icon",'#'+key,item.state);
+    $('#controlTree').jstree("set_icon",'#'+item.name,icons[item.state]);
     if (item.hasOwnProperty('children')) {
-        childrenTree(item.children)
+      refreshIcons(item.children)
     }
 })
-  $.each(idList, function (key,value){
-      $('#controlTree').jstree("set_icon",'#'+key,returnIcon(idList[key].state));
-  })
 }
 
 function populateButtons(){
@@ -72,6 +68,9 @@ $.ajax({
     //d = JSON.stringify(d);
     d = d.replace(/name/g, "text");
     d = JSON.parse(d)
+    if (d.hasOwnProperty('children')) {
+      d.children = addId(d.children)
+    }
     root = d.text
   $('#controlTree').jstree(true).settings.core.data = d;
   $('#controlTree').jstree(true).refresh();
@@ -98,8 +97,8 @@ function sendComm(command,runnumber, runtype){
       data: dataload,
       success: function (d) {
         alert(JSON.stringify(d));
-        getStatus()
         getTree()
+        getStatus()
       },
       error: function(e){
       console.log(e)
@@ -130,7 +129,11 @@ function sendComm(command,runnumber, runtype){
         success: function (d) {
           d = JSON.parse(d)
           $("#state:text").val(d.state)
+          $('#controlTree').jstree("set_icon",'#j1_1',icons[d.state]);
           state = d.state
+          if (d.hasOwnProperty('children')) {
+            refreshIcons(d.children)
+          }
           populateButtons()
           $('#json-renderer').jsonViewer(d);
         },
@@ -190,9 +193,10 @@ function sendComm(command,runnumber, runtype){
           //d = JSON.stringify(d);
           d = d.replace(/name/g, "text");
           d = JSON.parse(d)
-          console.log(d)
-          d = addId(d)
-          console.log(d)
+
+          if (d.hasOwnProperty('children')) {
+            d.children = addId(d.children)
+          }
           root = d.text
           $('#controlTree').jstree({
             'plugins': ['types'],
@@ -211,11 +215,12 @@ function sendComm(command,runnumber, runtype){
       
             }
         });
+        getStatus()
         },
         error: function(e){
           alert(JSON.stringify(e));
         }
       });
-      getStatus()
+      
       $("#selected").text('Selected: '+root)
     })
