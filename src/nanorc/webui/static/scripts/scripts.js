@@ -2,9 +2,47 @@ var fsm = {};
 var root = "";
 var state = "";
 var selectedNode = null;
+var icons = {"none":"/static/pics/question.png",
+            "booted":"/static/pics/gray.png",
+            "initialised":"/static/pics/orange.png",
+            "configured":"/static/pics/yellow.png",
+            "running":"/static/pics/green.png",
+            "paused":"/static/pics/blue.png",
+            "error":"/static/pics/red.png"
+            }
+
+  function childrenTree(json, lId){
+    $.each( json, function(key, item ){
+        $(lId).append("<li id="+item.text+"_a class='childItemList w-100'><span style='width: 10px;'><img style='width: 20px;' src="+returnIcon(idList[findIdByName(item.text)].state)+">&nbsp;</img></span>"+item.text+" - "+idList[findIdByName(item.text)].state+"&nbsp;</li>");
+            if (item.hasOwnProperty('children')) {
+            $(lId).append("<ul id="+item.text+"_list>");
+            childrenTree(item.children, "#"+item.text+"_list")
+            $(lId).append("</ul>");
+        }
+    })
+}
+function addId(json){
+  $.each( json, function(key,item ){
+    if (item.hasOwnProperty('text')) {
+      item.id = item.text
+    }
+    if (item.hasOwnProperty('children')) {
+      item.children = addId(item.children)
+    }
+    })
+return json
+}
+function refreshIcons(states){
+  $.each( states, function(key, item ){
+    $('#controlTree').jstree("set_icon",'#'+item.name,icons[item.state]);
+    if (item.hasOwnProperty('children')) {
+      refreshIcons(item.children)
+    }
+})
+}
+
 function populateButtons(){
 $( "#stateButtonsDiv" ).empty()
-console.log(fsm)
   for(var key in fsm.transitions) {   
       if(fsm.transitions[key]['source']==state || fsm.transitions[key]['source']== '*'){
         if(fsm.transitions[key]['dest'] != 'error'){
@@ -30,6 +68,9 @@ $.ajax({
     //d = JSON.stringify(d);
     d = d.replace(/name/g, "text");
     d = JSON.parse(d)
+    if (d.hasOwnProperty('children')) {
+      d.children = addId(d.children)
+    }
     root = d.text
   $('#controlTree').jstree(true).settings.core.data = d;
   $('#controlTree').jstree(true).refresh();
@@ -56,8 +97,8 @@ function sendComm(command,runnumber, runtype){
       data: dataload,
       success: function (d) {
         alert(JSON.stringify(d));
-        getStatus()
         getTree()
+        getStatus()
       },
       error: function(e){
       console.log(e)
@@ -88,7 +129,11 @@ function sendComm(command,runnumber, runtype){
         success: function (d) {
           d = JSON.parse(d)
           $("#state:text").val(d.state)
+          $('#controlTree').jstree("set_icon",'#j1_1',icons[d.state]);
           state = d.state
+          if (d.hasOwnProperty('children')) {
+            refreshIcons(d.children)
+          }
           populateButtons()
           $('#json-renderer').jsonViewer(d);
         },
@@ -148,12 +193,16 @@ function sendComm(command,runnumber, runtype){
           //d = JSON.stringify(d);
           d = d.replace(/name/g, "text");
           d = JSON.parse(d)
+
+          if (d.hasOwnProperty('children')) {
+            d.children = addId(d.children)
+          }
           root = d.text
           $('#controlTree').jstree({
             'plugins': ['types'],
             'types' : {
                     'default' : {
-                    'icon' : '/static/pics/gray.png'
+                    'icon' : '/static/pics/question.png'
                     }
                 },
             //'contextmenu': {
@@ -166,11 +215,12 @@ function sendComm(command,runnumber, runtype){
       
             }
         });
+        getStatus()
         },
         error: function(e){
           alert(JSON.stringify(e));
         }
       });
-      getStatus()
+      
       $("#selected").text('Selected: '+root)
     })
