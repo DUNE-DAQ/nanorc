@@ -11,6 +11,16 @@ var icons = {"none":"/static/pics/question.png",
             "error":"/static/pics/red.png"
             }
 
+  function statusTable(json, level){
+    $.each( json, function(key, item ){
+            if (item.hasOwnProperty('children')) {
+              $("#statustable").append("<tr><th scope='row'>"+"&emsp;&emsp;".repeat(level)+item.name+"</th><td>"+item.state+"</td><td></td><td></td><td></td></tr>");
+              statusTable(item.children, level+1)
+        }else{
+          $("#statustable").append("<tr><th scope='row'>"+"&emsp;&emsp;".repeat(level)+item.name+"</th><td>"+item.state+"&nbsp; - &nbsp;"+item.process_state+"</td><td>"+item.host+"</td><td>"+item.last_sent_command+"</td><td>"+item.last_ok_command+"</td></tr>");
+        }
+    })
+}
 function addId(json){
   $.each( json, function(key,item ){
     if (item.hasOwnProperty('text')) {
@@ -121,6 +131,8 @@ function sendComm(command,runnumber, runtype){
           $("#state:text").val(d.state)
           $('#controlTree').jstree("set_icon",'#j1_1',icons[d.state]);
           state = d.state
+          $("#statustable").empty()
+          statusTable({d}, 0)
           if (d.hasOwnProperty('children')) {
             refreshIcons(d.children)
           }
