@@ -11,13 +11,13 @@ var icons = {"none":"/static/pics/question.png",
             "error":"/static/pics/red.png"
             }
 
-  function childrenTree(json, lId){
+  function statusTable(json, level){
     $.each( json, function(key, item ){
-        $(lId).append("<li id="+item.text+"_a class='childItemList w-100'><span style='width: 10px;'><img style='width: 20px;' src="+returnIcon(idList[findIdByName(item.text)].state)+">&nbsp;</img></span>"+item.text+" - "+idList[findIdByName(item.text)].state+"&nbsp;</li>");
             if (item.hasOwnProperty('children')) {
-            $(lId).append("<ul id="+item.text+"_list>");
-            childrenTree(item.children, "#"+item.text+"_list")
-            $(lId).append("</ul>");
+              $("#statustable").append("<tr><th scope='row'>"+"&emsp;&emsp;".repeat(level)+item.name+"</th><td>"+item.state+"</td><td></td><td></td><td></td></tr>");
+              statusTable(item.children, level+1)
+        }else{
+          $("#statustable").append("<tr><th scope='row'>"+"&emsp;&emsp;".repeat(level)+item.name+"</th><td>"+item.state+"&nbsp; - &nbsp;"+item.process_state+"</td><td>"+item.host+"</td><td>"+item.last_sent_command+"</td><td>"+item.last_ok_command+"</td></tr>");
         }
     })
 }
@@ -131,6 +131,8 @@ function sendComm(command,runnumber, runtype){
           $("#state:text").val(d.state)
           $('#controlTree').jstree("set_icon",'#j1_1',icons[d.state]);
           state = d.state
+          $("#statustable").empty()
+          statusTable({d}, 0)
           if (d.hasOwnProperty('children')) {
             refreshIcons(d.children)
           }
