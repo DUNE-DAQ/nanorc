@@ -74,7 +74,7 @@ def timingcli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, ker
         raise click.Abort()
 
     def cleanup_rc():
-        logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
+        if rc.topnode.state != 'none': logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
         rc.terminate()
         if rc.return_code:
             ctx.exit(rc.return_code)
