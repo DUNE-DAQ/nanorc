@@ -38,7 +38,7 @@ from .cli import *
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
-@click.argument('cfg_dir', type=click.Path(exists=True))
+@click.argument('cfg_dir', type=str, callback=validate_conf)
 @click.pass_obj
 @click.pass_context
 def timingcli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, kerberos, cfg_dir):

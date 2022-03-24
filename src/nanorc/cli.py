@@ -97,6 +97,16 @@ def check_rc(ctx, obj):
     if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
         ctx.exit(obj.rc.return_code)
 
+def validate_conf(ctx, param, top_cfg):
+    print(top_cfg)
+    if os.path.isdir(top_cfg):
+        return top_cfg
+    if os.path.exists(top_cfg) and top_cfg[-5:]=='.json':
+        return top_cfg
+    if top_cfg.find('confservice:')==0:
+        return top_cfg
+    raise click.BadParameter(f"TOP_CFG should either be a directory, a json file, or a config service utility with the form confservice:the_conf_name! You provided: '{top_cfg}'")
+
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 @click.version_option(__version__)
@@ -107,7 +117,7 @@ def check_rc(ctx, obj):
 @click.option('--log-path', type=click.Path(exists=True), default=None, help='Where the logs should go (on localhost of applications)')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
-@click.argument('top_cfg', type=click.Path(exists=True))
+@click.argument('top_cfg', callback=validate_conf, type=str)
 @click.pass_obj
 @click.pass_context
 def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, top_cfg):

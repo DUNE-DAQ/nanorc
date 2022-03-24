@@ -1,7 +1,13 @@
 import os.path
 import json
+from pathlib import Path
 import copy
 import socket
+import requests
+import importlib.resources as resources
+import tempfile
+from rich.console import Console
+from . import confdata
 
 """Extract nested values from a JSON tree."""
 
@@ -26,12 +32,52 @@ def json_extract(obj, key):
     values = extract(obj, arr, key)
     return values
 
+def dump_json_recursively(json_data, path):
+    for f in json_data['files']:
+        with open(path/(f['name']+'.json'), 'w') as outfile:
+            json.dump(f['configuration'], outfile, indent=4)
+
+    for d in json_data['dirs']:
+        dirname = path/d['name']
+        dirname.mkdir(exist_ok=True)
+        dump_json_recursively(d['dir_content'], dirname)
+
 
 class ConfigManager:
     """docstring for ConfigManager"""
 
-    def __init__(self, cfg_dir):
+    def __init__(self, console, cfg_dir):
         super().__init__()
+        self.console = console
+        conf_service_flag = 'confservice:'
+
+        if cfg_dir.find(conf_service_flag) == 0:
+            conf_name = cfg_dir.replace(conf_service_flag, '')
+            console.log(f'Using the configuration service to grab \'{conf_name}\'')
+
+            conf_service={}
+            with resources.path(confdata, "config_service.json") as p:
+                conf_service = json.load(open(p,'r'))
+            url = conf_service['socket']
+
+            version_pos = conf_name.find(':v')
+            r = None
+            if version_pos>0:
+                version = conf_name[version_pos+2:]
+                conf_name = conf_name[:version_pos]
+                console.log(f'Using version {version} of \'{conf_name}\'.')
+                r = requests.get('http://'+url+'/retrieveVersion?name='+conf_name+'&version='+version)
+            else:
+                console.log(f'Using latest version of \'{conf_name}\'.')
+                r = requests.get('http://'+url+'/retrieveLast?name='+conf_name)
+
+            if r.status_code == 200:
+                config = json.loads(r.json())
+                path = Path(tempfile.mkdtemp())
+                dump_json_recursively(config, path)
+                cfg_dir = path
+            else:
+                raise RuntimeError(f'Unexpected HTTP status code: {r.status_code}: {r.json()}\nAre you sure the configuration \'{conf_name}\' exist?')
 
         cfg_dir = os.path.expandvars(cfg_dir)
 

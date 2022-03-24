@@ -7,6 +7,7 @@ setup(
         "click",
         "click-shell",
         "Flask",
+        "requests",
         "rich",
         "sh",
         "graphviz",

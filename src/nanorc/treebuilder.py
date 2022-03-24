@@ -28,7 +28,7 @@ class TreeBuilder:
             elif isinstance(d, str):
                 node = SubsystemNode(name=n,
                                      ssh_conf=self.ssh_conf,
-                                     cfgmgr=ConfigManager(d),
+                                     cfgmgr=ConfigManager(self.console,d),
                                      console=self.console,
                                      fsm_conf = fsm_conf,
                                      parent = mother)
@@ -49,8 +49,15 @@ class TreeBuilder:
         elif os.path.isfile(top_cfg):
             f = open(top_cfg, 'r')
             data = f.read()
+        elif top_cfg.find('confservice:')==0:
+            pretty_name=top_cfg.replace('confservice:', '')
+            data = {
+                "apparatus_id": pretty_name,
+                pretty_name:top_cfg
+            }
+            data = json.dumps(data)
         else:
-            self.log.error(f"{top_cfg} invalid! You must provide either a top level json file or a directory name")
+            self.log.error(f"{top_cfg} invalid! You must provide either a top level json file, a directory name, or confservice:configuration")
             exit(1)
 
         self.console = console
