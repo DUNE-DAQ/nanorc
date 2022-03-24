@@ -39,11 +39,12 @@ from .cli import *
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
 @click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
+@click.option('--port-offset', type=int, default=0, help='Application port offsetting for running more than one nanorc instance on the same node')
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.argument('user', type=str)
 @click.pass_obj
 @click.pass_context
-def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, timeout, cfg_dumpdir, dotnanorc, kerberos, cfg_dir, user):
+def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, timeout, cfg_dumpdir, dotnanorc, kerberos, port_offset, cfg_dir, user):
 
     if not elisa_conf:
         with resources.path(confdata, "elisa_conf.json") as p:
@@ -88,7 +89,8 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, timeout, cfg_du
                     run_registry = DBConfigSaver(runreg_socket),
                     logbook_type = elisa_conf,
                     timeout = timeout,
-                    use_kerb = kerberos)
+                    use_kerb = kerberos,
+                    port_offset = port_offset)
 
         rc.log_path = os.path.abspath(log_path)
     except Exception as e:

@@ -38,10 +38,11 @@ from .cli import *
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
+@click.option('--port-offset', type=int, default=0, help='Application port offsetting for running more than one nanorc instance on the same node')
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def timingcli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, kerberos, cfg_dir):
+def timingcli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, kerberos, port-offset, cfg_dir):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f"{credentials.user}@timingrc> "
@@ -66,7 +67,8 @@ def timingcli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, ker
                     run_registry = None,
                     logbook_type = None,
                     timeout = timeout,
-                    use_kerb = kerberos)
+                    use_kerb = kerberos,
+                    port_offset = port_offset)
 
         rc.log_path = os.path.abspath(log_path)
     except Exception as e:

@@ -30,7 +30,7 @@ def json_extract(obj, key):
 class ConfigManager:
     """docstring for ConfigManager"""
 
-    def __init__(self, cfg_dir):
+    def __init__(self, cfg_dir, port_offset):
         super().__init__()
 
         cfg_dir = os.path.expandvars(cfg_dir)
@@ -39,7 +39,7 @@ class ConfigManager:
             raise RuntimeError(f"'{cfg_dir}' does not exist or is not a directory")
 
         self.cfg_dir = cfg_dir
-
+        self.port_offset = port_offset
         self._load()
 
     def _import_cmd_data(self, cmd: str, cfg: dict) -> None:
@@ -90,6 +90,11 @@ class ConfigManager:
             n: (h if (not h in ("localhost", "127.0.0.1")) else socket.gethostname())
             for n, h in self.boot["hosts"].items()
         }
+
+        #port offseting
+        for app in self.boot["apps"]:
+            self.boot['apps'][app]['port'] += self.port_offset
+        self.boot['response_listener']['port'] += self.port_offset
 
         ll = { **self.boot["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration
         for k, v in ll.items():
