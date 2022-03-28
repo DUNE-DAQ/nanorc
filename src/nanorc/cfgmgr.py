@@ -34,7 +34,7 @@ class ConfigManager:
         super().__init__()
 
         cfg_dir = os.path.expandvars(cfg_dir)
-        
+
         if not (os.path.exists(cfg_dir) and os.path.isdir(cfg_dir)):
             raise RuntimeError(f"'{cfg_dir}' does not exist or is not a directory")
 
@@ -91,31 +91,57 @@ class ConfigManager:
             for n, h in self.boot["hosts"].items()
         }
 
-        for k, v in self.boot["env"].items():
-            if str(v).find("getenv") == 0:
+        ll = { **self.boot["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration
+        for k, v in ll.items():
+            if v == "getenv_ifset":
+                if k in os.environ.keys():
+                    self.boot["env"][k] = os.environ[k]
+                else:
+                    self.boot["env"].pop(k)
+            elif str(v).find("getenv") == 0:
                 if k in os.environ.keys():
                     self.boot["env"][k] = os.environ[k]
                 elif str(v).find(":") > 0:
                     self.boot["env"][k] = v[v.find(":") + 1:]
                 else:
                     raise ValueError("Key " + k + " is not in environment and no default specified!")
-               
+
         for exec_spec in self.boot["exec"].values():
-            for k, v in exec_spec["env"].items():
-                if str(v).find("getenv") == 0:
+            ll = { **exec_spec["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration
+            for k, v in ll.items():
+                if v == "getenv_ifset":
+                    if k in os.environ.keys():
+                        exec_spec["env"][k] = os.environ[k]
+                    else:
+                        exec_spec["env"].pop(k)
+                elif str(v).find("getenv") == 0:
                     if k in os.environ.keys():
                         exec_spec["env"][k] = os.environ[k]
                     elif str(v).find(":") > 0:
                         exec_spec["env"][k] = v[v.find(":") + 1:]
                     else:
                         raise ValueError("Key " + k + " is not in environment and no default specified!")
-            
+
         # Conf:
         ips = {n: socket.gethostbyname(h) for n, h in self.boot["hosts"].items()}
         # Set addresses to ips for networkmanager
         for connections in json_extract(self.init, "nwconnections"):
-            for c in connections: c["address"] = c["address"].format(**ips) 
-            
+            for c in connections:
+                from string import Formatter
+                fieldnames = [fname for _, fname, _, _ in Formatter().parse(c['address']) if fname]
+                if len(fieldnames)>1:
+                    raise RuntimeError(f"Too many fields in connection {c['address']}")
+                for fieldname in fieldnames:
+                    if fieldname in ips:
+                        c["address"] = c["address"].format(**ips)
+                    else:
+                        try:
+                            dico = {"HOST_IP":socket.gethostbyname(fieldname)}
+                            c['address'] = c['address'].replace(fieldname, "HOST_IP").format(**dico)
+                        except Exception as e:
+                            raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
+
+
 
     def runtime_start(self, data: dict) -> dict:
         """

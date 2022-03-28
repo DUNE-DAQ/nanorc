@@ -35,6 +35,7 @@ from .cli import *
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--log-path', type=click.Path(exists=True), default='/log', help='Where the logs should go (on localhost of applications)')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
+@click.option('--elisa-conf', type=click.Path(exists=True), default=None, help='ELisA configuration (by default, use the one in src/nanorc/confdata)')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
 @click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
@@ -42,7 +43,12 @@ from .cli import *
 @click.argument('user', type=str)
 @click.pass_obj
 @click.pass_context
-def np04cli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, dotnanorc, kerberos, cfg_dir, user):
+def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, timeout, cfg_dumpdir, dotnanorc, kerberos, cfg_dir, user):
+
+    if not elisa_conf:
+        with resources.path(confdata, "elisa_conf.json") as p:
+            elisa_conf = p
+
     obj.print_traceback = traceback
     credentials.change_user(user)
     ctx.command.shell.prompt = f"{credentials.user}@np04rc> "
@@ -54,7 +60,6 @@ def np04cli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, dotna
     grid.add_row(f"Use it with care, {credentials.user}!")
 
     obj.console.print(Panel.fit(grid))
-
 
     if loglevel:
         updateLogLevel(loglevel)
@@ -81,10 +86,11 @@ def np04cli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, dotna
                     top_cfg = cfg_dir,
                     run_num_mgr = DBRunNumberManager(rundb_socket),
                     run_registry = DBConfigSaver(runreg_socket),
-                    logbook_type = "elisa",
+                    logbook_type = elisa_conf,
                     timeout = timeout,
                     use_kerb = kerberos)
-        rc.log_path = log_path
+
+        rc.log_path = os.path.abspath(log_path)
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()
@@ -98,7 +104,6 @@ def np04cli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, dotna
     ctx.call_on_close(cleanup_rc)
     obj.rc = rc
     rc.ls(False)
-
 
 np04cli.add_command(status, 'status')
 np04cli.add_command(boot, 'boot')
@@ -129,14 +134,17 @@ def kinit(ctx, obj):
 @click.option('--force', default=False, is_flag=True)
 @click.option('--message', type=str, default="")
 @click.pass_obj
-def stop(obj, stop_wait:int, force:bool, message:str):
+@click.pass_context
+def stop(ctx, obj, stop_wait:int, force:bool, message:str):
     if not credentials.check_kerberos_credentials():
         logging.getLogger("cli").error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
         return
     obj.rc.pause(force)
+    check_rc(ctx,obj)
     obj.rc.status()
     time.sleep(stop_wait)
     obj.rc.stop(force, message=message)
+    check_rc(ctx,obj)
     obj.rc.status()
 
 
@@ -157,7 +165,8 @@ def message(obj, message):
 @click.option('--resume-wait', type=int, default=0, help='Seconds to wait between Start and Resume commands')
 @click.option('--message', type=str, default="")
 @click.pass_obj
-def start(obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str):
+@click.pass_context
+def start(ctx, obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str):
     """
     Start Command
 
@@ -170,9 +179,11 @@ def start(obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_inte
         return
 
     obj.rc.start(disable_data_storage, run_type, message=message)
+    check_rc(ctx,obj)
     obj.rc.status()
     time.sleep(resume_wait)
     obj.rc.resume(trigger_interval_ticks)
+    check_rc(ctx,obj)
     obj.rc.status()
 
 
