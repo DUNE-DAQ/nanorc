@@ -105,20 +105,23 @@ function sendComm(command,runnumber, runtype){
       }
   });
 }
-  function getStatus(){
-    if(selectedNode==null){
-        url = "http://"+serverhost+"/nanorcrest/status"
+  function getStatus(regCheck=false){
+    if (regCheck == true){
+      url = "http://"+serverhost+"/nanorcrest/status"
     }else{
-      if(selectedNode.text==root){
-        url = "http://"+serverhost+"/nanorcrest/status"
+      if(selectedNode==null){
+          url = "http://"+serverhost+"/nanorcrest/status"
       }else{
-        selText= selectedNode
-        path=$('#controlTree').jstree(true).get_path(selText,".")
-        path = path.replace(root+".", "");
-        url = "http://"+serverhost+"/nanorcrest/node/"+path
+        if(selectedNode.text==root){
+          url = "http://"+serverhost+"/nanorcrest/status"
+        }else{
+          selText= selectedNode
+          path=$('#controlTree').jstree(true).get_path(selText,".")
+          path = path.replace(root+".", "");
+          url = "http://"+serverhost+"/nanorcrest/node/"+path
+        }
       }
     }
-    console.log(url)
     $.ajax({
         url: url,
         beforeSend: function(xhr) { 
@@ -131,18 +134,22 @@ function sendComm(command,runnumber, runtype){
           $("#state:text").val(d.state)
           $('#controlTree').jstree("set_icon",'#j1_1',icons[d.state]);
           state = d.state
-          $("#statustable").empty()
-          statusTable({d}, 0)
           if (d.hasOwnProperty('children')) {
             refreshIcons(d.children)
           }
           populateButtons()
-          $('#json-renderer').jsonViewer(d);
+          if (regCheck == false){
+            $("#statustable").empty()
+            statusTable({d}, 0)
+          }else{
+            getStatus()
+          }
         },
         error: function(e){
           console.log(e)
         }
-    });}
+    });
+  }
   function getFsm(){
   $.ajax({
       url: "http://"+serverhost+"/nanorcrest/fsm",
@@ -179,6 +186,7 @@ function sendComm(command,runnumber, runtype){
 	}).resize();
     $(document).ready(function() {
       getFsm()
+      setInterval(getStatus, 1000, true);
       $.ajax({
         url: "http://"+serverhost+"/nanorcrest/tree",
         beforeSend: function(xhr) { 
