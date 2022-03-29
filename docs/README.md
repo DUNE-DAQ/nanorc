@@ -109,7 +109,7 @@ shonky rc> status
 
 When you've seen enough use `stop`, `scrap` and `terminate` commands. In case you experience timeout problems booting applications or sending commands, consider changing the `hosts` values from `localhost` to the hostname of your machine. This has to do with SSH authentication.
 
-nanorc commands can be autocompleted with TAB, for example, TAB will autocomplete `r` to `resume`. Options like `--disable-data-storage` will be completed with TAB after typing `start --d`
+nanorc commands can be autocompleted with TAB, for example, TAB will autocomplete `r` to `resume`. Options like `--disable-data-storage` will be completed with TAB after typing `start --d`.
 
 You can also control nanorc in "batch mode", e.g.:
 ```
