@@ -1,6 +1,7 @@
 var fsm = {};
 var root = "";
 var state = "";
+var statusTick;
 var selectedNode = null;
 var icons = {"none":"/static/pics/question.png",
             "booted":"/static/pics/gray.png",
@@ -81,6 +82,7 @@ $.ajax({
 });
 }
 function sendComm(command,runnumber, runtype){
+  clearInterval(statusTick);
   $("#state:text").val('Executing...')
   $(".control").attr("disabled", true);
   if(command == 'start'){
@@ -98,7 +100,7 @@ function sendComm(command,runnumber, runtype){
       success: function (d) {
         alert(JSON.stringify(d));
         getTree()
-        getStatus()
+        statusTick = setInterval(getStatus, 1000, true);
       },
       error: function(e){
       console.log(e)
@@ -106,6 +108,7 @@ function sendComm(command,runnumber, runtype){
   });
 }
   function getStatus(regCheck=false){
+    console.log("stat")
     if (regCheck == true){
       url = "http://"+serverhost+"/nanorcrest/status"
     }else{
@@ -186,7 +189,7 @@ function sendComm(command,runnumber, runtype){
 	}).resize();
     $(document).ready(function() {
       getFsm()
-      setInterval(getStatus, 1000, true);
+      statusTick = setInterval(getStatus, 1000, true);
       $.ajax({
         url: "http://"+serverhost+"/nanorcrest/tree",
         beforeSend: function(xhr) { 
