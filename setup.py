@@ -13,6 +13,8 @@ setup(
         "kubernetes==18.20.0",
         "docker",
         "PySocks"
+        "anytree",
+        "transitions",
     ],
     extras_require={"develop": [
         "ipdb",
