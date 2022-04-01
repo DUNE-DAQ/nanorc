@@ -42,7 +42,7 @@ from .cli import *
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def timingcli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, kerberos, port-offset, cfg_dir):
+def timingcli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, kerberos, port_offset, cfg_dir):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f"{credentials.user}@timingrc> "
