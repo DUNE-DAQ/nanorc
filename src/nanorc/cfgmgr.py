@@ -2,6 +2,7 @@ import os.path
 import json
 import copy
 import socket
+from urllib.parse import urlparse
 
 """Extract nested values from a JSON tree."""
 
@@ -145,6 +146,10 @@ class ConfigManager:
                             c['address'] = c['address'].replace(fieldname, "HOST_IP").format(**dico)
                         except Exception as e:
                             raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
+                # Port offsetting
+                port = urlparse(c['address']).port
+                newport = port + self.port_offset
+                c['address'] = c['address'].replace(str(port), str(newport))
 
 
 
