@@ -1,6 +1,7 @@
 var fsm = {};
 var root = "";
 var state = "";
+var statusTmp = {};
 var statusTick;
 var selectedNode = null;
 var icons = {"none":"/static/pics/question.png",
@@ -35,7 +36,7 @@ return json
 }
 function refreshIcons(states){
   $.each( states, function(key, item ){
-    $('#controlTree').jstree("set_icon",'#'+item.name,icons[item.state]);
+    $('#controlTree').jstree("set_icon",'#'+item.text,icons[item.state]);
     if (item.hasOwnProperty('children')) {
       refreshIcons(item.children)
     }
@@ -57,9 +58,8 @@ $(".control").click(function() {
 }); 
 }
 function getTree(){
-  console.log("http://"+serverhost+"/nanorcrest/tree")
 $.ajax({
-  url: "http://"+serverhost+"/nanorcrest/tree",
+  url: "http://"+serverhost+"/nanorcrest/status",
   beforeSend: function(xhr) { 
     xhr.setRequestHeader("Authorization", "Basic " + btoa("fooUsr:barPass")); 
   },
@@ -73,14 +73,40 @@ $.ajax({
       d.children = addId(d.children)
     }
     root = d.text
-  $('#controlTree').jstree(true).settings.core.data = d;
-  $('#controlTree').jstree(true).refresh();
+    $('#controlTree').jstree(true).settings.core.data = d;
+    $('#controlTree').unbind("refresh.jstree")
+    if (d.hasOwnProperty('children')) {
+      $('#controlTree').bind("refresh.jstree", function (event, data) {
+        refreshIcons(d.children)
+      })
+    }
+    $('#controlTree').jstree(true).refresh();
   },
   error: function(e){
     alert(JSON.stringify(e));
   }
 });
 }
+
+function refreshTree(tree){
+    d = JSON.stringify(tree);
+    d = d.replace(/name/g, "text");
+    d = JSON.parse(d)
+    if (d.hasOwnProperty('children')) {
+      d.children = addId(d.children)
+    }
+    root = d.text
+    $('#controlTree').jstree(true).settings.core.data = d;
+    $('#controlTree').unbind("refresh.jstree")
+    if (d.hasOwnProperty('children')) {
+      $('#controlTree').bind("refresh.jstree", function (event, data) {
+        $('#controlTree').jstree("set_icon",'#j1_1',icons[d.state]);
+        refreshIcons(d.children)
+      })
+    }
+    //refreshIcons(d.children)
+    $('#controlTree').jstree(true).refresh();
+  }
 function sendComm(command,runnumber, runtype){
   clearInterval(statusTick);
   $("#state:text").val('Executing...')
@@ -99,7 +125,7 @@ function sendComm(command,runnumber, runtype){
       data: dataload,
       success: function (d) {
         alert(JSON.stringify(d));
-        getTree()
+        //getTree()
         statusTick = setInterval(getStatus, 1000, true);
       },
       error: function(e){
@@ -108,7 +134,6 @@ function sendComm(command,runnumber, runtype){
   });
 }
   function getStatus(regCheck=false){
-    console.log("stat")
     if (regCheck == true){
       url = "http://"+serverhost+"/nanorcrest/status"
     }else{
@@ -132,21 +157,26 @@ function sendComm(command,runnumber, runtype){
         },
         type: 'GET',
         dataType: "text",
-        success: function (d) {
-          d = JSON.parse(d)
-          $("#state:text").val(d.state)
-          $('#controlTree').jstree("set_icon",'#j1_1',icons[d.state]);
-          state = d.state
-          if (d.hasOwnProperty('children')) {
-            refreshIcons(d.children)
+        success: function (d) { 
+          d = JSON.parse(d);
+          if(d=="I'm busy!"){
+            $("#state:text").val('Executing...')
+            $(".control").attr("disabled", true);
           }
-          populateButtons()
-          if (regCheck == false){
-            $("#statustable").empty()
-            statusTable({d}, 0)
-          }else{
-            getStatus()
+          else{
+            if(d.state!=state){
+              $("#state:text").val(d.state)
+              state = d.state
+              if(url=="http://"+serverhost+"/nanorcrest/status"){
+                refreshTree(d)
+              }
+              populateButtons()
+              $("#statustable").empty()
+              statusTable({d}, 0)
+            }
           }
+          
+          statusTmp = d;
         },
         error: function(e){
           console.log(e)
@@ -234,6 +264,5 @@ function sendComm(command,runnumber, runtype){
           alert(JSON.stringify(e));
         }
       });
-      
       $("#selected").text('Selected: '+root)
     })
