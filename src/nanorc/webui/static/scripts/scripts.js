@@ -124,7 +124,8 @@ function sendComm(command,runnumber, runtype){
       type: 'POST',
       data: dataload,
       success: function (d) {
-        alert(JSON.stringify(d));
+        //alert(JSON.stringify(d));
+        $('#json-renderer').jsonViewer(d,{collapsed: true});
         //getTree()
         statusTick = setInterval(getStatus, 1000, true);
       },
