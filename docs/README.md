@@ -12,11 +12,6 @@ This tutorial assumes you run on a linux host with /cvmfs mounted, such as lxplu
 
 First, set up a working area according to [the daq-buildtools instructions](https://dune-daq-sw.readthedocs.io/en/latest/packages/daq-buildtools/).
 
-Next, install nanorc:
-
-```bash
-pip install https://github.com/DUNE-DAQ/nanorc/archive/refs/tags/<tag/branch>.tar.gz
-```
 Get the example data file:
 
 ```bash
@@ -26,25 +21,34 @@ curl https://cernbox.cern.ch/index.php/s/VAqNtn7bwuQtff3/download -o frames.bin
 Generate a configuration:
 
 ```bash 
-python -m minidaqapp.nanorc.mdapp_multiru_gen mdapp_fake
+daqconf_multiru_gen fake_daq
+```
+
+Next (if you want to), you can create a file called `top_level.json` which contains:
+
+```json
+{
+  "apparatus_id": "fake_daq",
+  "minidaq": "fake_daq"
+}
 ```
 
 Now you're ready to run.
 
 ### Running the NanoRC
 
-In the `nanorc-demo` directory:
-
+To see a list of options you can pass nanorc in order to control things such as the amount of information it prints and the timeouts for transitions, run `nanorc -h`. We'll skip those for now in the following demo:
 ```
-./nanorc/nanorc.py mdapp_fake
+nanorc top_level.json # or "nanorc fake_daq" if you didn't create the top_level.json
 
-                            Shonky NanoRC                             
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ This is an admittedly shonky tiny RC to run DUNE-DAQ applications. ┃
-│   Give it a command and it will do your biddings,                  │
-│   but trust it and it will betray you!                             │
-│ Handle wiht care!                                                  │
-└────────────────────────────────────────────────────────────────────┘
+╭──────────────────────────────────────────────────────────────────────────╮
+│                              Shonky NanoRC                               │
+│  This is an admittedly shonky nanp RC to control DUNE-DAQ applications.  │
+│    Give it a command and it will do your biddings,                       │
+│    but trust it and it will betray you!                                  │
+│  Use it with care!                                                       │
+╰──────────────────────────────────────────────────────────────────────────╯
+
 shonky rc> 
 ```
 To see the commands available use `help`.
@@ -61,72 +65,83 @@ Undocumented commands:
 exit  help  quit
 ```
 
-`boot` will start your applications. In the case of the example, a trigger emulator application to supply triggers and a readout and dataflow application which receives the triggers.
+`boot` will start your applications. In the case of the example, a trigger application to supply triggers, a hardware signal interface (HSI) application, and a readout and dataflow application which receives the triggers.
 ```
 shonky rc> boot
-          {                                                                                                                                                 
-               'apps': {                                                                                                                                               
-                   'ruemu_df': {'exec': 'daq_application', 'host': 'host_rudf', 'port': 3334},                                                                      
-                   'trgemu': {'exec': 'daq_application', 'host': 'host_trg', 'port': 3333}                                                                         
-               },                                                                                                                                                 
-               'env': {'DBT_AREA_ROOT': 'env', 'DBT_ROOT': 'env'},                                                                                                    
-               'hosts': {'host_rudf': 'lxplus7102.cern.ch', 'host_trg': 'lxplus7102.cern.ch'}                                                              
-           }                                                                                                                                                           
-⠹ # apps started ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   0% -:--:-- 0:00:16
-⠹ ruemu_df       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   0% -:--:-- 0:00:16
-⠹ trgemu         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   0% -:--:-- 0:00:16
-                                    Apps                                     
-┏━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━┓
-┃ name     ┃ host               ┃ alive ┃ pings ┃ last cmd ┃ last succ. cmd ┃
-┡━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━┩
-│ ruemu_df │ lxplus7102.cern.ch │ True  │ True  │ None     │ None           │
-│ trgemu   │ lxplus7102.cern.ch │ True  │ True  │ None     │ None           │
-└──────────┴────────────────────┴───────┴───────┴──────────┴────────────────┘
+
+  # apps started ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00 0:00:02
+  dataflow       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00 0:00:02
+  hsi            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00 0:00:02
+  ruemu0         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00 0:00:01
+  trigger        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00 0:00:02
+                                Apps                                
+┏━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ name     ┃ host      ┃ alive ┃ pings ┃ last cmd ┃ last succ. cmd ┃
+┡━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ dataflow │ mu2edaq13 │ True  │ True  │ None     │ None           │
+│ hsi      │ mu2edaq13 │ True  │ True  │ None     │ None           │
+│ ruemu0   │ mu2edaq13 │ True  │ True  │ None     │ None           │
+│ trigger  │ mu2edaq13 │ True  │ True  │ None     │ None           │
+└──────────┴───────────┴───────┴───────┴──────────┴────────────────┘
+
 ```
 
-You can then send the `init`, `conf`, `start`, and `resume` commands to get things going. Note that `start` requires a run number as argument. The commands produce quite verbose output so that you can see what was sent directly to the applications without digging in the logfiles.
+You can then send the `init`, `conf`, `start`, and `resume` commands to get things going. `start` requires a run number as argument. It also optionally takes booleans to toggle data storage (`--disable-data-storage` and `--enable-data-storage`) and an integer to control trigger separation in ticks (`--trigger-interval-ticks <num ticks>`).
 
-Triggers will not be generated until after a resume command is issued, and then trigger records with 2 links each at 1 Hz will be generated.
+The commands produce quite verbose output so that you can see what was sent directly to the applications without digging in the logfiles.
+
+Triggers will not be generated until after a resume command is issued, and then trigger records with 2 links each at a default of 1 Hz will be generated.
 
 Use 'status' to see what's going on:
 
 ```
 shonky rc> status
                                     Apps                                     
-┏━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━┓
-┃ name     ┃ host               ┃ alive ┃ pings ┃ last cmd ┃ last succ. cmd ┃
-┡━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━┩
-│ ruemu_df │ lxplus7102.cern.ch │ True  │ True  │ start    │ start          │
-│ trgemu   │ lxplus7102.cern.ch │ True  │ True  │ resume   │ resume         │
-└──────────┴────────────────────┴───────┴───────┴──────────┴────────────────┘
+┏━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━┓
+┃ name     ┃ host      ┃ alive ┃ pings ┃ last cmd ┃ last succ. cmd ┃
+┡━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+│ dataflow │ mu2edaq13 │ True  │ True  │ None     │ None           │
+│ hsi      │ mu2edaq13 │ True  │ True  │ None     │ None           │
+│ ruemu0   │ mu2edaq13 │ True  │ True  │ None     │ None           │
+│ trigger  │ mu2edaq13 │ True  │ True  │ None     │ None           │
+└──────────┴───────────┴───────┴───────┴──────────┴────────────────┘
 ```
 
 When you've seen enough use `stop`, `scrap` and `terminate` commands. In case you experience timeout problems booting applications or sending commands, consider changing the `hosts` values from `localhost` to the hostname of your machine. This has to do with SSH authentication.
 
+nanorc commands can be autocompleted with TAB, for example, TAB will autocomplete `r` to `resume`. Options like `--disable-data-storage` will be completed with TAB after typing `start --d`.
+
+You can also control nanorc in "batch mode", e.g.:
+```
+run_number=999
+nanorc mdapp_fake boot init conf start --disable-data-storage $run_number wait 2 resume wait 60 pause wait 2 stop scrap terminate
+```
+Notice the ability to control the time via transitions from the command line via the `wait` argument. 
+
 ### Viewing logs and output
 
-Logs are kept in the working directory at the time you started nanorc, named `log_<name>_<port>.txt`.
+Logs are kept in the working directory at the time you started nanorc, named `log_<application name>_<port>.txt`.
 
-You can peak in the output hdf5 file using:
+You can peek at the output hdf5 file using:
 
 ```bash
 h5dump -H swtest_run000666_0000_tapper_20210513T133527.hdf5
 ```
-(your file will be named something else of course).
+(your file will be named something else, of course).
 
 For TriggerRecordHeaders:
 
 ```bash
-python3 $DFMODULES_FQ_DIR/dfmodules/bin/hdf5dump/hdf5_dump.py -TRH -f swtest_run000666_0000_tapper_20210513T133527.hdf5
+python3 $DFMODULES_FQ_DIR/dfmodules/bin/hdf5dump/hdf5_dump.py -p trigger -f swtest_run000666_0000_tapper_20210513T133527.hdf5
 ```
 For FragmentHeaders:
 ```bash
-python3 $DFMODULES_FQ_DIR/dfmodules/bin/hdf5dump/hdf5_dump.py -H -f swtest_run000666_0000_tapper_20210513T133527.hdf5
+python3 $DFMODULES_FQ_DIR/dfmodules/bin/hdf5dump/hdf5_dump.py -p fragment swtest_run000666_0000_tapper_20210513T133527.hdf5
 ```
 
 ## More on boot
 
-It can be instructive to take a closer look at how we can tell nanorc to `boot` the DAQ's applications. Let's take a look at a relatively simple example file, `examples/mdapp_fake/boot.json`:
+It can be instructive to take a closer look at how we can tell nanorc to `boot` the DAQ's applications. Let's take a look at a relatively simple example file in the nanorc repo, `examples/mdapp_fake/boot.json`:
 ```
 {
     "apps": {

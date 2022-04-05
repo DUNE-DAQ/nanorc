@@ -1,0 +1,130 @@
+{
+    "np02_coldbox": {
+        "connection": "https://np-vd-coldbox-elog.cern.ch/elisa/api/np-vd-coldbox-elog/",
+        "website": "https://np-vd-coldbox-elog.cern.ch",
+        "attributes": {
+            "start": {
+                "type": {
+                    "set_on_reply": false,
+                    "set_on_new_thread": true,
+                    "value":"Automatic"
+                },
+                "Automatic_Message_Type": {
+                    "set_on_reply": true,
+                    "set_on_new_thread": true,
+                    "value":"SoR"
+                }
+            },
+            "stop": {
+                "type": {
+                    "set_on_reply": false,
+                    "set_on_new_thread": true,
+                    "value":"Automatic"
+                },
+                "Automatic_Message_Type": {
+                    "set_on_reply": true,
+                    "set_on_new_thread": true,
+                    "value":"EoR"
+                }
+            },
+            "message": {
+                "type": {
+                    "set_on_reply": false,
+                    "set_on_new_thread": true,
+                    "value":"Automatic"
+                },
+                "Automatic_Message_Type": {
+                    "set_on_reply": true,
+                    "set_on_new_thread": true,
+                    "value":"Alarm"
+                }
+            }
+        }
+    },
+
+    "np02_pds": {
+        "connection": "https://np-vd-coldbox-elog.cern.ch/elisa/api/np-vd-coldbox-elog/",
+        "website": "https://np-vd-coldbox-elog.cern.ch",
+        "attributes": {
+            "start": {
+                "type": {
+                    "set_on_reply": false,
+                    "set_on_new_thread": true,
+                    "value":"Automatic"
+                },
+                "Automatic_Message_Type": {
+                    "set_on_reply": true,
+                    "set_on_new_thread": true,
+                    "value":"SoR"
+                }
+            },
+            "stop": {
+                "type": {
+                    "set_on_reply": false,
+                    "set_on_new_thread": true,
+                    "value":"Automatic"
+                },
+                "Automatic_Message_Type": {
+                    "set_on_reply": true,
+                    "set_on_new_thread": true,
+                    "value":"EoR"
+                }
+            },
+            "message": {
+                "type": {
+                    "set_on_reply": false,
+                    "set_on_new_thread": true,
+                    "value":"Automatic"
+                },
+                "Automatic_Message_Type": {
+                    "set_on_reply": true,
+                    "set_on_new_thread": true,
+                    "value":"Alarm"
+                }
+            }
+        }
+    },
+
+    "np04_coldbox": {
+        "connection": "https://pdsp-elog.cern.ch/elisa/api/ProtoDUNE-SP/",
+        "website": "https://pdsp-elog.cern.ch",
+        "attributes": {
+            "start": {
+                "type": {
+                    "set_on_reply": false,
+                    "set_on_new_thread": true,
+                    "value":"RunControl Message"
+                },
+                "RunControl_MessageType": {
+                    "set_on_reply": true,
+                    "set_on_new_thread": true,
+                    "value":"status"
+                }
+            },
+            "stop": {
+                "type": {
+                    "set_on_reply": false,
+                    "set_on_new_thread": true,
+                    "value":"RunControl Message"
+                },
+                "RunControl_MessageType": {
+                    "set_on_reply": true,
+                    "set_on_new_thread": true,
+                    "value":"status"
+                }
+            },
+            "message": {
+                "type": {
+                    "set_on_reply": false,
+                    "set_on_new_thread": true,
+                    "value":"RunControl Message"
+                },
+                "RunControl_MessageType": {
+                    "set_on_reply": true,
+                    "set_on_new_thread": true,
+                    "value":"status"
+                }
+            }
+        }
+    }
+}
