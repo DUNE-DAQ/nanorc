@@ -37,6 +37,9 @@ class NanoRC:
                                ssh_conf=ssh_conf,
                                fsm_conf=fsm_cfg)
 
+        self.custom_cmd = self.cfg.get_custom_commands()
+        self.console.print(f'Extra commands are {list(self.custom_cmd.keys())}')
+
         self.apparatus_id = self.cfg.apparatus_id
 
         self.run_num_mgr = run_num_mgr
@@ -67,6 +70,10 @@ class NanoRC:
         self.topnode = self.cfg.get_tree_structure()
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
 
+
+    def execute_custom_command(self, command, data):
+        ret = self.topnode.send_custom_command(command, data)
+        self.console.log(ret)
 
     def can_transition(self, command):
         can_execute = getattr(self.topnode, "can_"+command)

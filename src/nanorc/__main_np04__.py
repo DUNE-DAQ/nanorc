@@ -91,6 +91,8 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, timeout, cfg_du
                     use_kerb = kerberos)
 
         rc.log_path = os.path.abspath(log_path)
+        add_custom_cmds(ctx.command, rc.execute_custom_command, rc.custom_cmd)
+
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()

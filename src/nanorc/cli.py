@@ -97,6 +97,29 @@ def check_rc(ctx, obj):
     if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
         ctx.exit(obj.rc.return_code)
 
+
+def add_custom_cmds(cli, rc_cmd_exec, cmds):
+    for c,d in cmds.items():
+        arg_list = {}
+        arg_default = {}
+        for app, app_data in d.items():
+            for modules_data in app_data.values():
+                for module_data in modules_data:
+                    module = module_data['match']
+                    cmd_data = module_data['data']
+                    for arg in cmd_data:
+                        arg_list[arg] = type(cmd_data[arg])
+                        arg_default[arg] = cmd_data[arg]
+
+        def execute_custom(**kwargs):
+            rc_cmd_exec(c, kwargs)
+
+        execute_custom = click.command(c)(execute_custom)
+        for arg, argtype in arg_list.items():
+            arg_pretty = arg.replace("_", "-")
+            execute_custom = click.option(f'--{arg_pretty}', type=argtype, default=arg_default[arg])(execute_custom)
+
+        cli.add_command(execute_custom, c)
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 @click.version_option(__version__)
@@ -140,6 +163,8 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
 
         if log_path:
             rc.log_path = os.path.abspath(log_path)
+
+        add_custom_cmds(ctx.command, rc.execute_custom_command, rc.custom_cmd)
 
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")

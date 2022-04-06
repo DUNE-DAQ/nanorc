@@ -51,6 +51,14 @@ class SubsystemNode(StatefulNode):
         self.pm = None
         self.listener = None
 
+    def send_custom_command(self, cmd, data) -> dict:
+        ret = {}
+        for c in self.children:
+            ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=data)
+        return ret
+
+    def get_custom_commands(self):
+        return self.cfgmgr.get_custom_commands()
 
     def on_enter_boot_ing(self, event) -> NoReturn:
         self.log.info(f'Subsystem {self.name} is booting')

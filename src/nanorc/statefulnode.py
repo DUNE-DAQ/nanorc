@@ -33,6 +33,18 @@ class StatefulNode(NodeMixin):
         self.status_receiver_queue = Queue()
         self.order = order if order else dict()
 
+    def get_custom_commands(self):
+        ret = {}
+        for c in self.children:
+            ret.update(c.get_custom_commands())
+        return ret
+
+    def send_custom_command(self, cmd, data) -> dict:
+        ret = {}
+        for c in self.children:
+            ret[c.name] = c.send_custom_command(cmd, data)
+        return ret
+
 
     def on_enter_terminate_ing(self, _) -> NoReturn:
         if self.children:
