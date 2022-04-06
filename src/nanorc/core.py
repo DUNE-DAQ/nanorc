@@ -75,6 +75,16 @@ class NanoRC:
         ret = self.topnode.send_custom_command(command, data)
         self.console.log(ret)
 
+    def send_expert_command(self, app, json_file):
+        data = json.load(open(json_file,'r'))
+
+        if not isinstance(app, ApplicationNode):
+            self.log.error(f'You can only send expert commands to individual application! I\'m not sending anything for now.')
+            return
+
+        ret = app.parent.send_expert_command(app, data)
+        self.log.info(f'Reply: {ret}')
+
     def can_transition(self, command):
         can_execute = getattr(self.topnode, "can_"+command)
         if not can_execute():

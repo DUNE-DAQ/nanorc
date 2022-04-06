@@ -81,8 +81,10 @@ def validatePath(ctx, param, prompted_path):
     if prompted_path is None:
         return None
 
-    hierarchy = prompted_path.split("/")
+    if prompted_path[0] != "/":
+        prompted_path = '/'+prompted_path
 
+    hierarchy = prompted_path.split("/")
     topnode = ctx.obj.rc.topnode
 
     r = Resolver('name')
@@ -91,7 +93,7 @@ def validatePath(ctx, param, prompted_path):
     except Exception as ex:
         raise click.BadParameter(f"Couldn't find {prompted_path} in the tree") from ex
 
-    return hierarchy
+    return node
 
 def check_rc(ctx, obj):
     if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
@@ -310,6 +312,12 @@ def terminate(obj):
     time.sleep(1)
     obj.rc.status()
 
+@cli.command('expert_command')
+@click.argument('app', type=str, default=None, callback=validatePath)
+@click.argument('json_file', type=click.Path(exists=True))
+@click.pass_obj
+def expert_command(obj, app, json_file):
+    obj.rc.send_expert_command(app, json_file)
 
 @cli.command('wait')
 @click.pass_obj

@@ -57,6 +57,16 @@ class SubsystemNode(StatefulNode):
             ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=data)
         return ret
 
+    def send_expert_command(self, app, cmd) -> dict:
+        cmd_name = cmd['name']
+        cmd_payload = cmd['payload']
+        cmd_entry_state = cmd['entry_state']
+        cmd_exit_state = cmd_entry_state
+        return app.sup.send_command_and_wait(cmd_name,
+                                             cmd_data=cmd_payload,
+                                             entry_state=cmd_entry_state,
+                                             exit_state=cmd_exit_state)
+
     def get_custom_commands(self):
         return self.cfgmgr.get_custom_commands()
 
