@@ -13,6 +13,7 @@ import click
 import click_shell
 from click_shell import make_click_shell
 import os.path
+from pathlib import Path
 import logging
 
 from . import __version__
@@ -95,6 +96,9 @@ def validatePath(ctx, param, prompted_path):
 
     return node
 
+def validateCfgDir(ctx, param, path):
+    return str(Path(path))
+    
 def check_rc(ctx, obj):
     if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
         ctx.exit(obj.rc.return_code)
@@ -132,7 +136,7 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
 @click.option('--log-path', type=click.Path(exists=True), default=None, help='Where the logs should go (on localhost of applications)')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
-@click.argument('top_cfg', type=click.Path(exists=True))
+@click.argument('top_cfg', type=click.Path(exists=True), callback=validateCfgDir)
 @click.pass_obj
 @click.pass_context
 def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, top_cfg):

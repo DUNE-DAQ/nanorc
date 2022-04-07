@@ -48,9 +48,10 @@ class TreeBuilder:
         self.ssh_conf = ssh_conf
         self.fsm_conf = fsm_conf
         if os.path.isdir(top_cfg):
+            apparatus_id = top_cfg.split('/')[-1]
             data = {
-                "apparatus_id": top_cfg,
-                top_cfg:top_cfg
+                "apparatus_id": apparatus_id,
+                apparatus_id: top_cfg
             }
             data = json.dumps(data)
         elif os.path.isfile(top_cfg):
