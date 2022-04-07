@@ -1,5 +1,6 @@
 import logging
 import time
+import copy as cp
 import json
 import os
 from rich.console import Console
@@ -18,6 +19,18 @@ from rich.traceback import Traceback
 from datetime import datetime
 
 from typing import Union, NoReturn
+
+# Good ol' moo import
+from dunedaq.env import get_moo_model_path
+import moo.io
+moo.io.default_load_path = get_moo_model_path()
+import moo.otypes
+import moo.oschema as moosc
+moo.otypes.load_types('rcif/cmd.jsonnet')
+moo.otypes.load_types('cmdlib/cmd.jsonnet')
+import dunedaq.rcif.cmd as rccmd  # AddressedCmd,
+import dunedaq.cmdlib.cmd as cmd  # AddressedCmd,
+
 
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
@@ -77,6 +90,27 @@ class NanoRC:
 
     def send_expert_command(self, app, json_file):
         data = json.load(open(json_file,'r'))
+        try:
+            # masterminding moo here, and constructing a schema of no schema
+            cmd_data = moo.otypes.make_type(
+                name='command_data',
+                text="command_data",
+                doc="",
+                schema="string",
+                dtype='string')
+            # check this out, this is dumping raw json into a string
+            obj = cmd_data(json.dumps(data['data']))
+            d = cmd.Data(obj)
+            data_cp = cp.deepcopy(data)
+            data_cp['data'] = d
+            the_cmd = rccmd.RCCommand(**data_cp)
+            if the_cmd.exit_state != 'ANY' and the_cmd.entry_state != the_cmd.exit_state:
+                self.log.error(f'The entry and exit states need to be the same for expert commands!')
+
+            # fortunately we dont keep this frankenschemoo
+        except Exception as e:
+            self.log.error(f'The file {json_file} content doesn\'t correspond to a rcif.command.RCCommand, bailing\n{e}')
+            return
 
         if not isinstance(app, ApplicationNode):
             self.log.error(f'You can only send expert commands to individual application! I\'m not sending anything for now.')

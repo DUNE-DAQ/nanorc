@@ -58,8 +58,8 @@ class SubsystemNode(StatefulNode):
         return ret
 
     def send_expert_command(self, app, cmd) -> dict:
-        cmd_name = cmd['name']
-        cmd_payload = cmd['payload']
+        cmd_name = cmd['id']
+        cmd_payload = cmd['data']
         cmd_entry_state = cmd['entry_state']
         cmd_exit_state = cmd_entry_state
         return app.sup.send_command_and_wait(cmd_name,
