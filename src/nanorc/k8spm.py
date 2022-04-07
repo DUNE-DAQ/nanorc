@@ -8,6 +8,7 @@ import os
 from kubernetes import client, config
 from rich.console import Console
 from rich.progress import track
+#from .node import ApplicationNode
 
 class AppProcessDescriptor(object):
     """docstring for AppProcessDescriptor"""
@@ -125,7 +126,7 @@ class K8SProcessManager(object):
                             # Daq application container
                             client.V1Container(
                                 name="daq-application",
-                                image="pocket-daq-cvmfs:v0.1.0",
+                                image="localhost/pocket-daq-cvmfs:v0.1.1",
                                 # Environment variables
                                 env = [
                                     client.V1EnvVar(
@@ -181,7 +182,7 @@ class K8SProcessManager(object):
                                         container_port = 12349,
                                     ),
                                 ],
-                                # image_pull_policy="Never",
+                                image_pull_policy="Never",
                                 volume_mounts=([
                                     client.V1VolumeMount(
                                         mount_path="/cvmfs/dunedaq.opensciencegrid.org",
@@ -388,9 +389,9 @@ class K8SProcessManager(object):
             self.log.error(e)
             raise RuntimeError(f"Failed to create persistent volume claim {namespace}:{name}") from e
 
+    
     #---
     def boot(self, boot_info, partition):
-
         if self.apps:
             raise RuntimeError(
                 f"ERROR: apps have already been booted {' '.join(self.apps.keys())}. Terminate them all before booting a new set."
@@ -398,20 +399,7 @@ class K8SProcessManager(object):
 
         logging.info('Resolving the kind gateway')
         import docker, ipaddress
-        # Detect docker environment
-        docker_client = docker.from_env()
-
-        # Find the docker network called Kind
-        try:
-            kind_network = next(iter(n for n in docker_client.networks.list() if n.name == 'kind'))
-        except Exception as exc:
-            raise RuntimeError("Failed to identfy docker network 'kind'") from exc
-
-        # And extract the gateway ip, which corresponds to the host
-        try:
-            kind_gateway = next(iter(s['Gateway'] for s in kind_network.attrs['IPAM']['Config'] if isinstance(ipaddress.ip_address(s['Gateway']), ipaddress.IPv4Address)), None)
-        except Exception as exc:
-            raise RuntimeError("Identify the kind gateway address'") from exc
+        kind_gateway=socket.gethostbyname(socket.gethostname())
         logging.info(f"kind network gateway: {kind_gateway}")
 
         apps = boot_info["apps"].copy()

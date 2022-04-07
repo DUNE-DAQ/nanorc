@@ -17,7 +17,6 @@ from .node_render import *
 from .logbook import ElisaLogbook, FileLogbook
 import importlib
 from . import confdata
-
 from rich.traceback import Traceback
 from rich.progress import *
 from rich.table import Table
@@ -118,14 +117,17 @@ class NanoRC:
         self.return_code = print_node(node=self.topnode, console=self.console, leg=leg)
 
 
-    def boot(self, partition: str) -> NoReturn:
+    def boot(self) -> NoReturn:
         """
         Boots applications
         """
         self.execute_command("boot", timeout=self.timeout, log=self.log_path)
-
+        return
+    def xxxx():
+        print(f'tree: {self.cfg.get_tree_structure()}')
+        #print(f'boot: {self.topnode.cfmgr.boot}')
         try:
-            self.k8spm.boot(self.cfg.boot, partition)
+            self.k8spm.boot(self.topnode,self.cfg.topnode.fsm_conf)
         except Exception as e:
             self.console.print_exception()
             return

@@ -9,6 +9,7 @@ from rich.text import Text
 from rich.panel import Panel
 import logging
 from .sshpm import SSHProcessManager
+from .k8spm import K8SProcessManager
 from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
 from typing import Union, NoReturn
 from .fsm import FSM
@@ -56,22 +57,62 @@ class SubsystemNode(StatefulNode):
         self.log.info(f'Subsystem {self.name} is booting')
         try:
             if self.pm is None:
-                self.pm = SSHProcessManager(self.console, self.ssh_conf)
-            self.pm.boot(self.cfgmgr.boot, event.kwargs.get('log'))
+                #self.pm = SSHProcessManager(self.console, self.ssh_conf)
+                self.pm = K8SProcessManager(self.console)
+            #self.pm.boot(self.cfgmgr.boot, event.kwargs.get('log'))
+            self.pm.boot(self.cfgmgr.boot, self.name)
         except Exception as e:
             self.console.print_exception()
 
         self.listener = ResponseListener(self.cfgmgr.boot["response_listener"]["port"])
+        response_host = f'nanorc.{self.pm.partition}'
+        proxy = ('127.0.0.1', 31000)
 
         children = []
         failed = []
         for n,d in self.pm.apps.items():
             child = ApplicationNode(name=n,
                                     console=self.console,
-                                    sup=AppSupervisor(self.console, d, self.listener),
+                                    sup=AppSupervisor(self.console, d, self.listener,response_host,proxy),
                                     parent=self,
                                     fsm_conf=self.fsm_conf)
 
+            children.append(child)
+
+        timeout = 30
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeRemainingColumn(),
+            TimeElapsedColumn(),
+            console=self.console,
+        ) as progress:
+            total = progress.add_task("[yellow]# apps started", total=len(self.pm.apps))
+            apps_tasks = {
+                a: progress.add_task(f"[blue]{a}", total=1) for a in self.pm.apps
+            }
+            waiting = progress.add_task("[yellow]timeout", total=timeout)
+
+            for _ in range(timeout):
+                progress.update(waiting, advance=1)
+                resp=[]
+                for child in children:
+                    if child.sup.desc.proc.is_alive() and child.sup.commander.ping():
+                        resp.append(child.name)
+                for a, t in apps_tasks.items():
+                    if a in resp:
+                        progress.update(t, completed=1)
+                progress.update(total, completed=len(resp))
+                if resp == list(self.pm.apps.keys()):
+                    progress.update(waiting, visible=False)
+                    break
+                time.sleep(1)
+
+
+        #time.sleep(30)
+        for child in children:
             if child.sup.desc.proc.is_alive() and child.sup.commander.ping():
                 # nothing really happens in these 2:
                 child.boot()
@@ -85,7 +126,6 @@ class SubsystemNode(StatefulNode):
                     "error": "Not bootable",
                 })
                 child.to_error(event=event, command='boot')
-            children.append(child)
 
         self.children = children
 
