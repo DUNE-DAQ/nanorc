@@ -25,14 +25,61 @@ from datetime import datetime
 
 from typing import Union, NoReturn
 
+from dunedaq.env import get_moo_model_path
+import moo.io
+moo.io.default_load_path = get_moo_model_path()
+
+# Load configuration types
+import moo.otypes
+moo.otypes.load_types('rcif/cmd.jsonnet')
+moo.otypes.load_types('appfwk/cmd.jsonnet')
+moo.otypes.load_types('appfwk/app.jsonnet')
+
+moo.otypes.load_types('dfmodules/triggerrecordbuilder.jsonnet')
+moo.otypes.load_types('dfmodules/datawriter.jsonnet')
+moo.otypes.load_types('dfmodules/hdf5datastore.jsonnet')
+moo.otypes.load_types('dfmodules/fragmentreceiver.jsonnet')
+moo.otypes.load_types('dfmodules/triggerdecisionreceiver.jsonnet')
+moo.otypes.load_types('nwqueueadapters/queuetonetwork.jsonnet')
+moo.otypes.load_types('nwqueueadapters/networktoqueue.jsonnet')
+moo.otypes.load_types('nwqueueadapters/networkobjectreceiver.jsonnet')
+moo.otypes.load_types('nwqueueadapters/networkobjectsender.jsonnet')
+moo.otypes.load_types('networkmanager/nwmgr.jsonnet')
+
+
+# Import new types
+import dunedaq.cmdlib.cmd as basecmd # AddressedCmd,
+import dunedaq.rcif.cmd as rccmd # AddressedCmd,
+import dunedaq.appfwk.cmd as cmd # AddressedCmd,
+import dunedaq.appfwk.app as app # AddressedCmd,
+import dunedaq.dfmodules.triggerrecordbuilder as trb
+import dunedaq.dfmodules.datawriter as dw
+import dunedaq.hdf5libs.hdf5filelayout as h5fl
+import dunedaq.dfmodules.hdf5datastore as hdf5ds
+import dunedaq.dfmodules.fragmentreceiver as frcv
+import dunedaq.dfmodules.triggerdecisionreceiver as tdrcv
+import dunedaq.nwqueueadapters.networktoqueue as ntoq
+import dunedaq.nwqueueadapters.queuetonetwork as qton
+import dunedaq.nwqueueadapters.networkobjectreceiver as nor
+import dunedaq.nwqueueadapters.networkobjectsender as nos
+import dunedaq.networkmanager.nwmgr as nwmgr
+
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
     def __init__(self, console: Console, top_cfg: str, run_num_mgr, run_registry, logbook_type:str, timeout: int,
-                 use_kerb=True, logbook_prefix="", fsm_cfg="partition"):
+                 use_kerb=True, logbook_prefix="", fsm_cfg="partition",
+                 use_k8s=False):
+        
         super(NanoRC, self).__init__()
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
+        self.use_k8s = use_k8s
+        h5fl.PathParams(detector_group_type="TPC",
+                        detector_group_name="TPC",
+                        region_name_prefix='SOMETHING',
+                        element_name_prefix="Link"),
+                                        
         ssh_conf = []
         if not use_kerb:
             ssh_conf = ["-o GSSAPIAuthentication=no"]
@@ -41,7 +88,8 @@ class NanoRC:
                                top_cfg=top_cfg,
                                console=self.console,
                                ssh_conf=ssh_conf,
-                               fsm_conf=fsm_cfg)
+                               fsm_conf=fsm_cfg,
+                               resolve_hostname = not use_k8s)
 
         self.apparatus_id = self.cfg.apparatus_id
 
@@ -89,6 +137,7 @@ class NanoRC:
             return
 
         transition = getattr(self.topnode, command)
+        kwargs['k8s'] = self.use_k8s
         transition(*args, **kwargs)
         self.return_code = self.topnode.return_code.value
 
@@ -114,7 +163,7 @@ class NanoRC:
         """
         Boots applications
         """
-        self.execute_command("boot", timeout=self.timeout, log=self.log_path)
+        self.execute_command("boot", timeout=self.timeout, log=self.log_path, partition=partition)
 
 
     def terminate(self) -> NoReturn:

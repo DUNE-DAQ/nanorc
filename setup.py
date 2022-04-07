@@ -12,7 +12,7 @@ setup(
         "graphviz",
         "kubernetes==18.20.0",
         "docker",
-        "PySocks"
+        "PySocks",
         "anytree",
         "transitions",
     ],

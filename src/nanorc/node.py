@@ -9,6 +9,7 @@ from rich.text import Text
 from rich.panel import Panel
 import logging
 from .sshpm import SSHProcessManager
+from .k8spm import K8SProcessManager
 from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
 from typing import Union, NoReturn
 from .fsm import FSM
@@ -56,21 +57,43 @@ class SubsystemNode(StatefulNode):
         self.log.info(f'Subsystem {self.name} is booting')
         try:
             if self.pm is None:
-                self.pm = SSHProcessManager(self.console, self.ssh_conf)
-            self.pm.boot(self.cfgmgr.boot, event.kwargs.get('log'))
+                if event.kwargs['k8s']:
+                    if not event.kwargs['partition']:
+                        from .credmgr import credentials
+                        event.kwargs['partition'] = credentials.user+"-dunedaq"
+                    self.console.log(f'Creating a namespace \'{event.kwargs["partition"]}\' in kubernetes to hold your DAQ applications')
+                    self.pm = K8SProcessManager(self.console)
+                    # Yes, we need the list of connections here
+                    # I hate it dearly too
+                    # That and many other things. (I'M SUCH A HATER)
+                    connections = list(self.cfgmgr.init.values())[0]['nwconnections']
+                    self.pm.boot(self.cfgmgr.boot, event.kwargs['partition'], connections)
+                else: 
+                    self.pm = SSHProcessManager(self.console, self.ssh_conf)
+                    self.pm.boot(self.cfgmgr.boot, event.kwargs.get('log'))
         except Exception as e:
             self.console.print_exception()
 
         self.listener = ResponseListener(self.cfgmgr.boot["response_listener"]["port"])
-
+        
         children = []
         failed = []
         for n,d in self.pm.apps.items():
-            child = ApplicationNode(name=n,
-                                    console=self.console,
-                                    sup=AppSupervisor(self.console, d, self.listener),
-                                    parent=self,
-                                    fsm_conf=self.fsm_conf)
+            if event.kwargs['k8s']:
+                response_host = 'nanorc.'+d.partition
+                proxy = ('127.0.0.1', 32000)
+                child = ApplicationNode(name=n,
+                                        console=self.console,
+                                        sup=AppSupervisor(self.console, d, self.listener, response_host, proxy),
+                                        parent=self,
+                                        fsm_conf=self.fsm_conf)
+            else:
+                child = ApplicationNode(name=n,
+                                        console=self.console,
+                                        sup=AppSupervisor(self.console, d, self.listener),
+                                        parent=self,
+                                        fsm_conf=self.fsm_conf)
+                
 
             if child.sup.desc.proc.is_alive() and child.sup.commander.ping():
                 # nothing really happens in these 2:
@@ -121,6 +144,10 @@ class SubsystemNode(StatefulNode):
             self.pm.terminate()
         self.end_terminate()
 
+    def tweak_nwmgr_connection_for_k8s(self, data):
+        for connection in data['nwconnections']:
+            print(connection)
+        return data
 
     def _on_enter_callback(self, event):
         command = event.event.name
@@ -176,12 +203,15 @@ class SubsystemNode(StatefulNode):
                     data = f(event.kwargs['overwrite_data'])
                 else:
                     data = getattr(self.cfgmgr, command)
+
+                if command == 'init':
+                    data = self.tweak_nwmgr_connection_for_k8s(getattr(self.cfgmgr, command)[child_node.name])
                 entry_state = child_node.state.upper()
                 if entry_state in appfwk_state_dictionnary: entry_state = appfwk_state_dictionnary[entry_state]
 
                 child_node.trigger(command)
                 ## APP now in *_ing
-
+                
                 child_node.sup.send_command(command, cmd_data=data[child_node.name] if data else {}, entry_state=entry_state, exit_state=exit_state)
 
 

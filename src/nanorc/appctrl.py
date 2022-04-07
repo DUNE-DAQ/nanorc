@@ -239,7 +239,6 @@ class AppCommander:
             "entry_state": entry_state,
             "exit_state": exit_state,
         }
-        self.log.info(f"Sending {cmd_id} to {self.app} (http://{self.app_host}:{str(self.app_port)})")
         self.log.debug(json.dumps(cmd, sort_keys=True, indent=2))
 
         headers = {
@@ -248,7 +247,6 @@ class AppCommander:
         }
         if not self.listener_host is None:
             headers['X-Answer-Host'] = self.listener_host
-
 
         ack = requests.post(
             self.app_url,
@@ -279,6 +277,7 @@ class AppCommander:
             ResponseTimeout: Description
         """
         try:
+            # self.log.info(f"Checking for answers from {self.app} {self.sent_cmd}")
             r = self.response_queue.get(block=(timeout>0), timeout=timeout)
             self.log.info(f"Received reply from {self.app} to {self.sent_cmd}")
             self.sent_cmd = None

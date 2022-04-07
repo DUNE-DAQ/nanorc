@@ -30,9 +30,9 @@ def json_extract(obj, key):
 class ConfigManager:
     """docstring for ConfigManager"""
 
-    def __init__(self, cfg_dir):
+    def __init__(self, cfg_dir, resolve_hostname=True):
         super().__init__()
-
+        self.resolve_hostname = resolve_hostname
         cfg_dir = os.path.expandvars(cfg_dir)
 
         if not (os.path.exists(cfg_dir) and os.path.isdir(cfg_dir)):
@@ -121,7 +121,10 @@ class ConfigManager:
                         exec_spec["env"][k] = v[v.find(":") + 1:]
                     else:
                         raise ValueError("Key " + k + " is not in environment and no default specified!")
-
+                    
+        if not self.resolve_hostname:
+            return
+        
         # Conf:
         ips = {n: socket.gethostbyname(h) for n, h in self.boot["hosts"].items()}
         # Set addresses to ips for networkmanager
@@ -174,6 +177,7 @@ class ConfigManager:
             for m in c:
                 m["data"].update(data)
         return resume
+    
 
 
 if __name__ == "__main__":

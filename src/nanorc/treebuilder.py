@@ -28,7 +28,7 @@ class TreeBuilder:
             elif isinstance(d, str):
                 node = SubsystemNode(name=n,
                                      ssh_conf=self.ssh_conf,
-                                     cfgmgr=ConfigManager(d),
+                                     cfgmgr=ConfigManager(d, self.resolve_hostname),
                                      console=self.console,
                                      fsm_conf = fsm_conf,
                                      parent = mother)
@@ -36,7 +36,8 @@ class TreeBuilder:
                 self.log.error(f"ERROR processing the tree {n}: {d} I don't know what that's supposed to mean?")
                 exit(1)
 
-    def __init__(self, log, top_cfg, fsm_conf, console, ssh_conf):
+    def __init__(self, log, top_cfg, fsm_conf, console, ssh_conf, resolve_hostname):
+        self.resolve_hostname = resolve_hostname
         self.log = log
         self.ssh_conf = ssh_conf
         self.fsm_conf = fsm_conf

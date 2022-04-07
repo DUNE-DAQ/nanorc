@@ -7,7 +7,7 @@ import time
 import os
 from kubernetes import client, config
 from rich.console import Console
-from rich.progress import track
+from rich.progress import *
 
 class AppProcessDescriptor(object):
     """docstring for AppProcessDescriptor"""
@@ -98,8 +98,48 @@ class K8SProcessManager(object):
             self.log.error(e)
             raise RuntimeError(f"Failed to delete namespace {namespace}") from e
 
+    def get_container_port_list_from_connections(self, connections:list=None):
+        ret = [
+            client.V1ContainerPort(
+                name = 'restcmd',
+                protocol = "TCP",
+                container_port = 3333,
+            )]
+        
+        for c in connections:
+            ret += [
+                client.V1ContainerPort(
+                    # My sympathy for the nwmgr took yet another hit here
+                    name = c['name'].lower().replace(".", "").replace("_", "").replace("$","").replace("{", "").replace("}", "")[-15:],
+                    protocol = "TCP",
+                    container_port = int(c['address'].split(":")[-1]),
+                )]
+        return ret
+    
+
+    def get_service_port_list_from_connections(self, connections:list=None):
+        ret = [
+            client.V1ServicePort(
+                name = 'restcmd',
+                protocol = "TCP",
+                target_port = 3333,
+                port = 3333,
+            )]
+
+        for c in connections:
+            ret += [
+                client.V1ServicePort(
+                    # My sympathy for the nwmgr took yet another hit here
+                    name = c['name'].lower().replace(".", "").replace("_", "").replace("$","").replace("{", "").replace("}", "")[-15:],
+                    protocol = "TCP",
+                    target_port = int(c['address'].split(":")[-1]),
+                    port = int(c['address'].split(":")[-1]),
+                )]
+        return ret
+    
     # ----
-    def create_daqapp_deployment(self, name: str, app_label: str, namespace: str, cmd_port: int = 3333, mount_cvmfs: bool = False, env_vars: dict = None, run_as: dict = None):
+    def create_daqapp_deployment(self, name: str, app_label: str, namespace: str, cmd_port: int = 3333, mount_cvmfs: bool = False, env_vars: dict = None, run_as: dict = None,
+                                 connections:list = None):
         self.log.info(f"Creating {namespace}:{name} daq application (port: {cmd_port})")
 
         # Deployment
@@ -126,6 +166,7 @@ class K8SProcessManager(object):
                             client.V1Container(
                                 name="daq-application",
                                 image="pocket-daq-cvmfs:v0.1.0",
+                                image_pull_policy= "Never",
                                 # Environment variables
                                 env = [
                                     client.V1EnvVar(
@@ -139,48 +180,7 @@ class K8SProcessManager(object):
                                     "-c", "rest://localhost:3333",
                                     "-i", "influx://influxdb.monitoring:8086/write?db=influxdb"
                                     ],
-                                ports=[
-                                    client.V1ContainerPort(
-                                        container_port=3333,
-                                        name="restcmd",
-                                        protocol="TCP"
-                                        ),
-                                    client.V1ContainerPort(
-                                        name = "hsi-messages",
-                                        protocol = "TCP",
-                                        container_port = 12344,
-                                    ),
-                                    client.V1ContainerPort(
-                                        name = "trg-dec",
-                                        protocol = "TCP",
-                                        container_port = 12345,
-                                    ),
-                                    client.V1ContainerPort(
-                                        name = "timesyncs",
-                                        protocol = "TCP",
-                                        container_port = 12350,
-                                    ),
-                                    client.V1ContainerPort(
-                                        name = "fragments",
-                                        protocol = "TCP",
-                                        container_port = 12351,
-                                    ),
-                                    client.V1ContainerPort(
-                                        name = "trg-dec-tk",
-                                        protocol = "TCP",
-                                        container_port = 12346,
-                                    ),
-                                    client.V1ContainerPort(
-                                        name = "dr-dh0",
-                                        protocol = "TCP",
-                                        container_port = 12348,
-                                    ),
-                                    client.V1ContainerPort(
-                                        name = "dr-dh1",
-                                        protocol = "TCP",
-                                        container_port = 12349,
-                                    ),
-                                ],
+                                ports=self.get_container_port_list_from_connections(connections),
                                 # image_pull_policy="Never",
                                 volume_mounts=([
                                     client.V1VolumeMount(
@@ -235,56 +235,7 @@ class K8SProcessManager(object):
         service = client.V1Service(
             metadata=client.V1ObjectMeta(name=name),
             spec=client.V1ServiceSpec(
-                ports=[
-                    client.V1ServicePort(
-                        name = "restcmd",
-                        protocol = "TCP",
-                        target_port = "restcmd",
-                        port = 3333,
-                    ),
-                    client.V1ServicePort(
-                        name = "hsi-messages",
-                        protocol = "TCP",
-                        target_port = "hsi-messages",
-                        port = 12344,
-                    ),
-                    client.V1ServicePort(
-                        name = "trg-dec",
-                        protocol = "TCP",
-                        target_port = "trg-dec",
-                        port = 12345,
-                    ),
-                    client.V1ServicePort(
-                        name = "timesyncs",
-                        protocol = "TCP",
-                        target_port = "timesyncs",
-                        port = 12350,
-                    ),
-                    client.V1ServicePort(
-                        name = "fragments",
-                        protocol = "TCP",
-                        target_port = "fragments",
-                        port = 12351,
-                    ),
-                    client.V1ServicePort(
-                        name = "trg-dec-tk",
-                        protocol = "TCP",
-                        target_port = "trg-dec-tk",
-                        port = 12346,
-                    ),
-                    client.V1ServicePort(
-                        name = "dr-dh0",
-                        protocol = "TCP",
-                        target_port = "dr-dh0",
-                        port = 12348,
-                    ),
-                    client.V1ServicePort(
-                        name = "dr-dh1",
-                        protocol = "TCP",
-                        target_port = "dr-dh1",
-                        port = 12349,
-                    ),
-                ],
+                ports=self.get_service_port_list_from_connections(connections),
                 selector = {"app": app_label}
             )
         )  # V1Service
@@ -303,7 +254,10 @@ class K8SProcessManager(object):
 
         # Creating Service object
         service = client.V1Service(
-            metadata=client.V1ObjectMeta(name=name),
+            metadata=client.V1ObjectMeta(
+                name=name,
+                namespace=namespace
+            ),
             spec=client.V1ServiceSpec(
                 ports=[
                     client.V1ServicePort(
@@ -327,7 +281,8 @@ class K8SProcessManager(object):
         # Create Endpoints Objects
         endpoints = client.V1Endpoints(
             metadata=client.V1ObjectMeta(
-                name=name
+                name=name,
+                namespace=namespace
             ),
             subsets=[
                 client.V1EndpointSubset(
@@ -389,7 +344,7 @@ class K8SProcessManager(object):
             raise RuntimeError(f"Failed to create persistent volume claim {namespace}:{name}") from e
 
     #---
-    def boot(self, boot_info, partition):
+    def boot(self, boot_info, partition, connections):
 
         if self.apps:
             raise RuntimeError(
@@ -418,7 +373,7 @@ class K8SProcessManager(object):
         env_vars = boot_info["env"]
         # TODO: move into the rc boot method. The PM should not know about DUNEDAQ_PARTITION
         env_vars['DUNEDAQ_PARTITION'] = partition
-
+        
         self.partition = partition
         cmd_port = 3333
         
@@ -444,14 +399,55 @@ class K8SProcessManager(object):
             app_desc.conf = app_conf.copy()
             app_desc.partition = self.partition
             app_desc.host = f'{app_name}.{self.partition}'
+            app_desc.pod = ''
             app_desc.port = cmd_port
             app_desc.proc = K8sProcess(self, app_name, self.partition)
 
-            self.create_daqapp_deployment(app_name, app_name, self.partition, cmd_port, mount_cvmfs=True, env_vars=app_vars, run_as=run_as)
+            self.create_daqapp_deployment(app_name, app_name, self.partition, cmd_port, mount_cvmfs=True, env_vars=app_vars, run_as=run_as, connections=connections)
             self.apps[app_name] = app_desc
+            
+        # TODO: move (some of) this loop into k8spm?
+        timeout = 30
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeRemainingColumn(),
+            TimeElapsedColumn(),
+            console=self.console,
+        ) as progress:
+            total = progress.add_task("[yellow]# apps started", total=len(self.apps))
+            apps_tasks = {
+                a: progress.add_task(f"[blue]{a}", total=1) for a in self.apps
+            }
+            waiting = progress.add_task("[yellow]timeout", total=timeout)
 
-        self.create_nanorc_responder('nanorc', 'nanorc', self.partition, kind_gateway, boot_info["response_listener"]["port"])   
+            for _ in range(timeout):
+                progress.update(waiting, advance=1)
 
+                ready = self.check_apps()
+                for a, t in apps_tasks.items():
+                    if a in ready:
+                        progress.update(t, completed=1)
+                        self.apps[a].pod = ready[a]
+                progress.update(total, completed=len(ready))
+                if list(ready.keys()) == list(self.apps.keys()):
+                    progress.update(waiting, visible=False)
+                    break
+                
+                time.sleep(1)
+                
+            self.create_nanorc_responder('nanorc', 'nanorc', self.partition, kind_gateway, boot_info["response_listener"]["port"])
+
+    # ---
+    def check_apps(self):
+        ready = {}
+        for p in self._core_v1_api.list_namespaced_pod(self.partition).items:
+            for name in self.apps.keys():
+                if name in p.metadata.name and p.status.phase == "Running":
+                    ready[name]=p.metadata.name
+        return ready
 
     # ---
     def terminate(self):
