@@ -94,7 +94,13 @@ class ConfigManager:
 
         #port offseting
         for app in self.boot["apps"]:
-            self.boot['apps'][app]['port'] += self.port_offset
+            port = self.boot['apps'][app]['port']
+            newport = port + self.port_offset
+            fixed = self.boot['apps'][app].get('fixed')
+            if fixed : 
+                newport = port
+            self.boot['apps'][app]['port'] = newport
+
         self.boot['response_listener']['port'] += self.port_offset
 
         ll = { **self.boot["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration
@@ -149,6 +155,9 @@ class ConfigManager:
                 # Port offsetting
                 port = urlparse(c['address']).port
                 newport = port + self.port_offset
+                fixed = c.get('fixed')
+                if fixed : 
+                    newport = port
                 c['address'] = c['address'].replace(str(port), str(newport))
 
 

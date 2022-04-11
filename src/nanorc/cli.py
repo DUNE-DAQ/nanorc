@@ -107,11 +107,12 @@ def check_rc(ctx, obj):
 @click.option('--log-path', type=click.Path(exists=True), default=None, help='Where the logs should go (on localhost of applications)')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
-@click.option('--port-offset', type=int, default=0, help='Application port offsetting for running more than one nanorc instance on the same node')
+@click.option('--partition-number', type=int, default=0, help='Which partition number to run')
+@click.option('--partition-label', type=str, default="partition_test", help='partition label to be use as prefix of partition name')
 @click.argument('top_cfg', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, port_offset, top_cfg):
+def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, partition_number, partition_label, top_cfg):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f'{credentials.user}@rc> '
@@ -138,7 +139,8 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
                     timeout = timeout,
                     use_kerb = kerberos,
                     logbook_prefix = logbook_prefix,
-                    port_offset = port_offset)
+                    partition_number = partition_number,
+                    partition_label = partition_label )
 
         if log_path:
             rc.log_path = os.path.abspath(log_path)
