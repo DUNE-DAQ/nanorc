@@ -35,7 +35,7 @@ from .cli import *
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--log-path', type=click.Path(exists=True), default=os.getcwd(), help='Where the logs should go (on localhost of applications)')
-@click.option('--timeout', type=int, default=60, help='Application commands timeout')
+@accept_timeout
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.argument('cfg_dir', type=click.Path(exists=True))
@@ -93,7 +93,7 @@ timingcli.add_command(wait, 'wait')
 timingcli.add_command(terminate, 'terminate')
 
 @timingcli.command('start')
-@click.option('--timeout', type=int, default=None, help='start timeout')
+@accept_timeout
 @click.pass_obj
 @click.pass_context
 def start(ctx, obj, timeout:int):
@@ -103,7 +103,7 @@ def start(ctx, obj, timeout:int):
 
 
 @timingcli.command('stop')
-@click.option('--timeout', type=int, default=None, help='stop timeout')
+@accept_timeout
 @click.pass_obj
 @click.pass_context
 def start(ctx, obj, timeout:int):
