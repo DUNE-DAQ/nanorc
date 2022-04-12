@@ -133,6 +133,23 @@ class SSHProcessManager(object):
 
         self.watchers.append(t)
 
+    def pin_threads(self, app, pin_file):
+        env_vars = self.boot_info["env"]
+        app_conf = self.boot_info['apps'][app]
+        exec_vars = self.boot_info['exec'][app_conf['exec']]['env']
+        env_vars.update(exec_vars)
+
+        cmd =';'.join([ f"export {n}=\"{v}\"" for n,v in env_vars.items()])
+        host = ''
+        hosts = self.boot_info["hosts"]
+        for app_name, app_desc in self.apps.items():
+            if app_name != app: continue
+            host = app_desc.host
+        cmd += f'; readout-affinity.py --pinfile {pin_file}'
+        ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"] + [cmd]
+        proc = sh.ssh(ssh_args)
+        self.log.info(proc)
+
     def notify_join(self, name, watcher, exc):
         self.log.info(f"{name} process exited"+(f" with exit code {exc.exit_code}" if exc else ""))
         self.log.debug(name+str(exc))
@@ -146,7 +163,7 @@ class SSHProcessManager(object):
             )
 
         # Add a check for env and apps in boot_info keys
-
+        self.boot_info = boot_info
         apps = boot_info["apps"]
         hosts = boot_info["hosts"]
         env_vars = boot_info["env"]

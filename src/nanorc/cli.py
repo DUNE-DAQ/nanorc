@@ -81,21 +81,23 @@ def validatePath(ctx, param, prompted_path):
     if prompted_path is None:
         return None
 
-    hierarchy = prompted_path.split("/")
+    if prompted_path[0] != '/':
+        prompted_path = '/'+prompted_path
 
     topnode = ctx.obj.rc.topnode
 
     r = Resolver('name')
     try:
         node = r.get(topnode, prompted_path)
+        return node
     except Exception as ex:
         raise click.BadParameter(f"Couldn't find {prompted_path} in the tree") from ex
 
-    return hierarchy
 
 def check_rc(ctx, obj):
     if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
         ctx.exit(obj.rc.return_code)
+
 
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
@@ -160,6 +162,13 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
 @click.pass_obj
 def status(obj: NanoContext):
     obj.rc.status()
+
+@cli.command('pin-threads')
+@click.argument('path', type=str, default=None, callback=validatePath)
+@click.argument('pin-file', type=click.Path(exists=True))
+@click.pass_obj
+def pin_threads(obj:NanoContext, path, pin_file):
+    obj.rc.pin_threads(path, pin_file)
 
 @cli.command('boot')
 @click.pass_obj

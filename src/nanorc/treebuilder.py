@@ -5,7 +5,7 @@ import os
 import json
 from collections import OrderedDict
 from json import JSONDecoder
-
+from pathlib import Path
 def dict_raise_on_duplicates(ordered_pairs):
     count=0
     d=OrderedDict()
@@ -41,9 +41,10 @@ class TreeBuilder:
         self.ssh_conf = ssh_conf
         self.fsm_conf = fsm_conf
         if os.path.isdir(top_cfg):
+            apparatus = str(Path(top_cfg))
             data = {
-                "apparatus_id": top_cfg,
-                top_cfg:top_cfg
+                "apparatus_id": apparatus,
+                apparatus:top_cfg
             }
             data = json.dumps(data)
         elif os.path.isfile(top_cfg):

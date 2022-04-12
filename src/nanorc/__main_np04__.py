@@ -115,6 +115,7 @@ np04cli.add_command(resume, 'resume')
 np04cli.add_command(scrap, 'scrap')
 np04cli.add_command(wait, 'wait')
 np04cli.add_command(terminate, 'terminate')
+np04cli.add_command(pin_threads, 'pin-threads')
 np04cli.add_command(start_shell, 'shell')
 
 @np04cli.command('change_user')
