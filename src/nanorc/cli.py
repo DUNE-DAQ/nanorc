@@ -309,6 +309,50 @@ def scrap(ctx, obj, path, force):
     check_rc(ctx,obj)
     obj.rc.status()
 
+@cli.command('start_trigger')
+@click.option('--trigger-interval-ticks', type=int, default=None)
+@click.pass_obj
+@click.pass_context
+def start_trigger(ctx, obj, trigger_interval_ticks):
+    obj.rc.start_trigger(trigger_interval_ticks)
+    check_rc(ctx,obj)
+    obj.rc.status()
+
+@cli.command('stop_trigger')
+@click.pass_obj
+@click.pass_context
+def scrap(ctx, obj):
+    obj.rc.stop_trigger()
+    check_rc(ctx,obj)
+    obj.rc.status()
+
+@cli.command('change_rate')
+@click.option('--trigger-interval-ticks', type=int, default=None)
+@click.pass_obj
+@click.pass_context
+def change_rate(ctx, obj, trigger_interval_ticks):
+    obj.rc.change_rate(trigger_interval_ticks)
+    check_rc(ctx,obj)
+    obj.rc.status()
+
+@cli.command('enable')
+@click.argument('path', type=str, default=None, callback=validatePath)
+@click.pass_obj
+@click.pass_context
+def enable(ctx, obj, path):
+    obj.rc.enable(path)
+    check_rc(ctx,obj)
+    obj.rc.status()
+
+@cli.command('disable')
+@click.argument('path', type=str, default=None, callback=validatePath)
+@click.pass_obj
+@click.pass_context
+def disable(ctx, obj, path):
+    obj.rc.disable(path)
+    check_rc(ctx,obj)
+    obj.rc.status()
+
 @cli.command('terminate')
 @click.pass_obj
 def terminate(obj):

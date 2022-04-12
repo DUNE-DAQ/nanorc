@@ -174,6 +174,9 @@ class SubsystemNode(StatefulNode):
             self.listener.flask_manager = self.listener.create_manager()
 
         for n in appset:
+            if not n.enabled:
+                appset.remove(n)
+                continue
             if not n.sup.desc.proc.is_alive() or not n.sup.commander.ping():
                 text = f"'{n.name}' seems to be dead. So I cannot initiate transition '{command}'"
                 if force:
@@ -196,6 +199,8 @@ class SubsystemNode(StatefulNode):
             for child_node in appset:
                 # BERK I don't know how to sort this.
                 # This is essntially calling cfgmgr.runtime_start(runtime_start_data)
+                if not child_node.enabled: continue
+
                 if cfg_method:
                     f=getattr(self.cfgmgr,cfg_method)
                     data = f(event.kwargs['overwrite_data'])
@@ -216,6 +221,7 @@ class SubsystemNode(StatefulNode):
                 if len(appset)==0: break
                 done = []
                 for child_node in appset:
+                    if not child_node.enabled: continue
                     try:
                         r = child_node.sup.check_response()
                     except NoResponse:
@@ -246,6 +252,8 @@ class SubsystemNode(StatefulNode):
                     self.log.error(f'node \'{n}\' is not a child of the subprocess "{self.name}", check the order list for command "{command}"')
                     continue
                 child_node = [cn for cn in appset if cn.name == n][0] # YUK
+                if not child_node.enabled: continue
+
                 entry_state = child_node.state.upper()
                 if entry_state in appfwk_state_dictionnary: entry_state = appfwk_state_dictionnary[entry_state]
 

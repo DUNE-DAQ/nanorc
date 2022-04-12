@@ -327,3 +327,42 @@ class NanoRC:
                             overwrite_data=runtime_resume_data,
                             timeout=self.timeout)
         self.return_code = self.topnode.return_code.value
+
+
+    def start_trigger(self, trigger_interval_ticks: Union[int, None]) -> NoReturn:
+        """
+        Start the triggers
+        """
+        self.topnode.send_custom_command("start_trigger",
+                                         data={'trigger_interval_ticks':trigger_interval_ticks})
+
+
+    def stop_trigger(self) -> NoReturn:
+        """
+        Stop the triggers
+        """
+        self.topnode.send_custom_command("stop_trigger")
+
+
+    def change_rate(self, trigger_interval_ticks) -> NoReturn:
+        """
+        Start the triggers
+        """
+        self.topnode.send_custom_command("change_rate",
+                                         data={'trigger_interval_ticks':trigger_interval_ticks})
+
+
+    def disable(self, node) -> NoReturn:
+        """
+        Start the triggers
+        """
+        node.disable()
+        node.send_custom_command("disable", data={'name':node.name})
+
+
+    def enable(self, node) -> NoReturn:
+        """
+        Start the triggers
+        """
+        node.enable()
+        node.send_custom_command("enable", data={'name':node.name})
