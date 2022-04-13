@@ -82,8 +82,8 @@ class NanoRC:
         if not self.can_transition(command):
             return
 
-        if 'timeout' in kwargs:
-            kwargs['timeout'] = kwargs['timeout'] if kwargs['timeout'] is not None else self.timeout
+        kwargs['timeout'] = kwargs['timeout'] if kwargs.get('timeout') else self.timeout
+        self.log.debug(f'Using timeout = {kwargs["timeout"]}')
         transition = getattr(self.topnode, command)
         transition(*args, **kwargs)
         self.return_code = self.topnode.return_code.value
@@ -114,11 +114,11 @@ class NanoRC:
         self.execute_command("boot", timeout=timeout, log=self.log_path)
 
 
-    def terminate(self) -> NoReturn:
+    def terminate(self, timeout:int=None) -> NoReturn:
         """
         Terminates applications (but keep all the subsystems structure)
         """
-        self.execute_command("terminate")
+        self.execute_command("terminate", timeout=timeout)
 
 
     def init(self, path, timeout:int=None) -> NoReturn:

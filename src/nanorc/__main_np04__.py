@@ -34,7 +34,7 @@ from .cli import *
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--log-path', type=click.Path(exists=True), default='/log', help='Where the logs should go (on localhost of applications)')
-@accept_timeout
+@accept_timeout(60)
 @click.option('--elisa-conf', type=click.Path(exists=True), default=None, help='ELisA configuration (by default, use the one in src/nanorc/confdata)')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
@@ -133,7 +133,7 @@ def kinit(ctx, obj):
 @click.option('--stop-wait', type=int, default=0, help='Seconds to wait between Pause and Stop commands')
 @click.option('--force', default=False, is_flag=True)
 @click.option('--message', type=str, default="")
-@accept_timeout
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
 def stop(ctx, obj, stop_wait:int, force:bool, message:str, timeout:int):
@@ -165,7 +165,7 @@ def message(obj, message):
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.option('--resume-wait', type=int, default=0, help='Seconds to wait between Start and Resume commands')
 @click.option('--message', type=str, default="")
-@accept_timeout
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
 def start(ctx, obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str, timeout:int):

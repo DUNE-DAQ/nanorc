@@ -76,13 +76,16 @@ def updateLogLevel(loglevel):
             handler.setLevel(sh_command_level)
 
 def validate_timeout(ctx, timeout):
+    if timeout is None:
+        return timeout
     if timeout<=0:
         raise click.BadParameter('Timeout should be >0')
     return timeout
 
-def accept_timeout(function):
-    function = click.option('--timeout', type=int, default=30, help="Timeout, in seconds", callback=validate_timeout)(function)
-    return function
+def accept_timeout(default_timeout):
+    def add_decorator(function):
+        return click.option('--timeout', type=int, default=default_timeout, help="Timeout, in seconds", callback=validate_timeout)(function)
+    return add_decorator
 
 def validatePath(ctx, param, prompted_path):
 
@@ -114,7 +117,7 @@ def check_rc(ctx, obj):
 @click.option('--log-path', type=click.Path(exists=True), default=None, help='Where the logs should go (on localhost of applications)')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
-@accept_timeout
+@accept_timeout(60)
 @click.argument('top_cfg', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
@@ -169,7 +172,7 @@ def status(obj: NanoContext):
     obj.rc.status()
 
 @cli.command('boot')
-@accept_timeout
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
 def boot(ctx, obj, timeout:int):
@@ -179,7 +182,7 @@ def boot(ctx, obj, timeout:int):
 
 @cli.command('init')
 @click.option('--path', type=str, default=None, callback=validatePath)
-@accept_timeout
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
 def init(ctx, obj, path, timeout:int):
@@ -195,7 +198,7 @@ def ls(obj):
 
 @cli.command('conf')
 @click.option('--path', type=str, default=None, callback=validatePath)
-@accept_timeout
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
 def conf(ctx, obj, path, timeout:int):
@@ -216,7 +219,7 @@ def message(obj, message):
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.option('--resume-wait', type=int, default=0, help='Seconds to wait between Start and Resume commands')
 @click.option('--message', type=str, default="")
-@accept_timeout
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
 def start(ctx, obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str, timeout:int):
@@ -244,7 +247,7 @@ def start(ctx, obj:NanoContext, run:int, disable_data_storage:bool, trigger_inte
 @click.option('--stop-wait', type=int, default=0, help='Seconds to wait between Pause and Stop commands')
 @click.option('--force', default=False, is_flag=True)
 @click.option('--message', type=str, default="")
-@accept_timeout
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
 def stop(ctx, obj, stop_wait:int, force:bool, message:str, timeout:int):
@@ -257,7 +260,7 @@ def stop(ctx, obj, stop_wait:int, force:bool, message:str, timeout:int):
         obj.rc.status()
 
 @cli.command('pause')
-@accept_timeout
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
 def pause(ctx, obj, timeout:int):
@@ -267,7 +270,7 @@ def pause(ctx, obj, timeout:int):
 
 @cli.command('resume')
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
-@accept_timeout
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
 def resume(ctx, obj:NanoContext, trigger_interval_ticks:int, timeout:int):
@@ -285,7 +288,7 @@ def resume(ctx, obj:NanoContext, trigger_interval_ticks:int, timeout:int):
 @cli.command('scrap')
 @click.option('--path', type=str, default=None, callback=validatePath)
 @click.option('--force', default=False, is_flag=True)
-@accept_timeout
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
 def scrap(ctx, obj, path, force, timeout):
@@ -294,9 +297,10 @@ def scrap(ctx, obj, path, force, timeout):
     obj.rc.status()
 
 @cli.command('terminate')
+@accept_timeout(None)
 @click.pass_obj
-def terminate(obj):
-    obj.rc.terminate()
+def terminate(obj, timeout):
+    obj.rc.terminate(timeout=timeout)
     time.sleep(1)
     obj.rc.status()
 
