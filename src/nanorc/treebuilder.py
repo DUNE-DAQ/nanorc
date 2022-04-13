@@ -28,7 +28,9 @@ class TreeBuilder:
             elif isinstance(d, str):
                 node = SubsystemNode(name=n,
                                      ssh_conf=self.ssh_conf,
-                                     cfgmgr=ConfigManager(d, self.port_offset, self.partition_number, self.partition_label),
+                                     cfgmgr=ConfigManager(log=self.log, cfg_dir=d,
+                                                          port_offset=self.port_offset,
+                                                          partition_number=self.partition_number, partition_label=self.partition_label),
                                      console=self.console,
                                      fsm_conf = fsm_conf,
                                      parent = mother)
