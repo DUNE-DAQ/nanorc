@@ -23,7 +23,7 @@ class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
     def __init__(self, console: Console, top_cfg: str, run_num_mgr, run_registry, logbook_type:str, timeout: int,
-                 use_kerb=True, logbook_prefix="", partition_number=0, partition_label="partition_test", fsm_cfg="partition"):
+                 use_kerb=True, logbook_prefix="", partition_number=0, partition_label=None, fsm_cfg="partition"):
         super(NanoRC, self).__init__()
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
@@ -39,7 +39,9 @@ class NanoRC:
                                console=self.console,
                                ssh_conf=ssh_conf,
                                fsm_conf=fsm_cfg,
-                               port_offset=self.port_offset)
+                               port_offset=self.port_offset,
+                               partition_number=self.partition_number,
+                               partition_label=self.partition_label)
 
         self.apparatus_id = self.cfg.apparatus_id
 

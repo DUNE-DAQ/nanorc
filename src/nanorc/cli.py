@@ -108,7 +108,7 @@ def check_rc(ctx, obj):
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
 @click.option('--partition-number', type=int, default=0, help='Which partition number to run')
-@click.option('--partition-label', type=str, default="partition_test", help='partition label to be use as prefix of partition name')
+@click.option('--partition-label', type=str, default=None, help='partition label to be use as prefix of partition name')
 @click.argument('top_cfg', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context

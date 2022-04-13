@@ -31,7 +31,7 @@ def json_extract(obj, key):
 class ConfigManager:
     """docstring for ConfigManager"""
 
-    def __init__(self, cfg_dir, port_offset):
+    def __init__(self, cfg_dir, port_offset, partition_number, partition_label):
         super().__init__()
 
         cfg_dir = os.path.expandvars(cfg_dir)
@@ -41,6 +41,8 @@ class ConfigManager:
 
         self.cfg_dir = cfg_dir
         self.port_offset = port_offset
+        self.partition_number = partition_number
+        self.partition_label = partition_label
         self._load()
 
     def _import_cmd_data(self, cmd: str, cfg: dict) -> None:
@@ -117,6 +119,12 @@ class ConfigManager:
                     self.boot["env"][k] = v[v.find(":") + 1:]
                 else:
                     raise ValueError("Key " + k + " is not in environment and no default specified!")
+        # partition renaming using partition label and number
+        if self.partition_label is not None:
+            self.boot["env"]["DUNEDAQ_PARTITION"] = f"{self.partition_label}_{self.partition_number}"
+        else:
+            self.boot["env"]["DUNEDAQ_PARTITION"] += f"_{self.partition_number}"
+            print(self.boot["env"]["DUNEDAQ_PARTITION"])
 
         for exec_spec in self.boot["exec"].values():
             ll = { **exec_spec["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration
