@@ -256,7 +256,6 @@ class K8SProcessManager(object):
         service = client.V1Service(
             metadata=client.V1ObjectMeta(
                 name=name,
-                namespace=namespace
             ),
             spec=client.V1ServiceSpec(
                 ports=[
@@ -282,7 +281,6 @@ class K8SProcessManager(object):
         endpoints = client.V1Endpoints(
             metadata=client.V1ObjectMeta(
                 name=name,
-                namespace=namespace
             ),
             subsets=[
                 client.V1EndpointSubset(
