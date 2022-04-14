@@ -407,7 +407,7 @@ class K8SProcessManager(object):
             self.apps[app_name] = app_desc
             
         # TODO: move (some of) this loop into k8spm?
-        timeout = 30
+        timeout = 60
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
