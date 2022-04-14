@@ -125,19 +125,19 @@ class ConfigManager:
         # Conf:
         ips = {n: socket.gethostbyname(h) for n, h in self.boot["hosts"].items()}
         # Set addresses to ips for networkmanager
-        for connections in json_extract(self.init, "nwconnections"):
+        for connections in json_extract(self.init, "connections"):
             for c in connections:
                 from string import Formatter
-                fieldnames = [fname for _, fname, _, _ in Formatter().parse(c['address']) if fname]
+                fieldnames = [fname for _, fname, _, _ in Formatter().parse(c['uri']) if fname]
                 if len(fieldnames)>1:
-                    raise RuntimeError(f"Too many fields in connection {c['address']}")
+                    raise RuntimeError(f"Too many fields in connection {c['uri']}")
                 for fieldname in fieldnames:
                     if fieldname in ips:
-                        c["address"] = c["address"].format(**ips)
+                        c["uri"] = c["uri"].format(**ips)
                     else:
                         try:
                             dico = {"HOST_IP":socket.gethostbyname(fieldname)}
-                            c['address'] = c['address'].replace(fieldname, "HOST_IP").format(**dico)
+                            c['uri'] = c['uri'].replace(fieldname, "HOST_IP").format(**dico)
                         except Exception as e:
                             raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
 
