@@ -146,7 +146,7 @@ class SubsystemNode(StatefulNode):
 
     def tweak_nwmgr_connection_for_k8s(self, data):
         for connection in data['nwconnections']:
-            print(connection)
+            self.console.print(connection)
         return data
 
     def _on_enter_callback(self, event):

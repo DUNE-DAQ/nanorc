@@ -165,7 +165,7 @@ class K8SProcessManager(object):
                             # Daq application container
                             client.V1Container(
                                 name="daq-application",
-                                image="pocket-daq-cvmfs:v0.1.0",
+                                image="pocket-daq-area-cvmfs:v2.10.2",
                                 image_pull_policy= "Never",
                                 # Environment variables
                                 env = [
@@ -185,13 +185,15 @@ class K8SProcessManager(object):
                                 volume_mounts=([
                                     client.V1VolumeMount(
                                         mount_path="/cvmfs/dunedaq.opensciencegrid.org",
-                                        name="dunedaq"
+                                        name="dunedaq",
+                                        read_only=True
                                     )
                                 ] if mount_cvmfs else []) +
                                 [
                                     client.V1VolumeMount(
                                         mount_path="/dunedaq/pocket",
-                                        name="pocket"
+                                        name="pocket",
+                                        read_only=False
                                     )
                                 ]
                             )
@@ -199,10 +201,9 @@ class K8SProcessManager(object):
                         volumes=([
                             client.V1Volume(
                                 name="dunedaq",
-                                persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
-                                    claim_name="dunedaq.opensciencegrid.org",
-                                    read_only=True
-                                    )
+                                host_path=client.V1HostPathVolumeSource(
+                                    path='/cvmfs/dunedaq.opensciencegrid.org',
+                                )
                             )
                         ] if mount_cvmfs else []) +
                         [
