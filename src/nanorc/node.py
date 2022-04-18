@@ -145,8 +145,26 @@ class SubsystemNode(StatefulNode):
         self.end_terminate()
 
     def tweak_nwmgr_connection_for_k8s(self, data):
-        for connection in data['nwconnections']:
-            self.console.print(connection)
+        from kubernetes import client, config            
+        v1 = client.CoreV1Api()
+        x = v1.list_namespaced_service('user-dunedaq')
+        ips = {'host_'+i.metadata.name:i.spec.cluster_ip for i in x.items}
+        y = v1.list_namespaced_pod('user-dunedaq')
+        ips = {'host_'+j.metadata.labels['app']:j.status.pod_ip for j in y.items}
+
+        for c in data['nwconnections']:
+            self.console.print(f"before {c}")
+
+            from string import Formatter
+            fieldnames = [fname for _, fname, _, _ in Formatter().parse(c['address']) if fname]
+            if len(fieldnames)>1:
+                raise RuntimeError(f"Too many fields in connection {c['address']}")
+            for fieldname in fieldnames:
+                if fieldname in ips:
+                    c["address"] = c["address"].format(**ips)
+            self.console.print(f"after: {c}")
+
+
         return data
 
     def _on_enter_callback(self, event):
@@ -205,7 +223,8 @@ class SubsystemNode(StatefulNode):
                     data = getattr(self.cfgmgr, command)
 
                 if command == 'init':
-                    data = self.tweak_nwmgr_connection_for_k8s(getattr(self.cfgmgr, command)[child_node.name])
+
+                    data = {child_node.name: self.tweak_nwmgr_connection_for_k8s(getattr(self.cfgmgr, command)[child_node.name])}
                 entry_state = child_node.state.upper()
                 if entry_state in appfwk_state_dictionnary: entry_state = appfwk_state_dictionnary[entry_state]
 
