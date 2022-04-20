@@ -37,7 +37,7 @@ from .cli import *
 @click.option('--log-path', type=click.Path(exists=True), default=os.getcwd(), help='Where the logs should go (on localhost of applications)')
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
-@click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
+@click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
@@ -74,13 +74,14 @@ def timingcli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, ker
         raise click.Abort()
 
     def cleanup_rc():
-        logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
+        if rc.topnode.state != 'none': logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
         rc.terminate()
         if rc.return_code:
             ctx.exit(rc.return_code)
 
     ctx.call_on_close(cleanup_rc)
     obj.rc = rc
+    obj.shell = ctx.command
     rc.ls(False)
 
 
@@ -91,12 +92,14 @@ timingcli.add_command(conf, 'conf')
 timingcli.add_command(scrap, 'scrap')
 timingcli.add_command(wait, 'wait')
 timingcli.add_command(terminate, 'terminate')
+timingcli.add_command(start_shell, 'shell')
 
 @timingcli.command('start')
 @click.pass_obj
 @click.pass_context
 def start(ctx, obj):
     obj.rc.start(disable_data_storage=True, run_type="TEST")
+    check_rc(ctx,obj)
     obj.rc.status()
 
 
@@ -105,6 +108,7 @@ def start(ctx, obj):
 @click.pass_context
 def start(ctx, obj):
     obj.rc.stop()
+    check_rc(ctx,obj)
     obj.rc.status()
 
 

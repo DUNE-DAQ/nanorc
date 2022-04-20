@@ -197,9 +197,9 @@ class DBConfigSaver:
 
             with open(fname, "rb") as f:
                 files = {'file': f}
-                version = os.getenv("DUNEDAQ_RELEASE")
+                version = os.getenv("DUNE_DAQ_BASE_RELEASE")
                 if not version:
-                    raise RuntimeError('RunRegistryDB: dunedaq version not in the variable env DUNEDAQ_RELEASE! Exit nanorc and\nexport DUNEDAQ_RELEASE=dunedaq-vX.XX.XX\n')
+                    raise RuntimeError('RunRegistryDB: dunedaq version not in the variable env DUNE_DAQ_BASE_RELEASE! Exit nanorc and\nexport DUNE_DAQ_BASE_RELEASE=dunedaq-vX.XX.XX\n')
 
                 post_data = {"run_num": run,
                              "det_id": self.apparatus_id,

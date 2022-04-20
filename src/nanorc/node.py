@@ -55,7 +55,8 @@ class SubsystemNode(StatefulNode):
     def on_enter_boot_ing(self, event) -> NoReturn:
         self.log.info(f'Subsystem {self.name} is booting')
         try:
-            self.pm = SSHProcessManager(self.console, self.ssh_conf)
+            if self.pm is None:
+                self.pm = SSHProcessManager(self.console, self.ssh_conf)
             self.pm.boot(self.cfgmgr.boot, event.kwargs.get('log'))
         except Exception as e:
             self.console.print_exception()

@@ -49,7 +49,7 @@ class NanoRC:
         self.logbook = None
         self.log_path = None
 
-        if logbook_type != 'file' and logbook_type != '':
+        if logbook_type != 'file' and logbook_type != None and logbook_type != '':
             try:
                 elisa_conf = json.load(open(logbook_type,'r'))
                 if elisa_conf.get(self.apparatus_id):
@@ -68,6 +68,23 @@ class NanoRC:
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
 
 
+    def can_transition(self, command):
+        can_execute = getattr(self.topnode, "can_"+command)
+        if not can_execute():
+            self.log.error(f'Cannot {command}, as you are in {self.topnode.state} state.')
+            self.topnode.return_code = ErrorCode.InvalidTransition
+            self.return_code = self.topnode.return_code.value
+            return False
+        return True
+
+
+    def execute_command(self, command, *args, **kwargs):
+        if not self.can_transition(command):
+            return
+
+        transition = getattr(self.topnode, command)
+        transition(*args, **kwargs)
+        self.return_code = self.topnode.return_code.value
 
     def status(self) -> NoReturn:
         """
@@ -81,26 +98,6 @@ class NanoRC:
 
         print_status(apparatus_id=self.apparatus_id, topnode=self.topnode, console=self.console)
 
-
-    def boot(self) -> NoReturn:
-        """
-        Boots applications
-        """
-        if not self.topnode.can_boot():
-            self.log.error(f'Cannot boot, as you are is in {self.topnode.state} state.')
-            return
-        self.topnode.boot(timeout=self.timeout, log=self.log_path)
-        self.return_code = self.topnode.return_code.value
-
-
-    def terminate(self) -> NoReturn:
-        """
-        Terminates applications (but keep all the subsystems structure)
-        """
-        self.topnode.terminate()
-        self.return_code = self.topnode.return_code.value
-
-
     def ls(self, leg:bool=True) -> NoReturn:
         """
         Print the nodes
@@ -108,26 +105,46 @@ class NanoRC:
         self.return_code = print_node(node=self.topnode, console=self.console, leg=leg)
 
 
+    def boot(self) -> NoReturn:
+        """
+        Boots applications
+        """
+        self.execute_command("boot", timeout=self.timeout, log=self.log_path)
+
+
+    def terminate(self) -> NoReturn:
+        """
+        Terminates applications (but keep all the subsystems structure)
+        """
+        self.execute_command("terminate")
+
+
     def init(self, path) -> NoReturn:
         """
         Initializes the applications.
         """
-        if not self.topnode.can_init():
-            self.log.error(f'Cannot init, as you are is in {self.topnode.state} state.')
-            return
-        self.topnode.init(path=path, raise_on_fail=True, timeout=self.timeout)
-        self.return_code = self.topnode.return_code.value
+        self.execute_command("init", path=path, raise_on_fail=True, timeout=self.timeout)
 
 
     def conf(self, path) -> NoReturn:
         """
         Sends configure command to the applications.
         """
-        if not self.topnode.can_conf():
-            self.log.error(f'Cannot conf, as you are is in {self.topnode.state} state.')
-            return
-        self.topnode.conf(path=path, raise_on_fail=True, timeout=self.timeout)
-        self.return_code = self.topnode.return_code.value
+        self.execute_command("conf", path=path, raise_on_fail=True, timeout=self.timeout)
+
+
+    def pause(self, force:bool=False) -> NoReturn:
+        """
+        Sends pause command
+        """
+        self.execute_command("pause", path=None, raise_on_fail=True, timeout=self.timeout, force=force)
+
+
+    def scrap(self, path, force:bool=False) -> NoReturn:
+        """
+        Send scrap command
+        """
+        self.execute_command("scrap", path=None, raise_on_fail=True, timeout=self.timeout, force=force)
 
 
     def start(self, disable_data_storage: bool, run_type:str, message:str="") -> NoReturn:
@@ -139,9 +156,7 @@ class NanoRC:
             run_type (str): Description
         """
         # self.return_code = self.topnode.allowed("start", None)
-        if not self.topnode.can_start():
-            self.console.log(f"I cannot start now! {self.topnode.name} is {self.topnode.state}!")
-            self.return_code = 1
+        if not self.can_transition("start"):
             return
 
         if self.run_num_mgr:
@@ -212,8 +227,7 @@ class NanoRC:
         Sends stop command
         """
 
-        if not self.topnode.can_stop():
-            self.log.error(f'Cannot stop, as you are is in {self.topnode.state} state.')
+        if not self.can_transition("stop"):
             return
 
         if message != "":
@@ -236,16 +250,6 @@ class NanoRC:
                 self.console.rule(f"[bold magenta]Stopped running[/bold magenta]")
 
 
-    def pause(self, force:bool=False) -> NoReturn:
-        """
-        Sends pause command
-        """
-        if not self.topnode.can_pause():
-            self.log.error(f'Cannot pause, as you are is in {self.topnode.state} state.')
-            return
-
-        self.topnode.pause(path=None, raise_on_fail=True, timeout=self.timeout, force=force)
-        self.return_code = self.topnode.return_code.value
 
 
     def resume(self, trigger_interval_ticks: Union[int, None]) -> NoReturn:
@@ -255,10 +259,10 @@ class NanoRC:
         :param      trigger_interval_ticks:  The trigger interval ticks
         :type       trigger_interval_ticks:  int
         """
-        runtime_resume_data = {}
-        if not self.topnode.can_resume():
-            self.log.error(f'Cannot resume, as you are is in {self.topnode.state} state.')
+        if not self.can_transition("resume"):
             return
+
+        runtime_resume_data = {}
 
         if not trigger_interval_ticks is None:
             runtime_resume_data["trigger_interval_ticks"] = trigger_interval_ticks
@@ -271,16 +275,4 @@ class NanoRC:
                             cfg_method="runtime_resume",
                             overwrite_data=runtime_resume_data,
                             timeout=self.timeout)
-        self.return_code = self.topnode.return_code.value
-
-
-    def scrap(self, path, force:bool=False) -> NoReturn:
-        """
-        Send scrap command
-        """
-        if not self.topnode.can_scrap():
-            self.log.error(f'Cannot scrap, as you are is in {self.topnode.state} state.')
-            return
-
-        self.topnode.scrap(path=None, raise_on_fail=True, timeout=self.timeout, force=force)
         self.return_code = self.topnode.return_code.value

@@ -96,15 +96,15 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, timeout, cfg_du
         raise click.Abort()
 
     def cleanup_rc():
-        logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
+        if rc.topnode.state != 'none': logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
         rc.terminate()
         if rc.return_code:
             ctx.exit(rc.return_code)
 
     ctx.call_on_close(cleanup_rc)
     obj.rc = rc
+    obj.shell = ctx.command
     rc.ls(False)
-
 
 np04cli.add_command(status, 'status')
 np04cli.add_command(boot, 'boot')
@@ -115,6 +115,7 @@ np04cli.add_command(resume, 'resume')
 np04cli.add_command(scrap, 'scrap')
 np04cli.add_command(wait, 'wait')
 np04cli.add_command(terminate, 'terminate')
+np04cli.add_command(start_shell, 'shell')
 
 @np04cli.command('change_user')
 @click.argument('user', type=str, default=None)
@@ -135,14 +136,17 @@ def kinit(ctx, obj):
 @click.option('--force', default=False, is_flag=True)
 @click.option('--message', type=str, default="")
 @click.pass_obj
-def stop(obj, stop_wait:int, force:bool, message:str):
+@click.pass_context
+def stop(ctx, obj, stop_wait:int, force:bool, message:str):
     if not credentials.check_kerberos_credentials():
         logging.getLogger("cli").error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
         return
     obj.rc.pause(force)
+    check_rc(ctx,obj)
     obj.rc.status()
     time.sleep(stop_wait)
     obj.rc.stop(force, message=message)
+    check_rc(ctx,obj)
     obj.rc.status()
 
 
@@ -163,7 +167,8 @@ def message(obj, message):
 @click.option('--resume-wait', type=int, default=0, help='Seconds to wait between Start and Resume commands')
 @click.option('--message', type=str, default="")
 @click.pass_obj
-def start(obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str):
+@click.pass_context
+def start(ctx, obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str):
     """
     Start Command
 
@@ -176,9 +181,11 @@ def start(obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_inte
         return
 
     obj.rc.start(disable_data_storage, run_type, message=message)
+    check_rc(ctx,obj)
     obj.rc.status()
     time.sleep(resume_wait)
     obj.rc.resume(trigger_interval_ticks)
+    check_rc(ctx,obj)
     obj.rc.status()
 
 

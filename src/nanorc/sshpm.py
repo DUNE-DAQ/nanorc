@@ -179,6 +179,17 @@ class SSHProcessManager(object):
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"]
             # if not self.can_use_kerb:
             ssh_args += self.ssh_conf
+
+            ssh_test_args = ssh_args+['echo "Knock knock, tricks or treats!"']
+
+            try:
+                test_proc = sh.ssh(ssh_test_args)
+            except Exception as e:
+                self.log.error(f'I cannot ssh to {host}:')
+                self.log.error(f'ssh {" ".join(ssh_test_args)}')
+                self.log.error(str(e))
+                return
+
             ssh_args += [cmd]
 
             desc = AppProcessDescriptor(app_name)
@@ -196,7 +207,7 @@ class SSHProcessManager(object):
                 apps_running += [name]
         if apps_running:
             raise RuntimeError(f"ERROR: apps already running? {apps_running}")
-                
+
         for name, desc in self.apps.items():
             proc = sh.ssh(
                 *desc.ssh_args,
@@ -235,7 +246,7 @@ class SSHProcessManager(object):
                         progress.update(t, completed=1)
 
                 progress.update(total, completed=len(resp))
-                
+
                 if set.union(set(resp), set(failed.keys())) == set(self.apps.keys()):
                     progress.update(waiting, visible=False)
                     break
@@ -261,7 +272,7 @@ class SSHProcessManager(object):
                 failed[name] = exit_code
             else:
                 alive += [name]
-    
+
                 # Command port status
                 if is_port_open(
                         desc.host, desc.conf["port"]
