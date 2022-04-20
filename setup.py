@@ -5,6 +5,7 @@ setup(
     name="nanorc",
     package_data={
         'nanorc': [
+            'confdata/*.json',
             ## yes, I really hate this too
             'webuidata/*',
             'webuidata/*/*',
@@ -14,7 +15,7 @@ setup(
             'webuidata/*/*/*/*/*/*',
             'webuidata/*/*/*/*/*/*/*',
             'webuidata/*/*/*/*/*/*/*/*',
-            'confdata/*']
+]
     },
     install_requires=[
         "click",
