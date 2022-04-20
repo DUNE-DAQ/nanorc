@@ -6,6 +6,8 @@ import json
 from collections import OrderedDict
 from json import JSONDecoder
 from pathlib import Path
+from anytree import PreOrderIter
+
 def dict_raise_on_duplicates(ordered_pairs):
     count=0
     d=OrderedDict()
@@ -35,6 +37,12 @@ class TreeBuilder:
             else:
                 self.log.error(f"ERROR processing the tree {n}: {d} I don't know what that's supposed to mean?")
                 exit(1)
+
+    def get_custom_commands(self):
+        ret = {}
+        for node in PreOrderIter(self.topnode):
+            ret.update(node.get_custom_commands())
+        return ret
 
     def __init__(self, log, top_cfg, fsm_conf, console, ssh_conf):
         self.log = log

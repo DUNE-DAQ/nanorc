@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 from rich.panel import Panel
+import copy as cp
 import logging
 from .sshpm import SSHProcessManager
 from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
@@ -19,6 +20,11 @@ log = logging.getLogger("transitions.core")
 log.setLevel(logging.ERROR)
 log = logging.getLogger("transitions")
 log.setLevel(logging.ERROR)
+
+appfwk_state_dictionnary = { # !@#%&:(+_&||&!!!! (swears in raaawwww bits)
+    "BOOTED": "NONE",
+    "INITIALISED": "INITIAL",
+}
 
 class ApplicationNode(StatefulNode):
     def __init__(self, name, sup, console, fsm_conf, parent=None):
@@ -51,6 +57,49 @@ class SubsystemNode(StatefulNode):
         self.pm = None
         self.listener = None
 
+    def send_custom_command(self, cmd, data) -> dict:
+        ret = {}
+        
+        if cmd == 'scripts': # unfortunately I don't see how else to do this
+            scripts = self.cfgmgr.boot.get('scripts')
+            script = cp.deepcopy(scripts.get(data['script_name'])) if scripts else None
+            
+            if not script:
+                self.log.error(f"no {data['script_name']} script data in boot.json")
+                return {self.name : f"no {data['script_name']} script data in boot.json"}
+
+            try:
+                del data['script_name']
+                for key, val in data.items():
+                    script[key].update(val)
+                self.pm.execute_script(script)
+                
+            except Exception as e:
+                self.log.error(f'Couldn\'t execute the thread pinning scripts: {str(e)}')
+            return ret
+        
+        for c in self.children:
+            ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=data)
+        return ret
+
+    def send_expert_command(self, app, cmd) -> dict:
+        cmd_name = cmd['id']
+        cmd_payload = cmd['data']
+        cmd_entry_state = cmd['entry_state']
+        cmd_exit_state = cmd_entry_state
+        node_state = app.state.upper()
+        if node_state in appfwk_state_dictionnary: node_state = appfwk_state_dictionnary[node_state]
+        print(node_state, cmd_entry_state)
+        if cmd_entry_state != node_state:
+            self.log.error(f'The node is in \'{node_state}\' so I cannot send \'{cmd_name}\', which requires the app to be \'{cmd_entry_state}\'.')
+            return {'Failed': 'App in wrong state, cmd not sent'}
+        return app.sup.send_command_and_wait(cmd_name,
+                                             cmd_data=cmd_payload,
+                                             entry_state=cmd_entry_state,
+                                             exit_state=cmd_exit_state)
+
+    def get_custom_commands(self):
+        return self.cfgmgr.get_custom_commands()
 
     def on_enter_boot_ing(self, event) -> NoReturn:
         self.log.info(f'Subsystem {self.name} is booting')
@@ -139,10 +188,6 @@ class SubsystemNode(StatefulNode):
         cfg_method = event.kwargs.get("cfg_method")
         timeout = event.kwargs["timeout"]
         force = event.kwargs.get('force')
-        appfwk_state_dictionnary = { # !@#%&:(+_&||&!!!! (swears in raaawwww bits)
-            "BOOTED": "NONE",
-            "INITIALISED": "INITIAL",
-        }
 
         exit_state = self.get_destination(command).upper()
         if exit_state  in appfwk_state_dictionnary: exit_state  = appfwk_state_dictionnary[exit_state]
@@ -160,6 +205,9 @@ class SubsystemNode(StatefulNode):
             self.listener.flask_manager = self.listener.create_manager()
 
         for n in appset:
+            if not n.enabled:
+                appset.remove(n)
+                continue
             if not n.sup.desc.proc.is_alive() or not n.sup.commander.ping():
                 text = f"'{n.name}' seems to be dead. So I cannot initiate transition '{command}'"
                 if force:
@@ -182,6 +230,8 @@ class SubsystemNode(StatefulNode):
             for child_node in appset:
                 # BERK I don't know how to sort this.
                 # This is essntially calling cfgmgr.runtime_start(runtime_start_data)
+                if not child_node.enabled: continue
+
                 if cfg_method:
                     f=getattr(self.cfgmgr,cfg_method)
                     data = f(event.kwargs['overwrite_data'])
@@ -202,6 +252,7 @@ class SubsystemNode(StatefulNode):
                 if len(appset)==0: break
                 done = []
                 for child_node in appset:
+                    if not child_node.enabled: continue
                     try:
                         r = child_node.sup.check_response()
                     except NoResponse:
@@ -232,6 +283,8 @@ class SubsystemNode(StatefulNode):
                     self.log.error(f'node \'{n}\' is not a child of the subprocess "{self.name}", check the order list for command "{command}"')
                     continue
                 child_node = [cn for cn in appset if cn.name == n][0] # YUK
+                if not child_node.enabled: continue
+
                 entry_state = child_node.state.upper()
                 if entry_state in appfwk_state_dictionnary: entry_state = appfwk_state_dictionnary[entry_state]
 
