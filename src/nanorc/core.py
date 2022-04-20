@@ -88,7 +88,7 @@ class NanoRC:
         if not timeout:
             timeout = self.timeout
         ret = self.topnode.send_custom_command(command, data, timeout=timeout)
-        self.console.log(ret)
+        self.log.debug(ret)
 
     def send_expert_command(self, app, json_file, timeout):
         if not timeout:
@@ -340,27 +340,27 @@ class NanoRC:
         """
         Start the triggers
         """
-        self.topnode.send_custom_command("start_trigger",
-                                         data={'trigger_interval_ticks':trigger_interval_ticks,},
-                                         timeout=timeout)
+        self.execute_custom_command("start_trigger",
+                                    data={'trigger_interval_ticks':trigger_interval_ticks,},
+                                    timeout=timeout)
 
 
     def stop_trigger(self, timeout) -> NoReturn:
         """
         Stop the triggers
         """
-        self.topnode.send_custom_command("stop_trigger",
-                                         data={},
-                                         timeout=timeout)
+        self.execute_custom_command("stop_trigger",
+                                    data={},
+                                    timeout=timeout)
 
 
     def change_rate(self, trigger_interval_ticks, timeout) -> NoReturn:
         """
         Start the triggers
         """
-        self.topnode.send_custom_command("change_rate",
-                                         data={'trigger_interval_ticks':trigger_interval_ticks},
-                                         timeout=timeout)
+        self.execute_custom_command("change_rate",
+                                    data={'trigger_interval_ticks':trigger_interval_ticks},
+                                    timeout=timeout)
 
 
     def disable(self, node, timeout) -> NoReturn:
@@ -368,9 +368,9 @@ class NanoRC:
         Start the triggers
         """
         node.disable()
-        node.send_custom_command("disable",
-                                 data={'name':node.name},
-                                 timeout=timeout)
+        self.execute_custom_command("disable",
+                                    data={'name':node.name},
+                                    timeout=timeout)
 
 
     def enable(self, node, timeout) -> NoReturn:
@@ -378,6 +378,6 @@ class NanoRC:
         Start the triggers
         """
         node.enable()
-        node.send_custom_command("enable",
-                                 data={'name':node.name},
-                                 timeout=timeout)
+        self.execute_custom_command("enable",
+                                    data={'name':node.name},
+                                    timeout=timeout)
