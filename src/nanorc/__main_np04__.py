@@ -39,12 +39,13 @@ from .cli import *
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
 @click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
-@click.option('--port-offset', type=int, default=0, help='Application port offsetting for running more than one nanorc instance on the same node')
+@click.option('--partition-number', type=int, default=0, help='Which partition number to run')
+@click.option('--partition-label', type=str, default=None, help='partition label to be use as prefix of partition name')
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.argument('user', type=str)
 @click.pass_obj
 @click.pass_context
-def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, timeout, cfg_dumpdir, dotnanorc, kerberos, port_offset, cfg_dir, user):
+def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, timeout, cfg_dumpdir, dotnanorc, kerberos, partition_number, partition_label, cfg_dir, user):
 
     if not elisa_conf:
         with resources.path(confdata, "elisa_conf.json") as p:
@@ -61,6 +62,8 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, timeout, cfg_du
     grid.add_row(f"Use it with care, {credentials.user}!")
 
     obj.console.print(Panel.fit(grid))
+
+    port_offset = 0 + partition_number * 1_000
 
     if loglevel:
         updateLogLevel(loglevel)
@@ -90,7 +93,9 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, timeout, cfg_du
                     logbook_type = elisa_conf,
                     timeout = timeout,
                     use_kerb = kerberos,
-                    port_offset = port_offset)
+                    port_offset = port_offset,
+                    partition_number = partition_number,
+                    partition_label = partition_label)
 
         rc.log_path = os.path.abspath(log_path)
     except Exception as e:

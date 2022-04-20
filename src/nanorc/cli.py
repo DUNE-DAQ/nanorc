@@ -126,6 +126,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
 
     obj.console.print(Panel.fit(grid))
 
+    port_offset = 0 + partition_number * 1_000
 
     if loglevel:
         updateLogLevel(loglevel)
@@ -139,8 +140,9 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
                     timeout = timeout,
                     use_kerb = kerberos,
                     logbook_prefix = logbook_prefix,
-                    partition_number = partition_number,
-                    partition_label = partition_label )
+                    port_offset = port_offset,
+                    partition_label = partition_label,
+                    partition_number = partition_number)
 
         if log_path:
             rc.log_path = os.path.abspath(log_path)

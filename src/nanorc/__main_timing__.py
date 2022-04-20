@@ -38,10 +38,11 @@ from .cli import *
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
+@click.option('--partition-number', type=int, default=0, help='Which partition number to run')
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def timingcli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, kerberos, cfg_dir):
+def timingcli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, kerberos, partition_number, cfg_dir):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f"{credentials.user}@timingrc> "
@@ -54,6 +55,7 @@ def timingcli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, ker
 
     obj.console.print(Panel.fit(grid))
 
+    port_offset = 500 + partition_number * 1_000
 
     if loglevel:
         updateLogLevel(loglevel)
@@ -66,7 +68,10 @@ def timingcli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, ker
                     run_registry = None,
                     logbook_type = None,
                     timeout = timeout,
-                    use_kerb = kerberos)
+                    use_kerb = kerberos,
+                    port_offset = port_offset,
+                    partition_label = None,
+                    partition_number = None)
 
         rc.log_path = os.path.abspath(log_path)
     except Exception as e:

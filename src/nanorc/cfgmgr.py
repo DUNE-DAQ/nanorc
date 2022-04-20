@@ -41,8 +41,8 @@ class ConfigManager:
 
         self.cfg_dir = cfg_dir
         self.port_offset = port_offset
-        self.partition_number = partition_number
         self.partition_label = partition_label
+        self.partition_number = partition_number
         self._load()
 
     def _import_cmd_data(self, cmd: str, cfg: dict) -> None:
@@ -120,9 +120,10 @@ class ConfigManager:
                 else:
                     raise ValueError("Key " + k + " is not in environment and no default specified!")
         # partition renaming using partition label and number
-        if self.partition_label is not None:
-            self.boot["env"]["DUNEDAQ_PARTITION"] = f"{self.partition_label}_{self.partition_number}"
-        elif self.partition_number:
+        if self.partition_label:
+            self.boot["env"]["DUNEDAQ_PARTITION"] = f"{self.partition_label}"
+
+        if self.partition_number is not None:
             self.boot["env"]["DUNEDAQ_PARTITION"] += f"_{self.partition_number}"
 
         self.log.info(f'Using partition: \"{self.boot["env"]["DUNEDAQ_PARTITION"]}\"')
