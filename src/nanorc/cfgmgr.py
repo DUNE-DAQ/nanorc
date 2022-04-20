@@ -65,6 +65,12 @@ class ConfigManager:
         if "order" in cfg:
             setattr(self, f"{cmd}_order", cfg["order"])
 
+    def get_custom_commands(self):
+        ret = {}
+        for cmd in self.extra_cmds.keys():
+            ret[cmd] = getattr(self, cmd)
+        return ret
+
     def _load(self) -> None:
 
         pm_cfg = ["boot"]
@@ -84,7 +90,24 @@ class ConfigManager:
 
         self.boot = cfgs["boot"]
 
-        for c in rc_cmds:
+        json_files = [f for f in os.listdir(self.cfg_dir) if os.path.isfile(os.path.join(self.cfg_dir, f)) and '.json' in f]
+        self.extra_cmds = {}
+
+        for json_file in json_files:
+            cmd = json_file.split(".")[0]
+
+            if cmd in rc_cmds+pm_cfg:
+                continue
+
+            with open(os.path.join(self.cfg_dir,json_file), 'r') as jf:
+                try:
+                    j = json.load(jf)
+                    cfgs[cmd] = j
+                    self.extra_cmds[cmd] = j
+                except json.decoder.JSONDecodeError as e:
+                    raise RuntimeError(f"ERROR: failed to load {cmd}.json") from e
+
+        for c in rc_cmds+list(self.extra_cmds.keys()):
             self._import_cmd_data(c, cfgs[c])
 
         # Post-process conf

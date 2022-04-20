@@ -1,5 +1,6 @@
 import logging
 import time
+import copy as cp
 import json
 import os
 from rich.console import Console
@@ -18,6 +19,18 @@ from rich.traceback import Traceback
 from datetime import datetime
 
 from typing import Union, NoReturn
+
+# Good ol' moo import
+from dunedaq.env import get_moo_model_path
+import moo.io
+moo.io.default_load_path = get_moo_model_path()
+import moo.otypes
+import moo.oschema as moosc
+moo.otypes.load_types('rcif/cmd.jsonnet')
+moo.otypes.load_types('cmdlib/cmd.jsonnet')
+import dunedaq.rcif.cmd as rccmd  # AddressedCmd,
+import dunedaq.cmdlib.cmd as cmd  # AddressedCmd,
+
 
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
@@ -41,6 +54,9 @@ class NanoRC:
                                port_offset=self.port_offset,
                                partition_label=self.partition_label,
                                partition_number=self.partition_number)
+
+        self.custom_cmd = self.cfg.get_custom_commands()
+        self.console.print(f'Extra commands are {list(self.custom_cmd.keys())}')
 
         self.apparatus_id = self.cfg.apparatus_id
 
@@ -72,6 +88,41 @@ class NanoRC:
         self.topnode = self.cfg.get_tree_structure()
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
 
+
+    def execute_custom_command(self, command, data):
+        ret = self.topnode.send_custom_command(command, data)
+        self.console.log(ret)
+
+    def send_expert_command(self, app, json_file):
+        data = json.load(open(json_file,'r'))
+        try:
+            # masterminding moo here, and constructing a schema of no schema
+            cmd_data = moo.otypes.make_type(
+                name='command_data',
+                text="command_data",
+                doc="",
+                schema="string",
+                dtype='string')
+            # check this out, this is dumping raw json into a string
+            obj = cmd_data(json.dumps(data['data']))
+            d = cmd.Data(obj)
+            data_cp = cp.deepcopy(data)
+            data_cp['data'] = d
+            the_cmd = rccmd.RCCommand(**data_cp)
+            if the_cmd.exit_state != 'ANY' and the_cmd.entry_state != the_cmd.exit_state:
+                self.log.error(f'The entry and exit states need to be the same for expert commands!')
+
+            # fortunately we dont keep this frankenschemoo
+        except Exception as e:
+            self.log.error(f'The file {json_file} content doesn\'t correspond to a rcif.command.RCCommand, bailing\n{e}')
+            return
+
+        if not isinstance(app, ApplicationNode):
+            self.log.error(f'You can only send expert commands to individual application! I\'m not sending anything for now.')
+            return
+
+        ret = app.parent.send_expert_command(app, data)
+        self.log.info(f'Reply: {ret}')
 
     def can_transition(self, command):
         can_execute = getattr(self.topnode, "can_"+command)
@@ -281,3 +332,43 @@ class NanoRC:
                             overwrite_data=runtime_resume_data,
                             timeout=self.timeout)
         self.return_code = self.topnode.return_code.value
+
+
+    def start_trigger(self, trigger_interval_ticks: Union[int, None]) -> NoReturn:
+        """
+        Start the triggers
+        """
+        self.topnode.send_custom_command("start_trigger",
+                                         data={'trigger_interval_ticks':trigger_interval_ticks})
+
+
+    def stop_trigger(self) -> NoReturn:
+        """
+        Stop the triggers
+        """
+        self.topnode.send_custom_command("stop_trigger",
+                                         data={})
+
+
+    def change_rate(self, trigger_interval_ticks) -> NoReturn:
+        """
+        Start the triggers
+        """
+        self.topnode.send_custom_command("change_rate",
+                                         data={'trigger_interval_ticks':trigger_interval_ticks})
+
+
+    def disable(self, node) -> NoReturn:
+        """
+        Start the triggers
+        """
+        node.disable()
+        node.send_custom_command("disable", data={'name':node.name})
+
+
+    def enable(self, node) -> NoReturn:
+        """
+        Start the triggers
+        """
+        node.enable()
+        node.send_custom_command("enable", data={'name':node.name})
