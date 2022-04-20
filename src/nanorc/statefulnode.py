@@ -32,6 +32,32 @@ class StatefulNode(NodeMixin):
         self.return_code = ErrorCode.Success
         self.status_receiver_queue = Queue()
         self.order = order if order else dict()
+        self.enabled = True
+
+    def disable(self):
+        if not self.enabled:
+            self.log.error(f'Cannot disable {self.name} as it is already disabled!')
+            return
+        self.enabled = False
+
+    def enable(self):
+        if self.enabled:
+            self.log.error(f'Cannot enable {self.name} as it is already enabled!')
+            return
+        self.enabled = True
+
+    def get_custom_commands(self):
+        ret = {}
+        for c in self.children:
+            ret.update(c.get_custom_commands())
+        return ret
+
+    def send_custom_command(self, cmd, data, timeout) -> dict:
+        ret = {}
+        for c in self.children:
+            if c.enabled:
+                ret[c.name] = c.send_custom_command(cmd, data, timeout)
+        return ret
 
 
     def on_enter_terminate_ing(self, _) -> NoReturn:
@@ -69,10 +95,13 @@ class StatefulNode(NodeMixin):
         active_thread = []
         force = event.kwargs.get('force')
         if command in self.order:
-            self.log.info(f'Propagating to children nodes in the order {self.order[command]}')
+            self.log.info(f'Propagating to the enabled children nodes in the order {self.order[command]}')
+
             for cn in self.order[command]:
+                if not child.enabled: continue
                 child = [c for c in self.children if c.name == cn][0]
                 still_to_exec.append(child) # a record of which children still need to finish their task
+
                 try:
                     child.trigger(command, **event.kwargs)
                 except Exception as e:
@@ -81,8 +110,10 @@ class StatefulNode(NodeMixin):
                         continue
                     raise Exception from e
         else:
-            self.log.info(f'{self.name} propagating to children nodes ({[c.name for c in self.children]}) simultaneously')
+            self.log.info(f'{self.name} propagating to children nodes ({[c.name for c in self.children if c.enabled]}) simultaneously')
             for child in self.children:
+                if not child.enabled: continue
+
                 still_to_exec.append(child) # a record of which children still need to finish their task
                 all_kwargs = {
                     "trigger_name":command,

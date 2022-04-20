@@ -91,18 +91,21 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, timeout, cfg_du
                     use_kerb = kerberos)
 
         rc.log_path = os.path.abspath(log_path)
+        add_custom_cmds(ctx.command, rc.execute_custom_command, rc.custom_cmd)
+
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()
 
     def cleanup_rc():
-        logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
+        if rc.topnode.state != 'none': logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
         rc.terminate()
         if rc.return_code:
             ctx.exit(rc.return_code)
 
     ctx.call_on_close(cleanup_rc)
     obj.rc = rc
+    obj.shell = ctx.command
     rc.ls(False)
 
 np04cli.add_command(status, 'status')
@@ -114,6 +117,7 @@ np04cli.add_command(resume, 'resume')
 np04cli.add_command(scrap, 'scrap')
 np04cli.add_command(wait, 'wait')
 np04cli.add_command(terminate, 'terminate')
+np04cli.add_command(start_shell, 'shell')
 
 @np04cli.command('change_user')
 @click.argument('user', type=str, default=None)

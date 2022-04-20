@@ -69,18 +69,20 @@ def timingcli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, ker
                     use_kerb = kerberos)
 
         rc.log_path = os.path.abspath(log_path)
+        add_custom_cmds(ctx.command, rc.execute_custom_command, rc.custom_cmd)
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()
 
     def cleanup_rc():
-        logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
+        if rc.topnode.state != 'none': logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
         rc.terminate()
         if rc.return_code:
             ctx.exit(rc.return_code)
 
     ctx.call_on_close(cleanup_rc)
     obj.rc = rc
+    obj.shell = ctx.command
     rc.ls(False)
 
 
@@ -91,6 +93,7 @@ timingcli.add_command(conf, 'conf')
 timingcli.add_command(scrap, 'scrap')
 timingcli.add_command(wait, 'wait')
 timingcli.add_command(terminate, 'terminate')
+timingcli.add_command(start_shell, 'shell')
 
 @timingcli.command('start')
 @accept_timeout(None)

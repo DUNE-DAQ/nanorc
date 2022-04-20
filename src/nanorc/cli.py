@@ -11,7 +11,9 @@ import json
 import cmd
 import click
 import click_shell
+from click_shell import make_click_shell
 import os.path
+from pathlib import Path
 import logging
 
 from . import __version__
@@ -92,8 +94,10 @@ def validatePath(ctx, param, prompted_path):
     if prompted_path is None:
         return None
 
-    hierarchy = prompted_path.split("/")
+    if prompted_path[0] != "/":
+        prompted_path = '/'+prompted_path
 
+    hierarchy = prompted_path.split("/")
     topnode = ctx.obj.rc.topnode
 
     r = Resolver('name')
@@ -102,12 +106,38 @@ def validatePath(ctx, param, prompted_path):
     except Exception as ex:
         raise click.BadParameter(f"Couldn't find {prompted_path} in the tree") from ex
 
-    return hierarchy
+    return node
 
+def validateCfgDir(ctx, param, path):
+    return str(Path(path))
+    
 def check_rc(ctx, obj):
     if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
         ctx.exit(obj.rc.return_code)
 
+
+def add_custom_cmds(cli, rc_cmd_exec, cmds):
+    for c,d in cmds.items():
+        arg_list = {}
+        arg_default = {}
+        for app, app_data in d.items():
+            for modules_data in app_data.values():
+                for module_data in modules_data:
+                    module = module_data['match']
+                    cmd_data = module_data['data']
+                    for arg in cmd_data:
+                        arg_list[arg] = type(cmd_data[arg])
+                        arg_default[arg] = cmd_data[arg]
+
+        def execute_custom(**kwargs):
+            rc_cmd_exec(c, kwargs)
+
+        execute_custom = click.command(c)(execute_custom)
+        for arg, argtype in arg_list.items():
+            arg_pretty = arg.replace("_", "-")
+            execute_custom = click.option(f'--{arg_pretty}', type=argtype, default=arg_default[arg])(execute_custom)
+
+        cli.add_command(execute_custom, c)
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 @click.version_option(__version__)
@@ -118,7 +148,7 @@ def check_rc(ctx, obj):
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
 @accept_timeout(60)
-@click.argument('top_cfg', type=click.Path(exists=True))
+@click.argument('top_cfg', type=click.Path(exists=True), callback=validateCfgDir)
 @click.pass_obj
 @click.pass_context
 def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, top_cfg):
@@ -152,18 +182,21 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
         if log_path:
             rc.log_path = os.path.abspath(log_path)
 
+        add_custom_cmds(ctx.command, rc.execute_custom_command, rc.custom_cmd)
+
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()
 
     def cleanup_rc():
-        logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
+        if rc.topnode.state != 'none': logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
         rc.terminate()
         if rc.return_code:
             ctx.exit(rc.return_code)
 
     ctx.call_on_close(cleanup_rc)
     obj.rc = rc
+    obj.shell = ctx.command
     rc.ls(False)
 
 @cli.command('status')
@@ -296,6 +329,55 @@ def scrap(ctx, obj, path, force, timeout):
     check_rc(ctx,obj)
     obj.rc.status()
 
+@cli.command('start_trigger')
+@click.option('--trigger-interval-ticks', type=int, default=None)
+@accept_timeout(None)
+@click.pass_obj
+@click.pass_context
+def start_trigger(ctx, obj, trigger_interval_ticks, timeout):
+    obj.rc.start_trigger(trigger_interval_ticks, timeout=timeout)
+    check_rc(ctx,obj)
+    obj.rc.status()
+
+@cli.command('stop_trigger')
+@accept_timeout(None)
+@click.pass_obj
+@click.pass_context
+def scrap(ctx, obj, timeout):
+    obj.rc.stop_trigger(timeout=timeout)
+    check_rc(ctx,obj)
+    obj.rc.status()
+
+@cli.command('change_rate')
+@click.argument('trigger-interval-ticks', type=int)
+@accept_timeout(None)
+@click.pass_obj
+@click.pass_context
+def change_rate(ctx, obj, trigger_interval_ticks, timeout=timeout):
+    obj.rc.change_rate(trigger_interval_ticks)
+    check_rc(ctx,obj)
+    obj.rc.status()
+
+@cli.command('enable')
+@click.argument('path', type=str, default=None, callback=validatePath)
+@accept_timeout(None)
+@click.pass_obj
+@click.pass_context
+def enable(ctx, obj, path, timeout):
+    obj.rc.enable(path, timeout=timeout)
+    check_rc(ctx,obj)
+    obj.rc.status()
+
+@cli.command('disable')
+@click.argument('path', type=str, default=None, callback=validatePath)
+@accept_timeout(None)
+@click.pass_obj
+@click.pass_context
+def disable(ctx, obj, path):
+    obj.rc.disable(path, timeout=timeout)
+    check_rc(ctx,obj)
+    obj.rc.status()
+
 @cli.command('terminate')
 @accept_timeout(None)
 @click.pass_obj
@@ -304,6 +386,13 @@ def terminate(obj, timeout):
     time.sleep(1)
     obj.rc.status()
 
+@cli.command('expert_command')
+@click.argument('app', type=str, default=None, callback=validatePath)
+@click.argument('json_file', type=click.Path(exists=True))
+@accept_timeout(None)
+@click.pass_obj
+def expert_command(obj, app, json_file, timeout):
+    obj.rc.send_expert_command(app, json_file, timeout=timeout)
 
 @cli.command('wait')
 @click.pass_obj
@@ -325,3 +414,11 @@ def wait(obj, seconds):
             progress.update(waiting, advance=1)
 
             time.sleep(1)
+
+@cli.command('shell')
+@click.pass_obj
+@click.pass_context
+def start_shell(ctx, obj):
+    ctx.command = obj.shell
+    shell = make_click_shell(ctx,prompt=ctx.command.shell.prompt)
+    shell.cmdloop()
