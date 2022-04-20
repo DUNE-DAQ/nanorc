@@ -49,7 +49,7 @@ class TreeBuilder:
         self.ssh_conf = ssh_conf
         self.fsm_conf = fsm_conf
         if os.path.isdir(top_cfg):
-            apparatus = str(Path(top_cfg))
+            apparatus = str(Path(top_cfg).name)
             data = {
                 "apparatus_id": apparatus,
                 apparatus:top_cfg
