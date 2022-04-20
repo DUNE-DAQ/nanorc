@@ -122,11 +122,10 @@ class ConfigManager:
                     else:
                         raise ValueError("Key " + k + " is not in environment and no default specified!")
                     
-        if not self.resolve_hostname:
-            return
-        
-        # Conf:
-        ips = {n: socket.gethostbyname(h) for n, h in self.boot["hosts"].items()}
+        if self.resolve_hostname:
+            ips = {n: socket.gethostbyname(h) for n, h in self.boot["hosts"].items()}
+        else:
+            ips = {n: h for n, h in self.boot["hosts"].items()}
         # Set addresses to ips for networkmanager
         for connections in json_extract(self.init, "nwconnections"):
             for c in connections:

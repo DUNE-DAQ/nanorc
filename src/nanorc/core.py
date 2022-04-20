@@ -69,12 +69,13 @@ class NanoRC:
 
     def __init__(self, console: Console, top_cfg: str, run_num_mgr, run_registry, logbook_type:str, timeout: int,
                  use_kerb=True, logbook_prefix="", fsm_cfg="partition",
-                 use_k8s=False):
+                 use_k8s=False, use_podman=False):
         
         super(NanoRC, self).__init__()
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
         self.use_k8s = use_k8s
+        self.use_podman = use_podman
         h5fl.PathParams(detector_group_type="TPC",
                         detector_group_name="TPC",
                         region_name_prefix='SOMETHING',
@@ -138,6 +139,7 @@ class NanoRC:
 
         transition = getattr(self.topnode, command)
         kwargs['k8s'] = self.use_k8s
+        kwargs['podman'] = self.use_podman
         transition(*args, **kwargs)
         self.return_code = self.topnode.return_code.value
 

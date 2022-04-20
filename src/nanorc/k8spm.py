@@ -38,7 +38,7 @@ class K8sProcess(object):
 
 class K8SProcessManager(object):
     """docstring for K8SProcessManager"""
-    def __init__(self, console: Console):
+    def __init__(self, console: Console, podman: False):
         """A Kubernetes Process Manager
         
         Args:
@@ -48,6 +48,7 @@ class K8SProcessManager(object):
 
         self.log = logging.getLogger(__name__)
         self.console = console
+        self.podman=podman
         self.apps = {}
         self.partition = None
 
@@ -138,7 +139,9 @@ class K8SProcessManager(object):
         return ret
     
     # ----
-    def create_daqapp_deployment(self, name: str, app_label: str, namespace: str, cmd_port: int = 3333, mount_cvmfs: bool = False, env_vars: dict = None, run_as: dict = None,
+    def create_daqapp_deployment(self, name: str, app_label: str, namespace: str,
+                                 image: str, cmd_port: int = 3333, mount_cvmfs: bool = False,
+                                 env_vars: dict = None, run_as: dict = None,
                                  connections:list = None):
         self.log.info(f"Creating {namespace}:{name} daq application (port: {cmd_port})")
 
@@ -154,6 +157,8 @@ class K8SProcessManager(object):
                     metadata=client.V1ObjectMeta(labels={"app": app_label}),
                     # Pod specifications start here
                     spec=client.V1PodSpec(
+                        host_pid=True,
+                        hostname=name,
                         # Run the pod wuth same user id and group id as the current user
                         # Required in kind environment to create non-root files in shared folders
                         security_context=client.V1PodSecurityContext(
@@ -165,7 +170,7 @@ class K8SProcessManager(object):
                             # Daq application container
                             client.V1Container(
                                 name="daq-application",
-                                image="pocket-daq-cvmfs:v0.1.0",
+                                image=image,
                                 image_pull_policy= "Never",
                                 # Environment variables
                                 env = [
@@ -349,22 +354,25 @@ class K8SProcessManager(object):
                 f"ERROR: apps have already been booted {' '.join(self.apps.keys())}. Terminate them all before booting a new set."
             )
 
-        logging.info('Resolving the kind gateway')
-        import docker, ipaddress
-        # Detect docker environment
-        docker_client = docker.from_env()
+        if self.podman:
+            kind_gateway=socket.gethostbyname(socket.gethostname())
+        else:
+            logging.info('Resolving the kind gateway')
+            import docker, ipaddress
+            # Detect docker environment
+            docker_client = docker.from_env()
 
-        # Find the docker network called Kind
-        try:
-            kind_network = next(iter(n for n in docker_client.networks.list() if n.name == 'kind'))
-        except Exception as exc:
-            raise RuntimeError("Failed to identfy docker network 'kind'") from exc
+            # Find the docker network called Kind
+            try:
+                kind_network = next(iter(n for n in docker_client.networks.list() if n.name == 'kind'))
+            except Exception as exc:
+                raise RuntimeError("Failed to identfy docker network 'kind'") from exc
 
-        # And extract the gateway ip, which corresponds to the host
-        try:
-            kind_gateway = next(iter(s['Gateway'] for s in kind_network.attrs['IPAM']['Config'] if isinstance(ipaddress.ip_address(s['Gateway']), ipaddress.IPv4Address)), None)
-        except Exception as exc:
-            raise RuntimeError("Identify the kind gateway address'") from exc
+            # And extract the gateway ip, which corresponds to the host
+            try:
+                kind_gateway = next(iter(s['Gateway'] for s in kind_network.attrs['IPAM']['Config'] if isinstance(ipaddress.ip_address(s['Gateway']), ipaddress.IPv4Address)), None)
+            except Exception as exc:
+                raise RuntimeError("Identify the kind gateway address'") from exc
         logging.info(f"kind network gateway: {kind_gateway}")
 
         apps = boot_info["apps"].copy()
@@ -380,10 +388,15 @@ class K8SProcessManager(object):
         # Create the persistent volume claim
         self.create_cvmfs_pvc('dunedaq.opensciencegrid.org', self.partition)
 
-        run_as = {
-            'uid': os.getuid(),
-            'gid': os.getgid(),
-        }
+        if self.podman:
+            run_as = None
+            image = "localhost/pocket-daq-cvmfs:v0.1.2"
+        else:
+            run_as = {
+                'uid': os.getuid(),
+                'gid': os.getgid(),
+            }
+            image = "pocket-daq-cvmfs:v0.1.0"
         
         for app_name, app_conf in apps.items():
 
@@ -401,7 +414,7 @@ class K8SProcessManager(object):
             app_desc.port = cmd_port
             app_desc.proc = K8sProcess(self, app_name, self.partition)
 
-            self.create_daqapp_deployment(app_name, app_name, self.partition, cmd_port, mount_cvmfs=True, env_vars=app_vars, run_as=run_as, connections=connections)
+            self.create_daqapp_deployment(app_name, app_name, self.partition, image, cmd_port, mount_cvmfs=True, env_vars=app_vars, run_as=run_as, connections=connections)
             self.apps[app_name] = app_desc
             
         # TODO: move (some of) this loop into k8spm?
