@@ -341,7 +341,8 @@ class NanoRC:
         """
         Stop the triggers
         """
-        self.topnode.send_custom_command("stop_trigger")
+        self.topnode.send_custom_command("stop_trigger",
+                                         data={})
 
 
     def change_rate(self, trigger_interval_ticks) -> NoReturn:

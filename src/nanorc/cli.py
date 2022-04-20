@@ -327,7 +327,7 @@ def scrap(ctx, obj):
     obj.rc.status()
 
 @cli.command('change_rate')
-@click.option('--trigger-interval-ticks', type=int, default=None)
+@click.argument('trigger-interval-ticks', type=int)
 @click.pass_obj
 @click.pass_context
 def change_rate(ctx, obj, trigger_interval_ticks):
