@@ -133,23 +133,15 @@ class SSHProcessManager(object):
 
         self.watchers.append(t)
 
-    def pin_threads(self, app, pin_file):
-        self.log.info(f'Pinning thread of \'{app}\'')
-        env_vars = self.boot_info["env"]
-        app_conf = self.boot_info['apps'][app]
-        exec_vars = self.boot_info['exec'][app_conf['exec']]['env']
-        env_vars.update(exec_vars)
-
+    def execute_script(self, script_data):
+        env_vars = script_data["env"]
         cmd =';'.join([ f"export {n}=\"{v}\"" for n,v in env_vars.items()])
-        host = ''
-        hosts = self.boot_info["hosts"]
-        for app_name, app_desc in self.apps.items():
-            if app_name != app: continue
-            host = app_desc.host
-        cmd += f'; readout-affinity.py --pinfile {pin_file}'
-        ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"] + [cmd]
-        proc = sh.ssh(ssh_args)
-        self.log.info(proc)
+        cmd += ";"+"; ".join(script_data['cmd'])
+        hosts = set(self.boot_info["hosts"].values())
+        for host in hosts:
+            ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"] + [cmd]
+            proc = sh.ssh(ssh_args)
+            self.log.info(proc)
 
     def notify_join(self, name, watcher, exc):
         self.log.info(f"{name} process exited"+(f" with exit code {exc.exit_code}" if exc else ""))

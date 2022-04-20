@@ -80,7 +80,6 @@ class ConfigManager:
                     raise RuntimeError(f"ERROR: failed to load {f}.json") from e
 
         self.boot = cfgs["boot"]
-
         for c in rc_cmds:
             self._import_cmd_data(c, cfgs[c])
 
@@ -105,6 +104,22 @@ class ConfigManager:
                     self.boot["env"][k] = v[v.find(":") + 1:]
                 else:
                     raise ValueError("Key " + k + " is not in environment and no default specified!")
+        if self.boot.get('scripts'):
+            for script_spec in self.boot["scripts"].values():
+                ll = { **script_spec["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration
+                for k, v in ll.items():
+                    if v == "getenv_ifset":
+                        if k in os.environ.keys():
+                            script_spec["env"][k] = os.environ[k]
+                        else:
+                            script_spec["env"].pop(k)
+                    elif str(v).find("getenv") == 0:
+                        if k in os.environ.keys():
+                            script_spec["env"][k] = os.environ[k]
+                        elif str(v).find(":") > 0:
+                            script_spec["env"][k] = v[v.find(":") + 1:]
+                        else:
+                            raise ValueError("Key " + k + " is not in environment and no default specified!")
 
         for exec_spec in self.boot["exec"].values():
             ll = { **exec_spec["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration

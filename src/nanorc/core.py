@@ -2,6 +2,7 @@ import logging
 import time
 import json
 import os
+import copy as cp
 from rich.console import Console
 from rich.style import Style
 from rich.pretty import Pretty
@@ -278,14 +279,23 @@ class NanoRC:
         self.return_code = self.topnode.return_code.value
 
 
-    def pin_threads(self, apps, pin_file) -> NoReturn:
+    def pin_threads(self, pin_file) -> NoReturn:
         if not pin_file:
             self.log.error(f'No thread pinning file passed!')
             return
 
-        for appnode in apps:
-            subsystem = appnode.parent
+        subsystem = appnode.parent
+        scripts = cp.deepcopy(self.cfgmgr.boot.get('scripts'))
+        thread_pinning = scripts.get('thread_pinning') if scripts else None
+        if not thread_pinning:
+            self.log.error('I cannot pin the thread as the thread_pinning script isn\'t defined in boot.json')
+            return
+
+        thread_pinning['env']['DUNEDAQ_THREAD_PIN_FILE'] = pin_file
             if not isinstance(subsystem, SubsystemNode):
                 self.log.error(f'{app}\'s parent is not a subsystem! I cannot pin this app\'s threads')
                 return
-            subsystem.pm.pin_threads(appnode.name, pin_file)
+            try:
+                subsystem.pm.execute_script(thread_pinning)
+            except Exception as e:
+                self.log.error(f'Couldn\'t execute the thread pinning scripts: {str(e)}')
