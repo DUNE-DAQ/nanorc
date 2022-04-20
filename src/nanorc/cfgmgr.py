@@ -121,29 +121,20 @@ class ConfigManager:
                         exec_spec["env"][k] = v[v.find(":") + 1:]
                     else:
                         raise ValueError("Key " + k + " is not in environment and no default specified!")
-                    
-        if not self.resolve_hostname:
-            return
-        
-        # Conf:
-        ips = {n: socket.gethostbyname(h) for n, h in self.boot["hosts"].items()}
-        # Set addresses to ips for networkmanager
-        for connections in json_extract(self.init, "nwconnections"):
-            for c in connections:
-                from string import Formatter
-                fieldnames = [fname for _, fname, _, _ in Formatter().parse(c['address']) if fname]
-                if len(fieldnames)>1:
-                    raise RuntimeError(f"Too many fields in connection {c['address']}")
-                for fieldname in fieldnames:
-                    if fieldname in ips:
-                        c["address"] = c["address"].format(**ips)
-                    else:
-                        try:
-                            dico = {"HOST_IP":socket.gethostbyname(fieldname)}
-                            c['address'] = c['address'].replace(fieldname, "HOST_IP").format(**dico)
-                        except Exception as e:
-                            raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
 
+
+        if self.resolve_hostname:
+            hosts = self.boot["hosts"]
+        else:
+            hosts = { "host_"+app:app for app in self.boot["apps"].keys() }
+
+        for app_name, app_init in self.init.items():
+            hosts = { v:(n if v!='host_'+app_name else '0.0.0.0') for v,n in hosts.items() }
+
+            for connections in json_extract(app_init, "nwconnections"):
+                for c in connections:
+                    c['address'] = c["address"].format(**hosts)
+                    
 
     def runtime_start(self, data: dict) -> dict:
         """
