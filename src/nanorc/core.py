@@ -336,7 +336,7 @@ class NanoRC:
         self.return_code = self.topnode.return_code.value
 
 
-    def start_trigger(self, trigger_interval_ticks: Union[int, None], timeout=timeout) -> NoReturn:
+    def start_trigger(self, trigger_interval_ticks: Union[int, None], timeout) -> NoReturn:
         """
         Start the triggers
         """
@@ -345,7 +345,7 @@ class NanoRC:
                                          timeout=timeout)
 
 
-    def stop_trigger(self) -> NoReturn:
+    def stop_trigger(self, timeout) -> NoReturn:
         """
         Stop the triggers
         """
@@ -354,7 +354,7 @@ class NanoRC:
                                          timeout=timeout)
 
 
-    def change_rate(self, trigger_interval_ticks) -> NoReturn:
+    def change_rate(self, trigger_interval_ticks, timeout) -> NoReturn:
         """
         Start the triggers
         """
@@ -363,7 +363,7 @@ class NanoRC:
                                          timeout=timeout)
 
 
-    def disable(self, node) -> NoReturn:
+    def disable(self, node, timeout) -> NoReturn:
         """
         Start the triggers
         """
@@ -373,7 +373,7 @@ class NanoRC:
                                  timeout=timeout)
 
 
-    def enable(self, node) -> NoReturn:
+    def enable(self, node, timeout) -> NoReturn:
         """
         Start the triggers
         """

@@ -77,7 +77,7 @@ def updateLogLevel(loglevel):
         for handler in sh_command_logger.handlers:
             handler.setLevel(sh_command_level)
 
-def validate_timeout(ctx, timeout):
+def validate_timeout(ctx, param, timeout):
     if timeout is None:
         return timeout
     if timeout<=0:
@@ -353,8 +353,8 @@ def scrap(ctx, obj, timeout):
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def change_rate(ctx, obj, trigger_interval_ticks, timeout=timeout):
-    obj.rc.change_rate(trigger_interval_ticks)
+def change_rate(ctx, obj, trigger_interval_ticks, timeout):
+    obj.rc.change_rate(trigger_interval_ticks, timeout)
     check_rc(ctx,obj)
     obj.rc.status()
 
@@ -373,7 +373,7 @@ def enable(ctx, obj, path, timeout):
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def disable(ctx, obj, path):
+def disable(ctx, obj, path, timeout):
     obj.rc.disable(path, timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
