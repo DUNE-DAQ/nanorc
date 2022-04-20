@@ -18,6 +18,7 @@ import logging
 from . import __version__
 
 from anytree.resolver import Resolver
+from anytree import PreOrderIter
 
 from rich.table import Table
 from rich.panel import Panel
@@ -30,6 +31,7 @@ from nanorc.cfgsvr import FileConfigSaver
 from nanorc.core import NanoRC
 from nanorc.logbook import FileLogbook
 from nanorc.credmgr import credentials
+from nanorc.node import ApplicationNode
 
 class NanoContext:
     """docstring for NanoContext"""
@@ -43,6 +45,7 @@ class NanoContext:
         self.console = console
         self.print_traceback = False
         self.rc = None
+        self.pin_thread_file = None
 
 
 # ------------------------------------------------------------------------------
@@ -75,6 +78,32 @@ def updateLogLevel(loglevel):
         sh_command_logger.setLevel(sh_command_level)
         for handler in sh_command_logger.handlers:
             handler.setLevel(sh_command_level)
+
+def get_readout_apps(ctx, param, ruapps):
+    topnode = ctx.obj.rc.topnode
+    nodes = []
+    if ruapps:
+        r = Resolver('name')
+        for ruapp in ruapps:
+            node = None
+            try:
+                if ruapp[0] != '/':
+                    ruapp = '/'+ruapp
+                node = r.get(topnode, ruapp)
+            except Exception as ex:
+                raise click.BadParameter(f"Couldn't find {ruapp} in the tree") from ex
+
+            if not isinstance(node, ApplicationNode):
+                raise click.BadParameter(f'{ruapp} is not an application node!')
+            nodes.append(node)
+    else:
+        for node in PreOrderIter(topnode):
+            name = node.name.lower()
+            if 'ruflx' in name or 'ruemu' in name:
+                if not isinstance(node, ApplicationNode): continue
+                nodes.append(node)
+    return nodes
+
 
 def validatePath(ctx, param, prompted_path):
 
@@ -109,10 +138,11 @@ def check_rc(ctx, obj):
 @click.option('--log-path', type=click.Path(exists=True), default=None, help='Where the logs should go (on localhost of applications)')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
+@click.option('--pin-thread-file', type=click.Path(exists=True), default=None, help='File to pin the threads in the readout app')
 @click.argument('top_cfg', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, top_cfg):
+def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, top_cfg, pin_thread_file):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f'{credentials.user}@rc> '
@@ -125,7 +155,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
     grid.add_row(f"Use it with care, {credentials.user}!")
 
     obj.console.print(Panel.fit(grid))
-
+    obj.pin_thread_file = pin_thread_file
 
     if loglevel:
         updateLogLevel(loglevel)
@@ -165,10 +195,12 @@ def status(obj: NanoContext):
 
 @cli.command('pin-threads')
 @click.argument('path', type=str, default=None, callback=validatePath)
-@click.argument('pin-file', type=click.Path(exists=True))
+@click.option('--pin-thread-file', type=click.Path(exists=True), default=None)
 @click.pass_obj
-def pin_threads(obj:NanoContext, path, pin_file):
-    obj.rc.pin_threads(path, pin_file)
+def pin_threads(obj:NanoContext, path, pin_thread_file):
+    pin_thread_file = pin_thread_file if pin_thread_file else obj.pin_thread_file
+    obj.console.print(f'Pinning the threads of app: {path.name}, using the file: {pin_thread_file}')
+    obj.rc.pin_threads([path], pin_thread_file)
 
 @cli.command('boot')
 @click.pass_obj
@@ -195,12 +227,19 @@ def ls(obj):
 
 @cli.command('conf')
 @click.option('--path', type=str, default=None, callback=validatePath)
+@click.option('--enable-thread-pinning/--disable-thread-pinning', type=bool, default=False, help='Enable thread pinning or not')
+@click.option('--readout-app', multiple=True, default=[], help='Which app are readout apps (default the ones starting as ruemu or ruflx)', callback=get_readout_apps)
+@click.option('--pin-thread-file', type=click.Path(exists=True), default=None, help='The thread pinning file')
 @click.pass_obj
 @click.pass_context
-def conf(ctx, obj, path):
+def conf(ctx, obj, path, enable_thread_pinning, readout_app, pin_thread_file):
     obj.rc.conf(path)
     check_rc(ctx,obj)
     obj.rc.status()
+    if enable_thread_pinning and obj.rc.return_code == 0:
+        pin_thread_file = pin_thread_file if pin_thread_file else obj.pin_thread_file
+        obj.console.print(f'Pinning the threads of apps {[ruapp.name for ruapp in readout_app]}, using the file: {pin_thread_file}')
+        obj.rc.pin_threads(readout_app, pin_thread_file)
 
 
 @cli.command('message')

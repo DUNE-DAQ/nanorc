@@ -278,11 +278,14 @@ class NanoRC:
         self.return_code = self.topnode.return_code.value
 
 
-    def pin_threads(self, appnode, pin_file) -> NoReturn:
-        subsystem = appnode.parent
-        if not isinstance(subsystem, SubsystemNode):
-            self.log.error(f'{app}\'s parent is not a subsystem! I cannot pin this app\'s threads')
+    def pin_threads(self, apps, pin_file) -> NoReturn:
+        if not pin_file:
+            self.log.error(f'No thread pinning file passed!')
             return
-        subsystem.pm.pin_threads(appnode.name, pin_file)
 
-
+        for appnode in apps:
+            subsystem = appnode.parent
+            if not isinstance(subsystem, SubsystemNode):
+                self.log.error(f'{app}\'s parent is not a subsystem! I cannot pin this app\'s threads')
+                return
+            subsystem.pm.pin_threads(appnode.name, pin_file)

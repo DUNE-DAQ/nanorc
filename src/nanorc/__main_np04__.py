@@ -39,11 +39,12 @@ from .cli import *
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
 @click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
+@click.option('--pin-thread-file', type=click.Path(exists=True), default=None, help='File to pin the threads in the readout app')
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.argument('user', type=str)
 @click.pass_obj
 @click.pass_context
-def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, timeout, cfg_dumpdir, dotnanorc, kerberos, cfg_dir, user):
+def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, timeout, cfg_dumpdir, dotnanorc, kerberos, cfg_dir, pin_thread_file, user):
 
     if not elisa_conf:
         with resources.path(confdata, "elisa_conf.json") as p:
@@ -60,6 +61,7 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, timeout, cfg_du
     grid.add_row(f"Use it with care, {credentials.user}!")
 
     obj.console.print(Panel.fit(grid))
+    obj.pin_thread_file = pin_thread_file
 
     if loglevel:
         updateLogLevel(loglevel)
@@ -109,7 +111,6 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, timeout, cfg_du
 np04cli.add_command(status, 'status')
 np04cli.add_command(boot, 'boot')
 np04cli.add_command(init, 'init')
-np04cli.add_command(conf, 'conf')
 np04cli.add_command(pause, 'pause')
 np04cli.add_command(resume, 'resume')
 np04cli.add_command(scrap, 'scrap')
@@ -117,6 +118,27 @@ np04cli.add_command(wait, 'wait')
 np04cli.add_command(terminate, 'terminate')
 np04cli.add_command(pin_threads, 'pin-threads')
 np04cli.add_command(start_shell, 'shell')
+
+@np04cli.command('conf')
+@click.option('--path', type=str, default=None, callback=validatePath)
+@click.option('--enable-thread-pinning/--disable-thread-pinning', type=bool, default=True, help='Enable thread pinning or not') ### note the difference in default wrt the one in cli.py
+@click.option('--readout-app', multiple=True, default=[], help='Which app are readout apps (default the ones starting as ruemu or ruflx)', callback=get_readout_apps)
+@click.option('--pin-thread-file', type=click.Path(exists=True), default=None, help='The thread pinning file')
+@click.pass_obj
+@click.pass_context
+def conf(ctx, obj, path, enable_thread_pinning, readout_app, pin_thread_file):
+    pin_thread_file = pin_thread_file if pin_thread_file else obj.pin_thread_file
+    if enable_thread_pinning and not pin_thread_file:
+        obj.rc.log.error('No thread pinning file! Either use \'conf --diable-thread-pinning\' or \'conf --pin-thread-file /path/to/the/file\' (you can also path \'--pin-thread-file\' to nano04rc).')
+        return
+
+    obj.rc.conf(path)
+    check_rc(ctx,obj)
+    obj.rc.status()
+    if enable_thread_pinning and obj.rc.return_code == 0:
+        pin_thread_file = pin_thread_file if pin_thread_file else obj.pin_thread_file
+        obj.console.print(f'Pinning the threads of apps {[ruapp.name for ruapp in readout_app]}, using the file: {pin_thread_file}')
+        obj.rc.pin_threads(readout_app, pin_thread_file)
 
 @np04cli.command('change_user')
 @click.argument('user', type=str, default=None)
