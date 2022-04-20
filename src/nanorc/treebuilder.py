@@ -5,6 +5,7 @@ import os
 import json
 from collections import OrderedDict
 from json import JSONDecoder
+from anytree import PreOrderIter
 
 def dict_raise_on_duplicates(ordered_pairs):
     count=0
@@ -36,14 +37,21 @@ class TreeBuilder:
                 self.log.error(f"ERROR processing the tree {n}: {d} I don't know what that's supposed to mean?")
                 exit(1)
 
+    def get_custom_commands(self):
+        ret = {}
+        for node in PreOrderIter(self.topnode):
+            ret.update(node.get_custom_commands())
+        return ret
+
     def __init__(self, log, top_cfg, fsm_conf, console, ssh_conf):
         self.log = log
         self.ssh_conf = ssh_conf
         self.fsm_conf = fsm_conf
         if os.path.isdir(top_cfg):
+            apparatus_id = top_cfg.split('/')[-1]
             data = {
-                "apparatus_id": top_cfg,
-                top_cfg:top_cfg
+                "apparatus_id": apparatus_id,
+                apparatus_id: top_cfg
             }
             data = json.dumps(data)
         elif os.path.isfile(top_cfg):
