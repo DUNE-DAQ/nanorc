@@ -134,6 +134,7 @@ class SSHProcessManager(object):
         self.watchers.append(t)
 
     def pin_threads(self, app, pin_file):
+        self.log.info(f'Pinning thread of \'{app}\'')
         env_vars = self.boot_info["env"]
         app_conf = self.boot_info['apps'][app]
         exec_vars = self.boot_info['exec'][app_conf['exec']]['env']
