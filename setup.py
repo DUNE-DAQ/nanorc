@@ -12,6 +12,7 @@ setup(
         "graphviz",
         "anytree",
         "transitions",
+        "psutil",
     ],
     extras_require={"develop": [
         "ipdb",
