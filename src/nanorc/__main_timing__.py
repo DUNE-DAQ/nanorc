@@ -35,13 +35,14 @@ from .cli import *
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--log-path', type=click.Path(exists=True), default=os.getcwd(), help='Where the logs should go (on localhost of applications)')
-@click.option('--timeout', type=int, default=60, help='Application commands timeout')
+@accept_timeout(60)
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
+@click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=validate_partition_number)
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def timingcli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, kerberos, cfg_dir):
+def timingcli(ctx, obj, traceback, loglevel, log_path, cfg_dumpdir, kerberos, timeout, partition_number, cfg_dir):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f"{credentials.user}@timingrc> "
@@ -54,6 +55,7 @@ def timingcli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, ker
 
     obj.console.print(Panel.fit(grid))
 
+    port_offset = 500 + partition_number * 1_000
 
     if loglevel:
         updateLogLevel(loglevel)
@@ -66,7 +68,10 @@ def timingcli(ctx, obj, traceback, loglevel, log_path, timeout, cfg_dumpdir, ker
                     run_registry = None,
                     logbook_type = None,
                     timeout = timeout,
-                    use_kerb = kerberos)
+                    use_kerb = kerberos,
+                    port_offset = port_offset,
+                    partition_label = None,
+                    partition_number = None)
 
         rc.log_path = os.path.abspath(log_path)
         add_custom_cmds(ctx.command, rc.execute_custom_command, rc.custom_cmd)
@@ -96,19 +101,21 @@ timingcli.add_command(terminate, 'terminate')
 timingcli.add_command(start_shell, 'shell')
 
 @timingcli.command('start')
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def start(ctx, obj):
-    obj.rc.start(disable_data_storage=True, run_type="TEST")
+def start(ctx, obj, timeout:int):
+    obj.rc.start(disable_data_storage=True, run_type="TEST", timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
 
 
 @timingcli.command('stop')
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def start(ctx, obj):
-    obj.rc.stop()
+def start(ctx, obj, timeout:int):
+    obj.rc.stop(timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
 

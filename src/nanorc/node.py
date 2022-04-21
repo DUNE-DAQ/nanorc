@@ -57,7 +57,7 @@ class SubsystemNode(StatefulNode):
         self.pm = None
         self.listener = None
 
-    def send_custom_command(self, cmd, data) -> dict:
+    def send_custom_command(self, cmd, data, timeout, app=None) -> dict:
         ret = {}
         
         if cmd == 'scripts': # unfortunately I don't see how else to do this
@@ -79,10 +79,11 @@ class SubsystemNode(StatefulNode):
             return ret
         
         for c in self.children:
-            ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=data)
+            if app and c.name!=app: continue
+            ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=data, timeout=timeout)
         return ret
 
-    def send_expert_command(self, app, cmd) -> dict:
+    def send_expert_command(self, app, cmd, timeout) -> dict:
         cmd_name = cmd['id']
         cmd_payload = cmd['data']
         cmd_entry_state = cmd['entry_state']
@@ -96,7 +97,8 @@ class SubsystemNode(StatefulNode):
         return app.sup.send_command_and_wait(cmd_name,
                                              cmd_data=cmd_payload,
                                              entry_state=cmd_entry_state,
-                                             exit_state=cmd_exit_state)
+                                             exit_state=cmd_exit_state,
+                                             timeout=timeout)
 
     def get_custom_commands(self):
         return self.cfgmgr.get_custom_commands()
@@ -106,7 +108,8 @@ class SubsystemNode(StatefulNode):
         try:
             if self.pm is None:
                 self.pm = SSHProcessManager(self.console, self.ssh_conf)
-            self.pm.boot(self.cfgmgr.boot, event.kwargs.get('log'))
+            timeout = event.kwargs["timeout"]
+            self.pm.boot(self.cfgmgr.boot, event.kwargs.get('log'), timeout)
         except Exception as e:
             self.console.print_exception()
 

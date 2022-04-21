@@ -148,7 +148,7 @@ class SSHProcessManager(object):
         self.log.debug(name+str(exc))
         self.event_queue.put((name, exc))
 
-    def boot(self, boot_info, log=None):
+    def boot(self, boot_info, log=None, timeout=30):
 
         if self.apps:
             raise RuntimeError(
@@ -230,7 +230,6 @@ class SSHProcessManager(object):
             self.watch(name, proc)
             desc.proc = proc
 
-        timeout = 30
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
