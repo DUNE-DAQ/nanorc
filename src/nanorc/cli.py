@@ -19,7 +19,6 @@ import logging
 from . import __version__
 
 from anytree.resolver import Resolver
-from anytree import PreOrderIter
 
 from rich.table import Table
 from rich.panel import Panel
@@ -32,7 +31,6 @@ from nanorc.cfgsvr import FileConfigSaver
 from nanorc.core import NanoRC
 from nanorc.logbook import FileLogbook
 from nanorc.credmgr import credentials
-from nanorc.node import ApplicationNode
 
 class NanoContext:
     """docstring for NanoContext"""
