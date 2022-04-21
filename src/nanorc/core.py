@@ -379,7 +379,7 @@ class NanoRC:
                                     timeout=timeout)
 
 
-    def disable(self, node, timeout) -> NoReturn:
+    def disable(self, node, timeout, resource_name) -> NoReturn:
         """
         Start the triggers
         """
@@ -387,12 +387,12 @@ class NanoRC:
         if ret != 0:
             return
         self.execute_custom_command("disable",
-                                    data={'name':node.name},
+                                    data={'resource_name': resource_name if resource_name else node.name},
                                     timeout=timeout,
                                     node=node)
 
 
-    def enable(self, node, timeout) -> NoReturn:
+    def enable(self, node, timeout, resource_name) -> NoReturn:
         """
         Start the triggers
         """
@@ -400,6 +400,6 @@ class NanoRC:
         if ret != 0:
             return
         self.execute_custom_command("enable",
-                                    data={'name':node.name},
+                                    data={'resource_name': resource_name if resource_name else node.name},
                                     timeout=timeout,
                                     node=node)
