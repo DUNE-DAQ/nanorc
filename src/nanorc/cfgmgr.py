@@ -2,6 +2,7 @@ import os.path
 import json
 import copy
 import socket
+from urllib.parse import urlparse
 
 """Extract nested values from a JSON tree."""
 
@@ -30,16 +31,18 @@ def json_extract(obj, key):
 class ConfigManager:
     """docstring for ConfigManager"""
 
-    def __init__(self, cfg_dir):
+    def __init__(self, log, cfg_dir, port_offset, partition_number, partition_label):
         super().__init__()
-
+        self.log = log
         cfg_dir = os.path.expandvars(cfg_dir)
 
         if not (os.path.exists(cfg_dir) and os.path.isdir(cfg_dir)):
             raise RuntimeError(f"'{cfg_dir}' does not exist or is not a directory")
 
         self.cfg_dir = cfg_dir
-
+        self.port_offset = port_offset
+        self.partition_label = partition_label
+        self.partition_number = partition_number
         self._load()
 
     def _import_cmd_data(self, cmd: str, cfg: dict) -> None:
@@ -114,6 +117,17 @@ class ConfigManager:
             for n, h in self.boot["hosts"].items()
         }
 
+        #port offseting
+        for app in self.boot["apps"]:
+            port = self.boot['apps'][app]['port']
+            newport = port + self.port_offset
+            fixed = self.boot['apps'][app].get('fixed')
+            if fixed :
+                newport = port
+            self.boot['apps'][app]['port'] = newport
+
+        self.boot['response_listener']['port'] += self.port_offset
+
         ll = { **self.boot["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration
         for k, v in ll.items():
             if v == "getenv_ifset":
@@ -128,6 +142,14 @@ class ConfigManager:
                     self.boot["env"][k] = v[v.find(":") + 1:]
                 else:
                     raise ValueError("Key " + k + " is not in environment and no default specified!")
+        # partition renaming using partition label and number
+        if self.partition_label:
+            self.boot["env"]["DUNEDAQ_PARTITION"] = f"{self.partition_label}"
+
+        if self.partition_number is not None:
+            self.boot["env"]["DUNEDAQ_PARTITION"] += f"_{self.partition_number}"
+
+        self.log.info(f'Using partition: \"{self.boot["env"]["DUNEDAQ_PARTITION"]}\"')
 
         for exec_spec in self.boot["exec"].values():
             ll = { **exec_spec["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration
@@ -163,6 +185,13 @@ class ConfigManager:
                             c['address'] = c['address'].replace(fieldname, "HOST_IP").format(**dico)
                         except Exception as e:
                             raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
+                # Port offsetting
+                port = urlparse(c['address']).port
+                newport = port + self.port_offset
+                fixed = c.get('fixed')
+                if fixed :
+                    newport = port
+                c['address'] = c['address'].replace(str(port), str(newport))
 
 
 

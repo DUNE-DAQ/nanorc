@@ -110,11 +110,15 @@ def validatePath(ctx, param, prompted_path):
 
 def validateCfgDir(ctx, param, path):
     return str(Path(path))
-    
+
 def check_rc(ctx, obj):
     if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
         ctx.exit(obj.rc.return_code)
 
+def validate_partition_number(ctx, param, number):
+    if number<0 or number>10:
+        raise click.BadParameter(f"Partition number should be between 0 and 10 (you fed {number})")
+    return number
 
 def add_custom_cmds(cli, rc_cmd_exec, cmds):
     for c,d in cmds.items():
@@ -148,10 +152,12 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
 @accept_timeout(60)
+@click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=validate_partition_number)
+@click.option('--partition-label', type=str, default=None, help='partition label to be use as prefix of partition name')
 @click.argument('top_cfg', type=click.Path(exists=True), callback=validateCfgDir)
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, top_cfg):
+def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, timeout, kerberos, partition_number, partition_label, top_cfg):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f'{credentials.user}@rc> '
@@ -165,6 +171,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
 
     obj.console.print(Panel.fit(grid))
 
+    port_offset = 0 + partition_number * 1_000
 
     if loglevel:
         updateLogLevel(loglevel)
@@ -177,7 +184,10 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
                     logbook_type = "file",
                     timeout = timeout,
                     use_kerb = kerberos,
-                    logbook_prefix = logbook_prefix)
+                    logbook_prefix = logbook_prefix,
+                    port_offset = port_offset,
+                    partition_label = partition_label,
+                    partition_number = partition_number)
 
         if log_path:
             rc.log_path = os.path.abspath(log_path)
@@ -343,7 +353,7 @@ def start_trigger(ctx, obj, trigger_interval_ticks, timeout):
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def scrap(ctx, obj, timeout):
+def stop_trigger(ctx, obj, timeout):
     obj.rc.stop_trigger(timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
