@@ -3,8 +3,10 @@ from .node import SubsystemNode
 from .cfgmgr import ConfigManager
 import os
 import json
+from pathlib import Path
 from collections import OrderedDict
 from json import JSONDecoder
+from anytree import PreOrderIter
 
 def dict_raise_on_duplicates(ordered_pairs):
     count=0
@@ -21,14 +23,18 @@ class TreeBuilder:
         for n,d in js.items():
             if isinstance(d, dict):
                 child = StatefulNode(name=n,
-                                  parent=mother,
-                                  console=self.console,
-                                  fsm_conf = fsm_conf)
+                                     parent=mother,
+                                     console=self.console,
+                                     fsm_conf = fsm_conf)
                 self.extract_json_to_nodes(d, child, fsm_conf = fsm_conf)
             elif isinstance(d, str):
                 node = SubsystemNode(name=n,
                                      ssh_conf=self.ssh_conf,
-                                     cfgmgr=ConfigManager(d),
+                                     cfgmgr=ConfigManager(log=self.log,
+                                                          cfg_dir=d,
+                                                          port_offset=self.port_offset,
+                                                          partition_label=self.partition_label,
+                                                          partition_number=self.partition_number),
                                      console=self.console,
                                      fsm_conf = fsm_conf,
                                      parent = mother)
@@ -36,14 +42,24 @@ class TreeBuilder:
                 self.log.error(f"ERROR processing the tree {n}: {d} I don't know what that's supposed to mean?")
                 exit(1)
 
-    def __init__(self, log, top_cfg, fsm_conf, console, ssh_conf):
+    def get_custom_commands(self):
+        ret = {}
+        for node in PreOrderIter(self.topnode):
+            ret.update(node.get_custom_commands())
+        return ret
+
+    def __init__(self, log, top_cfg, fsm_conf, console, ssh_conf, port_offset, partition_label, partition_number):
         self.log = log
         self.ssh_conf = ssh_conf
         self.fsm_conf = fsm_conf
+        self.port_offset = port_offset
+        self.partition_label = partition_label
+        self.partition_number = partition_number
         if os.path.isdir(top_cfg):
+            apparatus_id = Path(top_cfg).name
             data = {
-                "apparatus_id": top_cfg,
-                top_cfg:top_cfg
+                "apparatus_id": apparatus_id,
+                apparatus_id: top_cfg
             }
             data = json.dumps(data)
         elif os.path.isfile(top_cfg):
