@@ -352,15 +352,15 @@ class NanoRC:
         self.return_code = self.topnode.return_code.value
 
 
-    def execute_script(self, data=None) -> NoReturn:
-        self.topnode.send_custom_command('scripts', data=data)
+    def execute_script(self, timeout, data=None) -> NoReturn:
+        self.execute_custom_command('scripts', data=data, timeout=timeout)
 
     def start_trigger(self, trigger_interval_ticks: Union[int, None], timeout) -> NoReturn:
         """
         Start the triggers
         """
         self.execute_custom_command("start_trigger",
-                                    data={'trigger_interval_ticks':trigger_interval_ticks,},
+                                    data={'trigger_interval_ticks':trigger_interval_ticks},
                                     timeout=timeout)
 
 

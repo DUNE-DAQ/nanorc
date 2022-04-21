@@ -59,8 +59,8 @@ class TreeBuilder:
         if os.path.isdir(top_cfg):
             apparatus_id = Path(top_cfg).name
             data = {
-                "apparatus_id": apparatus,
-                apparatus:top_cfg
+                "apparatus_id": apparatus_id,
+                apparatus_id: top_cfg
             }
             data = json.dumps(data)
         elif os.path.isfile(top_cfg):
