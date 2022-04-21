@@ -108,14 +108,19 @@ function refreshTree(tree){
     $('#controlTree').jstree(true).refresh();
   }
 function sendComm(command,runnumber, runtype){
-  clearInterval(statusTick);
-  $("#state:text").val('Executing...')
-  $(".control").attr("disabled", true);
   if(command == 'start'){
-    dataload = {"command":command,"run_type":runtype,"run_num":runnumber,}
+    if ($.isNumeric( runnumber )){
+      dataload = {"command":command,"run_type":runtype,"run_num":runnumber,}
+    }else{
+      alert('Runnumber must be a NUMBER!')
+      return;
+    }
   }else{
     dataload= "command="+command
   }
+  clearInterval(statusTick);
+  $("#state:text").val('Executing...')
+  $(".control").attr("disabled", true);
   $.ajax({
       url: "http://"+serverhost+"/nanorcrest/command",
       beforeSend: function(xhr) { 
@@ -127,6 +132,9 @@ function sendComm(command,runnumber, runtype){
         //alert(JSON.stringify(d));
         $('#json-renderer').jsonViewer(d,{collapsed: true});
         //getTree()
+        $(".control").attr("disabled", false);
+        $("#state:text").val(state)
+        getStatus()
         statusTick = setInterval(getStatus, 1000, true);
       },
       error: function(e){
