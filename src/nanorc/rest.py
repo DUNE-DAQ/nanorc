@@ -173,7 +173,7 @@ class command(Resource):
             elif cmd == 'start':
                 run_type               =     get_argument(form, 'run_type'              , default_val='TEST', required=False)
                 run_num                = int(get_argument(form, 'run_num'               , default_val=None  , required=True ))
-                disable_data_storage   =     get_argument(form, 'disable_data_storage'  , default_val=True  , required=False)
+                disable_data_storage   =     get_argument(form, 'disable_data_storage'  , default_val=False , required=False)
                 trigger_interval_ticks =     get_argument(form, 'trigger_interval_ticks', default_val=None  , required=False)
                 message                =     get_argument(form, 'message'               , default_val=''    , required=False)
                 resume_wait            =     get_argument(form, 'resume_wait'           , default_val=0     , required=False)
