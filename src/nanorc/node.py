@@ -56,9 +56,10 @@ class SubsystemNode(StatefulNode):
         self.pm = None
         self.listener = None
 
-    def send_custom_command(self, cmd, data, timeout) -> dict:
+    def send_custom_command(self, cmd, data, timeout, app=None) -> dict:
         ret = {}
         for c in self.children:
+            if app and c.name!=app: continue
             ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=data, timeout=timeout)
         return ret
 

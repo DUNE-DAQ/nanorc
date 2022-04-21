@@ -37,14 +37,16 @@ class StatefulNode(NodeMixin):
     def disable(self):
         if not self.enabled:
             self.log.error(f'Cannot disable {self.name} as it is already disabled!')
-            return
+            return 1
         self.enabled = False
+        return 0
 
     def enable(self):
         if self.enabled:
             self.log.error(f'Cannot enable {self.name} as it is already enabled!')
-            return
+            return 1
         self.enabled = True
+        return 0
 
     def get_custom_commands(self):
         ret = {}
