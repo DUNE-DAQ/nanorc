@@ -38,7 +38,7 @@ from .cli import *
 @click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
-@click.option('--partition-number', type=int, default=0, help='Which partition number to run')
+@click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=validate_partition_number)
 @click.argument('cfg_dir', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context

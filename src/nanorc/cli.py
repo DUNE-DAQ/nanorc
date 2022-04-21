@@ -103,6 +103,10 @@ def check_rc(ctx, obj):
     if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
         ctx.exit(obj.rc.return_code)
 
+def validate_partition_number(ctx, param, number):
+    if number<0 or number>10:
+        raise click.BadParameter(f"Partition number should be between 0 and 10 (you fed {number})")
+    return number
 
 def add_custom_cmds(cli, rc_cmd_exec, cmds):
     for c,d in cmds.items():
@@ -136,7 +140,7 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
 @click.option('--log-path', type=click.Path(exists=True), default=None, help='Where the logs should go (on localhost of applications)')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
-@click.option('--partition-number', type=int, default=0, help='Which partition number to run')
+@click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=validate_partition_number)
 @click.option('--partition-label', type=str, default=None, help='partition label to be use as prefix of partition name')
 @click.argument('top_cfg', type=click.Path(exists=True), callback=validateCfgDir)
 @click.pass_obj
