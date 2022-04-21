@@ -36,19 +36,24 @@ class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
     def __init__(self, console: Console, top_cfg: str, run_num_mgr, run_registry, logbook_type:str, timeout: int,
-                 use_kerb=True, logbook_prefix="", fsm_cfg="partition"):
+                 use_kerb=True, logbook_prefix="", port_offset=0, partition_label=None, partition_number=None, fsm_cfg="partition"):
         super(NanoRC, self).__init__()
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
         ssh_conf = []
         if not use_kerb:
             ssh_conf = ["-o GSSAPIAuthentication=no"]
-
+        self.partition_label = partition_label
+        self.partition_number = partition_number
+        self.port_offset = port_offset
         self.cfg = TreeBuilder(log=self.log,
                                top_cfg=top_cfg,
                                console=self.console,
                                ssh_conf=ssh_conf,
-                               fsm_conf=fsm_cfg)
+                               fsm_conf=fsm_cfg,
+                               port_offset=self.port_offset,
+                               partition_label=self.partition_label,
+                               partition_number=self.partition_number)
 
         self.custom_cmd = self.cfg.get_custom_commands()
         self.console.print(f'Extra commands are {list(self.custom_cmd.keys())}')
