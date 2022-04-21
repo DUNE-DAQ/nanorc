@@ -89,11 +89,16 @@ class NanoRC:
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
 
 
-    def execute_custom_command(self, command, data):
-        ret = self.topnode.send_custom_command(command, data)
-        self.console.log(ret)
+    def execute_custom_command(self, command, data, timeout):
+        if not timeout:
+            timeout = self.timeout
+        ret = self.topnode.send_custom_command(command, data, timeout=timeout)
+        self.log.debug(ret)
 
-    def send_expert_command(self, app, json_file):
+    def send_expert_command(self, app, json_file, timeout):
+        if not timeout:
+            timeout = self.timeout
+
         data = json.load(open(json_file,'r'))
         try:
             # masterminding moo here, and constructing a schema of no schema
@@ -121,7 +126,7 @@ class NanoRC:
             self.log.error(f'You can only send expert commands to individual application! I\'m not sending anything for now.')
             return
 
-        ret = app.parent.send_expert_command(app, data)
+        ret = app.parent.send_expert_command(app, data, timeout=timeout)
         self.log.info(f'Reply: {ret}')
 
     def can_transition(self, command):
@@ -138,6 +143,8 @@ class NanoRC:
         if not self.can_transition(command):
             return
 
+        kwargs['timeout'] = kwargs['timeout'] if kwargs.get('timeout') else self.timeout
+        self.log.debug(f'Using timeout = {kwargs["timeout"]}')
         transition = getattr(self.topnode, command)
         transition(*args, **kwargs)
         self.return_code = self.topnode.return_code.value
@@ -161,49 +168,49 @@ class NanoRC:
         self.return_code = print_node(node=self.topnode, console=self.console, leg=leg)
 
 
-    def boot(self) -> NoReturn:
+    def boot(self, timeout:int=None) -> NoReturn:
         """
         Boots applications
         """
-        self.execute_command("boot", timeout=self.timeout, log=self.log_path)
+        self.execute_command("boot", timeout=timeout, log=self.log_path)
 
 
-    def terminate(self) -> NoReturn:
+    def terminate(self, timeout:int=None) -> NoReturn:
         """
         Terminates applications (but keep all the subsystems structure)
         """
-        self.execute_command("terminate")
+        self.execute_command("terminate", timeout=timeout)
 
 
-    def init(self, path) -> NoReturn:
+    def init(self, path, timeout:int=None) -> NoReturn:
         """
         Initializes the applications.
         """
-        self.execute_command("init", path=path, raise_on_fail=True, timeout=self.timeout)
+        self.execute_command("init", path=path, raise_on_fail=True, timeout=timeout)
 
 
-    def conf(self, path) -> NoReturn:
+    def conf(self, path, timeout:int=None) -> NoReturn:
         """
         Sends configure command to the applications.
         """
-        self.execute_command("conf", path=path, raise_on_fail=True, timeout=self.timeout)
+        self.execute_command("conf", path=path, raise_on_fail=True, timeout=timeout)
 
 
-    def pause(self, force:bool=False) -> NoReturn:
+    def pause(self, force:bool=False, timeout:int=None) -> NoReturn:
         """
         Sends pause command
         """
-        self.execute_command("pause", path=None, raise_on_fail=True, timeout=self.timeout, force=force)
+        self.execute_command("pause", path=None, raise_on_fail=True, timeout=timeout, force=force)
 
 
-    def scrap(self, path, force:bool=False) -> NoReturn:
+    def scrap(self, path, force:bool=False, timeout:int=None) -> NoReturn:
         """
         Send scrap command
         """
-        self.execute_command("scrap", path=None, raise_on_fail=True, timeout=self.timeout, force=force)
+        self.execute_command("scrap", path=None, raise_on_fail=True, timeout=timeout, force=force)
 
 
-    def start(self, disable_data_storage: bool, run_type:str, message:str="") -> NoReturn:
+    def start(self, disable_data_storage: bool, run_type:str, message:str="", timeout:int=None) -> NoReturn:
         """
         Sends start command to the applications
 
@@ -245,10 +252,10 @@ class NanoRC:
                 self.return_code = 1
                 return
 
-        self.topnode.start(path=None, raise_on_fail=True,
-                           cfg_method="runtime_start",
-                           overwrite_data=runtime_start_data,
-                           timeout=self.timeout)
+        self.execute_command("start", path=None, raise_on_fail=True,
+                             cfg_method="runtime_start",
+                             overwrite_data=runtime_start_data,
+                             timeout=timeout)
 
         self.return_code = self.topnode.return_code.value
         if self.return_code == 0:
@@ -278,7 +285,7 @@ class NanoRC:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
 
-    def stop(self, force:bool=False, message:str="") -> NoReturn:
+    def stop(self, force:bool=False, message:str="", timeout:int=None) -> NoReturn:
         """
         Sends stop command
         """
@@ -296,7 +303,7 @@ class NanoRC:
         if self.cfgsvr:
             self.cfgsvr.save_on_stop(self.run)
 
-        self.topnode.stop(path=None, raise_on_fail=True, timeout=self.timeout, force=force)
+        self.execute_command("stop", path=None, raise_on_fail=True, timeout=timeout, force=force)
         self.return_code = self.topnode.return_code.value
 
         if self.return_code == 0:
@@ -308,7 +315,7 @@ class NanoRC:
 
 
 
-    def resume(self, trigger_interval_ticks: Union[int, None]) -> NoReturn:
+    def resume(self, trigger_interval_ticks: Union[int, None], timeout:int=None) -> NoReturn:
         """
         Sends resume command
 
@@ -327,48 +334,56 @@ class NanoRC:
                                    overwrite_data=runtime_resume_data,
                                    cfg_method="runtime_resume")
 
-        self.topnode.resume(path=None, raise_on_fail=True,
-                            cfg_method="runtime_resume",
-                            overwrite_data=runtime_resume_data,
-                            timeout=self.timeout)
+        self.execute_command("resume",
+                             path=None, raise_on_fail=True,
+                             cfg_method="runtime_resume",
+                             overwrite_data=runtime_resume_data,
+                             timeout=timeout)
         self.return_code = self.topnode.return_code.value
 
 
-    def start_trigger(self, trigger_interval_ticks: Union[int, None]) -> NoReturn:
+    def start_trigger(self, trigger_interval_ticks: Union[int, None], timeout) -> NoReturn:
         """
         Start the triggers
         """
-        self.topnode.send_custom_command("start_trigger",
-                                         data={'trigger_interval_ticks':trigger_interval_ticks})
+        self.execute_custom_command("start_trigger",
+                                    data={'trigger_interval_ticks':trigger_interval_ticks,},
+                                    timeout=timeout)
 
 
-    def stop_trigger(self) -> NoReturn:
+    def stop_trigger(self, timeout) -> NoReturn:
         """
         Stop the triggers
         """
-        self.topnode.send_custom_command("stop_trigger",
-                                         data={})
+        self.execute_custom_command("stop_trigger",
+                                    data={},
+                                    timeout=timeout)
 
 
-    def change_rate(self, trigger_interval_ticks) -> NoReturn:
+    def change_rate(self, trigger_interval_ticks, timeout) -> NoReturn:
         """
         Start the triggers
         """
-        self.topnode.send_custom_command("change_rate",
-                                         data={'trigger_interval_ticks':trigger_interval_ticks})
+        self.execute_custom_command("change_rate",
+                                    data={'trigger_interval_ticks':trigger_interval_ticks},
+                                    timeout=timeout)
 
 
-    def disable(self, node) -> NoReturn:
+    def disable(self, node, timeout) -> NoReturn:
         """
         Start the triggers
         """
         node.disable()
-        node.send_custom_command("disable", data={'name':node.name})
+        self.execute_custom_command("disable",
+                                    data={'name':node.name},
+                                    timeout=timeout)
 
 
-    def enable(self, node) -> NoReturn:
+    def enable(self, node, timeout) -> NoReturn:
         """
         Start the triggers
         """
         node.enable()
-        node.send_custom_command("enable", data={'name':node.name})
+        self.execute_custom_command("enable",
+                                    data={'name':node.name},
+                                    timeout=timeout)

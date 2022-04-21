@@ -34,7 +34,7 @@ from .cli import *
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--log-path', type=click.Path(exists=True), default='/log', help='Where the logs should go (on localhost of applications)')
-@click.option('--timeout', type=int, default=60, help='Application commands timeout')
+@accept_timeout(60)
 @click.option('--elisa-conf', type=click.Path(exists=True), default=None, help='ELisA configuration (by default, use the one in src/nanorc/confdata)')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
@@ -45,7 +45,7 @@ from .cli import *
 @click.argument('user', type=str)
 @click.pass_obj
 @click.pass_context
-def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, timeout, cfg_dumpdir, dotnanorc, kerberos, partition_number, partition_label, cfg_dir, user):
+def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, dotnanorc, kerberos, timeout, partition_number, partition_label, cfg_dir, user):
 
     if not elisa_conf:
         with resources.path(confdata, "elisa_conf.json") as p:
@@ -144,17 +144,18 @@ def kinit(ctx, obj):
 @click.option('--stop-wait', type=int, default=0, help='Seconds to wait between Pause and Stop commands')
 @click.option('--force', default=False, is_flag=True)
 @click.option('--message', type=str, default="")
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def stop(ctx, obj, stop_wait:int, force:bool, message:str):
+def stop(ctx, obj, stop_wait:int, force:bool, message:str, timeout:int):
     if not credentials.check_kerberos_credentials():
         logging.getLogger("cli").error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
         return
-    obj.rc.pause(force)
+    obj.rc.pause(force, timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
     time.sleep(stop_wait)
-    obj.rc.stop(force, message=message)
+    obj.rc.stop(force, message=message, timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
 
@@ -175,9 +176,10 @@ def message(obj, message):
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.option('--resume-wait', type=int, default=0, help='Seconds to wait between Start and Resume commands')
 @click.option('--message', type=str, default="")
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def start(ctx, obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str):
+def start(ctx, obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str, timeout:int):
     """
     Start Command
 
@@ -189,11 +191,11 @@ def start(ctx, obj:NanoContext, run_type:str, disable_data_storage:bool, trigger
         logging.getLogger("cli").error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
         return
 
-    obj.rc.start(disable_data_storage, run_type, message=message)
+    obj.rc.start(disable_data_storage, run_type, message=message, timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
     time.sleep(resume_wait)
-    obj.rc.resume(trigger_interval_ticks)
+    obj.rc.resume(trigger_interval_ticks, timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
 
