@@ -370,21 +370,23 @@ def change_rate(ctx, obj, trigger_interval_ticks, timeout):
 
 @cli.command('enable')
 @click.argument('path', type=str, default=None, callback=validatePath)
+@click.option('--resource-name', type=str, required=True)
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def enable(ctx, obj, path, timeout):
-    obj.rc.enable(path, timeout=timeout)
+def enable(ctx, obj, path, resource_name, timeout):
+    obj.rc.enable(path, timeout=timeout, resource_name=resource_name)
     check_rc(ctx,obj)
     obj.rc.status()
 
 @cli.command('disable')
 @click.argument('path', type=str, default=None, callback=validatePath)
+@click.option('--resource-name', type=str, required=True)
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def disable(ctx, obj, path, timeout):
-    obj.rc.disable(path, timeout=timeout)
+def disable(ctx, obj, path, resource_name, timeout):
+    obj.rc.disable(path, timeout=timeout, resource_name=resource_name)
     check_rc(ctx,obj)
     obj.rc.status()
 

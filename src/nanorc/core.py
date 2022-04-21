@@ -89,10 +89,20 @@ class NanoRC:
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
 
 
-    def execute_custom_command(self, command, data, timeout):
+    def execute_custom_command(self, command, data, timeout, node=None):
         if not timeout:
             timeout = self.timeout
-        ret = self.topnode.send_custom_command(command, data, timeout=timeout)
+
+        if not node:
+            self.log.debug(f'Sending {command} to all the nodes')
+            ret = self.topnode.send_custom_command(command, data, timeout=timeout)
+        elif isinstance(node, ApplicationNode):
+            self.log.debug(f'Telling {node.parent.name} to send {command} to {node.name}')
+            ret = node.parent.send_custom_command(command, data, timeout=timeout, app=node.name)
+        else:
+            self.log.debug(f'Sending {command} to {node.name}')
+            ret = node.send_custom_command(command, data, timeout=timeout)
+
         self.log.debug(ret)
 
     def send_expert_command(self, app, json_file, timeout):
@@ -369,21 +379,27 @@ class NanoRC:
                                     timeout=timeout)
 
 
-    def disable(self, node, timeout) -> NoReturn:
+    def disable(self, node, timeout, resource_name) -> NoReturn:
         """
         Start the triggers
         """
-        node.disable()
+        ret = node.disable()
+        if ret != 0:
+            return
         self.execute_custom_command("disable",
-                                    data={'name':node.name},
-                                    timeout=timeout)
+                                    data={'resource_name': resource_name if resource_name else node.name},
+                                    timeout=timeout,
+                                    node=node)
 
 
-    def enable(self, node, timeout) -> NoReturn:
+    def enable(self, node, timeout, resource_name) -> NoReturn:
         """
         Start the triggers
         """
-        node.enable()
+        ret = node.enable()
+        if ret != 0:
+            return
         self.execute_custom_command("enable",
-                                    data={'name':node.name},
-                                    timeout=timeout)
+                                    data={'resource_name': resource_name if resource_name else node.name},
+                                    timeout=timeout,
+                                    node=node)
