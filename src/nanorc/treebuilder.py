@@ -3,6 +3,7 @@ from .node import SubsystemNode
 from .cfgmgr import ConfigManager
 import os
 import json
+from pathlib import Path
 from collections import OrderedDict
 from json import JSONDecoder
 from anytree import PreOrderIter
@@ -55,7 +56,7 @@ class TreeBuilder:
         self.partition_label = partition_label
         self.partition_number = partition_number
         if os.path.isdir(top_cfg):
-            apparatus_id = top_cfg.split('/')[-1]
+            apparatus_id = Path(top_cfg).name
             data = {
                 "apparatus_id": apparatus_id,
                 apparatus_id: top_cfg
