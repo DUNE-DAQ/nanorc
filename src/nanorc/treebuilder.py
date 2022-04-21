@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from collections import OrderedDict
 from json import JSONDecoder
+from pathlib import Path
 from anytree import PreOrderIter
 
 def dict_raise_on_duplicates(ordered_pairs):

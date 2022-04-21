@@ -142,6 +142,23 @@ class ConfigManager:
                     self.boot["env"][k] = v[v.find(":") + 1:]
                 else:
                     raise ValueError("Key " + k + " is not in environment and no default specified!")
+        if self.boot.get('scripts'):
+            for script_spec in self.boot["scripts"].values():
+                ll = { **script_spec["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration
+                for k, v in ll.items():
+                    if v == "getenv_ifset":
+                        if k in os.environ.keys():
+                            script_spec["env"][k] = os.environ[k]
+                        else:
+                            script_spec["env"].pop(k)
+                    elif str(v).find("getenv") == 0:
+                        if k in os.environ.keys():
+                            script_spec["env"][k] = os.environ[k]
+                        elif str(v).find(":") > 0:
+                            script_spec["env"][k] = v[v.find(":") + 1:]
+                        else:
+                            raise ValueError("Key " + k + " is not in environment and no default specified!")
+
         # partition renaming using partition label and number
         if self.partition_label:
             self.boot["env"]["DUNEDAQ_PARTITION"] = f"{self.partition_label}"

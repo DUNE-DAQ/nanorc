@@ -94,7 +94,7 @@ def validatePath(ctx, param, prompted_path):
     if prompted_path is None:
         return None
 
-    if prompted_path[0] != "/":
+    if prompted_path[0] != '/':
         prompted_path = '/'+prompted_path
 
     hierarchy = prompted_path.split("/")
@@ -103,6 +103,7 @@ def validatePath(ctx, param, prompted_path):
     r = Resolver('name')
     try:
         node = r.get(topnode, prompted_path)
+        return node
     except Exception as ex:
         raise click.BadParameter(f"Couldn't find {prompted_path} in the tree") from ex
 
@@ -142,6 +143,7 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
             execute_custom = click.option(f'--{arg_pretty}', type=argtype, default=arg_default[arg])(execute_custom)
 
         cli.add_command(execute_custom, c)
+
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 @click.version_option(__version__)
@@ -214,6 +216,16 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
 def status(obj: NanoContext):
     obj.rc.status()
 
+@cli.command('pin-threads')
+@click.option('--pin-thread-file', type=click.Path(exists=True), default=None)
+@accept_timeout(None)
+@click.pass_obj
+def pin_threads(obj:NanoContext, pin_thread_file, timeout:int):
+    data = { "script_name": 'thread_pinning' }
+    if pin_thread_file:
+        data["env"]: { "DUNEDAQ_THREAD_PIN_FILE": pin_thread_file }
+    obj.rc.execute_script(data=data, timeout=timeout)
+
 @cli.command('boot')
 @accept_timeout(None)
 @click.pass_obj
@@ -248,7 +260,6 @@ def conf(ctx, obj, path, timeout:int):
     obj.rc.conf(path, timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
-
 
 @cli.command('message')
 @click.argument('message', type=str, default=None)
