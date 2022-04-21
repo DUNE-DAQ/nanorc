@@ -53,9 +53,18 @@ def print_status(topnode, console, apparatus_id='') -> int:
                 alive = f'dead[{exit_code}]'
             ping  = sup.commander.ping()
             last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
+
+            state_str = Text()
+            if not node.enabled:
+                state_str = Text(f"{node.state} - {alive} - disabled")
+            elif node.is_error():
+                state_str = Text(f"{node.state} - {alive}", style=('bold red'))
+            else:
+                state_str = Text(f"{node.state} - {alive}")
+
             table.add_row(
                 Text(pre)+Text(node.name),
-                Text(f"{node.state} - {alive}", style=('bold red' if node.is_error() else "")),
+                state_str,
                 sup.desc.host,
                 str(ping),
                 Text(str(sup.last_sent_command), style=('bold red' if last_cmd_failed else '')),

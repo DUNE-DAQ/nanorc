@@ -13,6 +13,7 @@ import click
 import click_shell
 from click_shell import make_click_shell
 import os.path
+from pathlib import Path
 import logging
 
 from . import __version__
@@ -76,41 +77,89 @@ def updateLogLevel(loglevel):
         for handler in sh_command_logger.handlers:
             handler.setLevel(sh_command_level)
 
+def validate_timeout(ctx, param, timeout):
+    if timeout is None:
+        return timeout
+    if timeout<=0:
+        raise click.BadParameter('Timeout should be >0')
+    return timeout
+
+def accept_timeout(default_timeout):
+    def add_decorator(function):
+        return click.option('--timeout', type=int, default=default_timeout, help="Timeout, in seconds", callback=validate_timeout)(function)
+    return add_decorator
+
 def validatePath(ctx, param, prompted_path):
 
     if prompted_path is None:
         return None
 
-    hierarchy = prompted_path.split("/")
+    if prompted_path[0] != '/':
+        prompted_path = '/'+prompted_path
 
+    hierarchy = prompted_path.split("/")
     topnode = ctx.obj.rc.topnode
 
     r = Resolver('name')
     try:
         node = r.get(topnode, prompted_path)
+        return node
     except Exception as ex:
         raise click.BadParameter(f"Couldn't find {prompted_path} in the tree") from ex
 
-    return hierarchy
+    return node
+
+def validateCfgDir(ctx, param, path):
+    return str(Path(path))
 
 def check_rc(ctx, obj):
     if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
         ctx.exit(obj.rc.return_code)
+
+def validate_partition_number(ctx, param, number):
+    if number<0 or number>10:
+        raise click.BadParameter(f"Partition number should be between 0 and 10 (you fed {number})")
+    return number
+
+def add_custom_cmds(cli, rc_cmd_exec, cmds):
+    for c,d in cmds.items():
+        arg_list = {}
+        arg_default = {}
+        for app, app_data in d.items():
+            for modules_data in app_data.values():
+                for module_data in modules_data:
+                    module = module_data['match']
+                    cmd_data = module_data['data']
+                    for arg in cmd_data:
+                        arg_list[arg] = type(cmd_data[arg])
+                        arg_default[arg] = cmd_data[arg]
+
+        def execute_custom(**kwargs):
+            rc_cmd_exec(c, kwargs)
+
+        execute_custom = click.command(c)(execute_custom)
+        for arg, argtype in arg_list.items():
+            arg_pretty = arg.replace("_", "-")
+            execute_custom = click.option(f'--{arg_pretty}', type=argtype, default=arg_default[arg])(execute_custom)
+
+        cli.add_command(execute_custom, c)
 
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 @click.version_option(__version__)
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
 @click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
-@click.option('--timeout', type=int, default=60, help='Application commands timeout')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--log-path', type=click.Path(exists=True), default=None, help='Where the logs should go (on localhost of applications)')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
-@click.argument('top_cfg', type=click.Path(exists=True))
+@accept_timeout(60)
+@click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=validate_partition_number)
+@click.option('--partition-label', type=str, default=None, help='partition label to be use as prefix of partition name')
+@click.argument('top_cfg', type=click.Path(exists=True), callback=validateCfgDir)
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, top_cfg):
+def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, timeout, kerberos, partition_number, partition_label, top_cfg):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f'{credentials.user}@rc> '
@@ -124,6 +173,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
 
     obj.console.print(Panel.fit(grid))
 
+    port_offset = 0 + partition_number * 1_000
 
     if loglevel:
         updateLogLevel(loglevel)
@@ -136,10 +186,15 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
                     logbook_type = "file",
                     timeout = timeout,
                     use_kerb = kerberos,
-                    logbook_prefix = logbook_prefix)
+                    logbook_prefix = logbook_prefix,
+                    port_offset = port_offset,
+                    partition_label = partition_label,
+                    partition_number = partition_number)
 
         if log_path:
             rc.log_path = os.path.abspath(log_path)
+
+        add_custom_cmds(ctx.command, rc.execute_custom_command, rc.custom_cmd)
 
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
@@ -161,20 +216,32 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
 def status(obj: NanoContext):
     obj.rc.status()
 
+@cli.command('pin-threads')
+@click.option('--pin-thread-file', type=click.Path(exists=True), default=None)
+@accept_timeout(None)
+@click.pass_obj
+def pin_threads(obj:NanoContext, pin_thread_file, timeout:int):
+    data = { "script_name": 'thread_pinning' }
+    if pin_thread_file:
+        data["env"]: { "DUNEDAQ_THREAD_PIN_FILE": pin_thread_file }
+    obj.rc.execute_script(data=data, timeout=timeout)
+
 @cli.command('boot')
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def boot(ctx, obj):
-    obj.rc.boot()
+def boot(ctx, obj, timeout:int):
+    obj.rc.boot(timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
 
 @cli.command('init')
 @click.option('--path', type=str, default=None, callback=validatePath)
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def init(ctx, obj, path):
-    obj.rc.init(path)
+def init(ctx, obj, path, timeout:int):
+    obj.rc.init(path, timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
 
@@ -186,13 +253,13 @@ def ls(obj):
 
 @cli.command('conf')
 @click.option('--path', type=str, default=None, callback=validatePath)
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def conf(ctx, obj, path):
-    obj.rc.conf(path)
+def conf(ctx, obj, path, timeout:int):
+    obj.rc.conf(path, timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
-
 
 @cli.command('message')
 @click.argument('message', type=str, default=None)
@@ -206,9 +273,10 @@ def message(obj, message):
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.option('--resume-wait', type=int, default=0, help='Seconds to wait between Start and Resume commands')
 @click.option('--message', type=str, default="")
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def start(ctx, obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str):
+def start(ctx, obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str, timeout:int):
     """
     Start Command
 
@@ -220,50 +288,53 @@ def start(ctx, obj:NanoContext, run:int, disable_data_storage:bool, trigger_inte
     """
 
     obj.rc.run_num_mgr.set_run_number(run)
-    obj.rc.start(disable_data_storage, "TEST", message=message)
+    obj.rc.start(disable_data_storage, "TEST", message=message, timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
     time.sleep(resume_wait)
     if obj.rc.return_code == 0:
         time.sleep(resume_wait)
-        obj.rc.resume(trigger_interval_ticks)
+        obj.rc.resume(trigger_interval_ticks, timeout=timeout)
         obj.rc.status()
 
 @cli.command('stop')
 @click.option('--stop-wait', type=int, default=0, help='Seconds to wait between Pause and Stop commands')
 @click.option('--force', default=False, is_flag=True)
 @click.option('--message', type=str, default="")
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def stop(ctx, obj, stop_wait:int, force:bool, message:str):
-    obj.rc.pause(force)
+def stop(ctx, obj, stop_wait:int, force:bool, message:str, timeout:int):
+    obj.rc.pause(force, timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
     time.sleep(stop_wait)
     if obj.rc.return_code == 0:
-        obj.rc.stop(force, message=message)
+        obj.rc.stop(force, message=message, timeout=timeout)
         obj.rc.status()
 
 @cli.command('pause')
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def pause(ctx, obj):
-    obj.rc.pause()
+def pause(ctx, obj, timeout:int):
+    obj.rc.pause(timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
 
 @cli.command('resume')
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def resume(ctx, obj:NanoContext, trigger_interval_ticks:int):
+def resume(ctx, obj:NanoContext, trigger_interval_ticks:int, timeout:int):
     """Resume Command
 
     Args:
         obj (NanoContext): Context object
         trigger_interval_ticks (int): Trigger separation in ticks
     """
-    obj.rc.resume(trigger_interval_ticks)
+    obj.rc.resume(trigger_interval_ticks, timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
 
@@ -271,20 +342,80 @@ def resume(ctx, obj:NanoContext, trigger_interval_ticks:int):
 @cli.command('scrap')
 @click.option('--path', type=str, default=None, callback=validatePath)
 @click.option('--force', default=False, is_flag=True)
+@accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def scrap(ctx, obj, path, force):
-    obj.rc.scrap(path, force)
+def scrap(ctx, obj, path, force, timeout):
+    obj.rc.scrap(path, force, timeout=timeout)
+    check_rc(ctx,obj)
+    obj.rc.status()
+
+@cli.command('start_trigger')
+@click.option('--trigger-interval-ticks', type=int, default=None)
+@accept_timeout(None)
+@click.pass_obj
+@click.pass_context
+def start_trigger(ctx, obj, trigger_interval_ticks, timeout):
+    obj.rc.start_trigger(trigger_interval_ticks, timeout=timeout)
+    check_rc(ctx,obj)
+    obj.rc.status()
+
+@cli.command('stop_trigger')
+@accept_timeout(None)
+@click.pass_obj
+@click.pass_context
+def stop_trigger(ctx, obj, timeout):
+    obj.rc.stop_trigger(timeout=timeout)
+    check_rc(ctx,obj)
+    obj.rc.status()
+
+@cli.command('change_rate')
+@click.argument('trigger-interval-ticks', type=int)
+@accept_timeout(None)
+@click.pass_obj
+@click.pass_context
+def change_rate(ctx, obj, trigger_interval_ticks, timeout):
+    obj.rc.change_rate(trigger_interval_ticks, timeout)
+    check_rc(ctx,obj)
+    obj.rc.status()
+
+@cli.command('enable')
+@click.argument('path', type=str, default=None, callback=validatePath)
+@click.option('--resource-name', type=str, required=True)
+@accept_timeout(None)
+@click.pass_obj
+@click.pass_context
+def enable(ctx, obj, path, resource_name, timeout):
+    obj.rc.enable(path, timeout=timeout, resource_name=resource_name)
+    check_rc(ctx,obj)
+    obj.rc.status()
+
+@cli.command('disable')
+@click.argument('path', type=str, default=None, callback=validatePath)
+@click.option('--resource-name', type=str, required=True)
+@accept_timeout(None)
+@click.pass_obj
+@click.pass_context
+def disable(ctx, obj, path, resource_name, timeout):
+    obj.rc.disable(path, timeout=timeout, resource_name=resource_name)
     check_rc(ctx,obj)
     obj.rc.status()
 
 @cli.command('terminate')
+@accept_timeout(None)
 @click.pass_obj
-def terminate(obj):
-    obj.rc.terminate()
+def terminate(obj, timeout):
+    obj.rc.terminate(timeout=timeout)
     time.sleep(1)
     obj.rc.status()
 
+@cli.command('expert_command')
+@click.argument('app', type=str, default=None, callback=validatePath)
+@click.argument('json_file', type=click.Path(exists=True))
+@accept_timeout(None)
+@click.pass_obj
+def expert_command(obj, app, json_file, timeout):
+    obj.rc.send_expert_command(app, json_file, timeout=timeout)
 
 @cli.command('wait')
 @click.pass_obj
