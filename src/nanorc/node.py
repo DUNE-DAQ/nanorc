@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 from rich.panel import Panel
+import copy as cp
 import logging
 from .sshpm import SSHProcessManager
 from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
@@ -58,6 +59,25 @@ class SubsystemNode(StatefulNode):
 
     def send_custom_command(self, cmd, data, timeout, app=None) -> dict:
         ret = {}
+        
+        if cmd == 'scripts': # unfortunately I don't see how else to do this
+            scripts = self.cfgmgr.boot.get('scripts')
+            script = cp.deepcopy(scripts.get(data['script_name'])) if scripts else None
+            
+            if not script:
+                self.log.error(f"no {data['script_name']} script data in boot.json")
+                return {self.name : f"no {data['script_name']} script data in boot.json"}
+
+            try:
+                del data['script_name']
+                for key, val in data.items():
+                    script[key].update(val)
+                self.pm.execute_script(script)
+                
+            except Exception as e:
+                self.log.error(f'Couldn\'t execute the thread pinning scripts: {str(e)}')
+            return ret
+        
         for c in self.children:
             if app and c.name!=app: continue
             ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=data, timeout=timeout)
@@ -137,6 +157,17 @@ class SubsystemNode(StatefulNode):
             self.to_error(event=event, response=response)
         else:
             self.end_boot(response=response)
+
+
+    def on_exit_conf_ing(self, event) -> NoReturn:
+        scripts = self.cfgmgr.boot.get('scripts')
+        thread_pinning = scripts.get('thread_pinning') if scripts else None
+        if thread_pinning:
+            try:
+                self.pm.execute_script(thread_pinning)
+            except Exception as e:
+                self.log.error(f'Couldn\'t execute the thread pinning scripts: {str(e)}')
+        super()._on_exit_callback(event)
 
 
     def on_enter_terminate_ing(self, _) -> NoReturn:
