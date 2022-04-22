@@ -108,11 +108,12 @@ def check_rc(ctx, obj):
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
 @click.option('--k8s', is_flag=True, default=False, help='Use K8s?')
+@click.option('--kind/--no-kind', is_flag=True, default=True, help='Running in a Kind single node cluster')
 @click.option('--podman', is_flag=True, default=False, help='Use Podman rather than Docker for container runtime')
 @click.argument('top_cfg', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, k8s, podman, top_cfg):
+def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, k8s, kind, podman, top_cfg):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f'{credentials.user}@rc> '
@@ -140,6 +141,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
                     use_kerb = kerberos,
                     logbook_prefix = logbook_prefix,
                     use_k8s=k8s,
+                    use_kind=kind,
                     use_podman=podman)
 
         if log_path:

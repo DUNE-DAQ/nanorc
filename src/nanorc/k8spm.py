@@ -38,7 +38,7 @@ class K8sProcess(object):
 
 class K8SProcessManager(object):
     """docstring for K8SProcessManager"""
-    def __init__(self, console: Console, podman: False):
+    def __init__(self, console: Console, kind: True, podman: False):
         """A Kubernetes Process Manager
         
         Args:
@@ -48,7 +48,8 @@ class K8SProcessManager(object):
 
         self.log = logging.getLogger(__name__)
         self.console = console
-        self.podman=podman
+        self.kind = kind
+        self.podman = podman
         self.apps = {}
         self.partition = None
 
@@ -140,7 +141,8 @@ class K8SProcessManager(object):
     
     # ----
     def create_daqapp_deployment(self, name: str, app_label: str, namespace: str,
-                                 image: str, cmd_port: int = 3333, mount_cvmfs: bool = False,
+                                 image: str, pocket_share: str,
+                                 cmd_port: int = 3333, mount_cvmfs: bool = False,
                                  env_vars: dict = None, run_as: dict = None,
                                  connections:list = None):
         self.log.info(f"Creating {namespace}:{name} daq application (port: {cmd_port})")
@@ -214,7 +216,7 @@ class K8SProcessManager(object):
                             client.V1Volume(
                                 name="pocket",
                                 host_path=client.V1HostPathVolumeSource(
-                                    path='/pocket',
+                                    path=pocket_share,
                                 )
                             )
                         ]
@@ -354,9 +356,12 @@ class K8SProcessManager(object):
                 f"ERROR: apps have already been booted {' '.join(self.apps.keys())}. Terminate them all before booting a new set."
             )
 
-        if self.podman:
-            kind_gateway=socket.gethostbyname(socket.gethostname())
+        if 'POCKET_SHARE' in os.environ:
+            pocket_share=os.environ['POCKET_SHARE']
         else:
+            pocket_share='/pocket'
+
+        if self.kind and not self.podman:
             logging.info('Resolving the kind gateway')
             import docker, ipaddress
             # Detect docker environment
@@ -373,6 +378,8 @@ class K8SProcessManager(object):
                 kind_gateway = next(iter(s['Gateway'] for s in kind_network.attrs['IPAM']['Config'] if isinstance(ipaddress.ip_address(s['Gateway']), ipaddress.IPv4Address)), None)
             except Exception as exc:
                 raise RuntimeError("Identify the kind gateway address'") from exc
+        else:
+            kind_gateway=socket.gethostbyname(socket.gethostname())
         logging.info(f"kind network gateway: {kind_gateway}")
 
         apps = boot_info["apps"].copy()
@@ -414,7 +421,9 @@ class K8SProcessManager(object):
             app_desc.port = cmd_port
             app_desc.proc = K8sProcess(self, app_name, self.partition)
 
-            self.create_daqapp_deployment(app_name, app_name, self.partition, image, cmd_port, mount_cvmfs=True, env_vars=app_vars, run_as=run_as, connections=connections)
+            self.create_daqapp_deployment(app_name, app_name, self.partition,
+                                          image, pocket_share,
+                                          cmd_port, mount_cvmfs=True, env_vars=app_vars, run_as=run_as, connections=connections)
             self.apps[app_name] = app_desc
             
         # TODO: move (some of) this loop into k8spm?
@@ -448,8 +457,8 @@ class K8SProcessManager(object):
                     break
                 
                 time.sleep(1)
-                
-            self.create_nanorc_responder('nanorc', 'nanorc', self.partition, kind_gateway, boot_info["response_listener"]["port"])
+
+        self.create_nanorc_responder('nanorc', 'nanorc', self.partition, kind_gateway, boot_info["response_listener"]["port"])
 
     # ---
     def check_apps(self):
