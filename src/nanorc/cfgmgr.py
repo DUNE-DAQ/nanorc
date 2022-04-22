@@ -203,12 +203,12 @@ class ConfigManager:
                         except Exception as e:
                             raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
                 # Port offsetting
-                port = urlparse(c['address']).port
+                port = urlparse(c['uri']).port
                 newport = port + self.port_offset
                 fixed = c.get('fixed')
                 if fixed :
                     newport = port
-                c['address'] = c['address'].replace(str(port), str(newport))
+                c['uri'] = c['uri'].replace(str(port), str(newport))
 
 
 
