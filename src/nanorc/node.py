@@ -78,9 +78,14 @@ class SubsystemNode(StatefulNode):
                 self.log.error(f'Couldn\'t execute the thread pinning scripts: {str(e)}')
             return ret
 
-        for c in self.children:
-            if app and c.name!=app: continue
-            ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=data, timeout=timeout)
+        cmd_dict = getattr(self.cfgmgr, cmd)
+        for app_name, cmd_data in cmd_dict.items():
+            for c in self.children:
+                if app and c.name!=app_name: continue
+                cmd_data2 = cp.deepcopy(cmd_data)
+                for m in cmd_data2['modules']:
+                    m['data'].update(data)
+                ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=cmd_data2, timeout=timeout)
         return ret
 
     def send_expert_command(self, app, cmd, timeout) -> dict:
