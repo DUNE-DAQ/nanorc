@@ -138,9 +138,11 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
                         arg_list[arg] = type(cmd_data[arg])
                         arg_default[arg] = cmd_data[arg]
 
-        def execute_custom(timeout, **kwargs):
-            rc_cmd_exec(c, data=kwargs, timeout=timeout)
+        def execute_custom(ctx, obj, timeout, **kwargs):
+            rc_cmd_exec(command=obj.info_name, data=kwargs, timeout=timeout)
 
+        execute_custom = click.pass_obj(execute_custom)
+        execute_custom = click.pass_context(execute_custom)
         execute_custom = click.command(c)(execute_custom)
         execute_custom = accept_timeout(None)(execute_custom)
         for arg, argtype in arg_list.items():
