@@ -138,14 +138,14 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
                         arg_list[arg] = type(cmd_data[arg])
                         arg_default[arg] = cmd_data[arg]
 
-        def execute_custom(**kwargs):
-            rc_cmd_exec(c, kwargs)
+        def execute_custom(timeout, **kwargs):
+            rc_cmd_exec(c, data=kwargs, timeout=timeout)
 
         execute_custom = click.command(c)(execute_custom)
+        execute_custom = accept_timeout(None)(execute_custom)
         for arg, argtype in arg_list.items():
             arg_pretty = arg.replace("_", "-")
             execute_custom = click.option(f'--{arg_pretty}', type=argtype, default=arg_default[arg])(execute_custom)
-
         cli.add_command(execute_custom, c)
 
 # ------------------------------------------------------------------------------
