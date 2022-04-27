@@ -163,8 +163,8 @@ class ConfigManager:
         if self.partition_label:
             self.boot["env"]["DUNEDAQ_PARTITION"] = f"{self.partition_label}"
 
-        if self.partition_number is not None:
-            self.boot["env"]["DUNEDAQ_PARTITION"] += f"_{self.partition_number}"
+        # if self.partition_number is not None:
+        #     self.boot["env"]["DUNEDAQ_PARTITION"] += f"_{self.partition_number}"
 
         self.log.info(f'Using partition: \"{self.boot["env"]["DUNEDAQ_PARTITION"]}\"')
 
