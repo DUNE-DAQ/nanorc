@@ -141,7 +141,8 @@ class K8SProcessManager(object):
     def create_daqapp_deployment(self, name: str, app_label: str, namespace: str, cmd_port: int = 3333, mount_cvmfs: bool = False, env_vars: dict = None, run_as: dict = None,
                                  connections:list = None):
         self.log.info(f"Creating {namespace}:{name} daq application (port: {cmd_port})")
-
+        daq_app_image="pocket-daq-area-cvmfs:v2.10.0",
+        
         # Deployment
         deployment = client.V1Deployment(
             # api_version="apps/v1",
@@ -165,7 +166,7 @@ class K8SProcessManager(object):
                             # Daq application container
                             client.V1Container(
                                 name="daq-application",
-                                image="pocket-daq-area-cvmfs:v2.10.2",
+                                image=daq_app_image,
                                 image_pull_policy= "Never",
                                 # Environment variables
                                 env = [
