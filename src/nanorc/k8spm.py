@@ -5,7 +5,9 @@ import rich
 import socket
 import time
 import os
-from kubernetes import client, config
+import threading
+import datetime
+from kubernetes import client, config, watch
 from rich.console import Console
 from rich.progress import *
 
@@ -141,7 +143,7 @@ class K8SProcessManager(object):
     
     # ----
     def create_daqapp_deployment(self, name: str, app_label: str, namespace: str,
-                                 image: str, pocket_share: str,
+                                 host_class: str, image: str, pocket_share: str,
                                  cmd_port: int = 3333, mount_cvmfs: bool = False,
                                  env_vars: dict = None, run_as: dict = None,
                                  connections:list = None):
@@ -219,7 +221,8 @@ class K8SProcessManager(object):
                                     path=pocket_share,
                                 )
                             )
-                        ]
+                        ],
+                        node_selector={'dune.daq/class':host_class} if host_class else None
                     ))
             )
 
@@ -348,6 +351,25 @@ class K8SProcessManager(object):
             self.log.error(e)
             raise RuntimeError(f"Failed to create persistent volume claim {namespace}:{name}") from e
 
+
+    def event_listener(self, namespace: str, apps):
+        self.log.info("event_listener thread started")
+        start=datetime.datetime.now(datetime.timezone.utc)
+        watcher=watch.Watch()
+
+        for ev in watcher.stream(self._core_v1_api.list_namespaced_event,
+                                 namespace):
+            evobj=ev['object']
+            obj=evobj.involved_object
+            pname=obj.name.split('-')
+            name=pname[0]
+            #print(f'app {name}: {evobj.reason}')
+            if evobj.last_timestamp>start and name in apps:
+                if evobj.type=='Normal':
+                    if evobj.reason=='Started' and evobj.count>1:
+                        self.log.error(f'app {name} died and was restarted {evobj.count-1} times')
+                elif evobj.type=='Warning':
+                    self.log.warn(f'app {name}: {evobj.message}')
     #---
     def boot(self, boot_info, partition, connections):
 
@@ -385,9 +407,9 @@ class K8SProcessManager(object):
         apps = boot_info["apps"].copy()
         env_vars = boot_info["env"]
         # TODO: move into the rc boot method. The PM should not know about DUNEDAQ_PARTITION
-        env_vars['DUNEDAQ_PARTITION'] = partition
+        #env_vars['DUNEDAQ_PARTITION'] = partition
         
-        self.partition = partition
+        self.partition = env_vars['DUNEDAQ_PARTITION']
         cmd_port = 3333
         
         # Create partition
@@ -404,9 +426,17 @@ class K8SProcessManager(object):
                 'gid': os.getgid(),
             }
             image = "pocket-daq-cvmfs:v0.1.0"
-        
-        for app_name, app_conf in apps.items():
 
+        self.listen_thread=threading.Thread(target=self.event_listener,
+                                            args=(self.partition,apps))
+        self.listen_thread.daemon=True
+        self.listen_thread.start()
+
+        for app_name, app_conf in apps.items():
+            if 'class' in app_conf:
+                host_class=app_conf['class']
+            else:
+                host_class=None
             exec_vars = boot_info['exec'][app_conf['exec']]['env']
 
             app_vars = {}
@@ -422,11 +452,11 @@ class K8SProcessManager(object):
             app_desc.proc = K8sProcess(self, app_name, self.partition)
 
             self.create_daqapp_deployment(app_name, app_name, self.partition,
-                                          image, pocket_share,
+                                          host_class, image, pocket_share,
                                           cmd_port, mount_cvmfs=True, env_vars=app_vars, run_as=run_as, connections=connections)
             self.apps[app_name] = app_desc
             
-        # TODO: move (some of) this loop into k8spm?
+
         timeout = 60
         with Progress(
             SpinnerColumn(),
