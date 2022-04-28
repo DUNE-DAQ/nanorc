@@ -62,7 +62,9 @@ class SubsystemNode(StatefulNode):
                         from .credmgr import credentials
                         event.kwargs['partition'] = credentials.user+"-dunedaq"
                     self.console.log(f'Creating a namespace \'{event.kwargs["partition"]}\' in kubernetes to hold your DAQ applications')
-                    self.pm = K8SProcessManager(self.console)
+                    self.pm = K8SProcessManager(self.console,
+                                                cluster=event.kwargs['k8s'],
+                                                daq_app_image=event.kwargs['daq_app_image'])
                     # Yes, we need the list of connections here
                     # I hate it dearly too
                     # That and many other things. (I'M SUCH A HATER)

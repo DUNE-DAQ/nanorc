@@ -107,11 +107,12 @@ def check_rc(ctx, obj):
 @click.option('--log-path', type=click.Path(exists=True), default=None, help='Where the logs should go (on localhost of applications)')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
-@click.option('--k8s', is_flag=True, default=False, help='Use K8s?')
+@click.option('--k8s', type=click.Choice(['kind', 'np04cluster'], case_sensitive=False), default=None, help='Which K8s?')
+@click.option('--daq-app-image', type=str, default="pocket-daq-area-cvmfs:v2.11.0", help='Which image to use')
 @click.argument('top_cfg', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, k8s, top_cfg):
+def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, k8s, daq_app_image, top_cfg):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f'{credentials.user}@rc> '
@@ -138,7 +139,8 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
                     timeout = timeout,
                     use_kerb = kerberos,
                     logbook_prefix = logbook_prefix,
-                    use_k8s=k8s)
+                    k8s=k8s,
+                    daq_app_image=daq_app_image)
 
         if log_path:
             rc.log_path = os.path.abspath(log_path)

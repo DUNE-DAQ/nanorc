@@ -38,19 +38,20 @@ class K8sProcess(object):
 
 class K8SProcessManager(object):
     """docstring for K8SProcessManager"""
-    def __init__(self, console: Console):
+    def __init__(self, console: Console, cluster, daq_app_image):
         """A Kubernetes Process Manager
         
         Args:
             console (Console): Description
         """
         super(K8SProcessManager, self).__init__()
-
+        self.daq_app_image = daq_app_image
         self.log = logging.getLogger(__name__)
         self.console = console
         self.apps = {}
         self.partition = None
-
+        self.cluster = cluster
+        
         config.load_kube_config()
 
         self._core_v1_api = client.CoreV1Api()
@@ -141,7 +142,6 @@ class K8SProcessManager(object):
     def create_daqapp_deployment(self, name: str, app_label: str, namespace: str, cmd_port: int = 3333, mount_cvmfs: bool = False, env_vars: dict = None, run_as: dict = None,
                                  connections:list = None):
         self.log.info(f"Creating {namespace}:{name} daq application (port: {cmd_port})")
-        daq_app_image="pocket-daq-area-cvmfs:v2.10.0"
         
         # Deployment
         deployment = client.V1Deployment(
@@ -166,7 +166,7 @@ class K8SProcessManager(object):
                             # Daq application container
                             client.V1Container(
                                 name="daq-application",
-                                image=daq_app_image,
+                                image=self.daq_app_image,
                                 image_pull_policy= "Never",
                                 # Environment variables
                                 env = [
@@ -351,23 +351,27 @@ class K8SProcessManager(object):
                 f"ERROR: apps have already been booted {' '.join(self.apps.keys())}. Terminate them all before booting a new set."
             )
 
-        logging.info('Resolving the kind gateway')
-        import docker, ipaddress
-        # Detect docker environment
-        docker_client = docker.from_env()
+        if self.cluster == 'kind':
+            logging.info('Resolving the kind gateway')
+            import docker, ipaddress
+            # Detect docker environment
+            docker_client = docker.from_env()
 
-        # Find the docker network called Kind
-        try:
-            kind_network = next(iter(n for n in docker_client.networks.list() if n.name == 'kind'))
-        except Exception as exc:
-            raise RuntimeError("Failed to identfy docker network 'kind'") from exc
+            # Find the docker network called Kind
+            try:
+                kind_network = next(iter(n for n in docker_client.networks.list() if n.name == 'kind'))
+            except Exception as exc:
+                raise RuntimeError("Failed to identfy docker network 'kind'") from exc
 
-        # And extract the gateway ip, which corresponds to the host
-        try:
-            kind_gateway = next(iter(s['Gateway'] for s in kind_network.attrs['IPAM']['Config'] if isinstance(ipaddress.ip_address(s['Gateway']), ipaddress.IPv4Address)), None)
-        except Exception as exc:
-            raise RuntimeError("Identify the kind gateway address'") from exc
-        logging.info(f"kind network gateway: {kind_gateway}")
+            # And extract the gateway ip, which corresponds to the host
+            try:
+                self.gateway = next(iter(s['Gateway'] for s in kind_network.attrs['IPAM']['Config'] if isinstance(ipaddress.ip_address(s['Gateway']), ipaddress.IPv4Address)), None)
+            except Exception as exc:
+                raise RuntimeError("Identify the kind gateway address'") from exc
+            logging.info(f"kind network gateway: {kind_gateway}")
+        else:
+            import socket
+            self.gateway = socket.gethostbyname(socket.gethostname())
 
         apps = boot_info["apps"].copy()
         env_vars = boot_info["env"]
@@ -438,7 +442,7 @@ class K8SProcessManager(object):
                 
                 time.sleep(1)
                 
-            self.create_nanorc_responder('nanorc', 'nanorc', self.partition, kind_gateway, boot_info["response_listener"]["port"])
+            self.create_nanorc_responder('nanorc', 'nanorc', self.partition, self.gateway, boot_info["response_listener"]["port"])
 
     # ---
     def check_apps(self):
