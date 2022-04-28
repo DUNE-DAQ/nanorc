@@ -59,11 +59,11 @@ class SubsystemNode(StatefulNode):
 
     def send_custom_command(self, cmd, data, timeout, app=None) -> dict:
         ret = {}
-        
+
         if cmd == 'scripts': # unfortunately I don't see how else to do this
             scripts = self.cfgmgr.boot.get('scripts')
             script = cp.deepcopy(scripts.get(data['script_name'])) if scripts else None
-            
+
             if not script:
                 self.log.error(f"no {data['script_name']} script data in boot.json")
                 return {self.name : f"no {data['script_name']} script data in boot.json"}
@@ -73,14 +73,24 @@ class SubsystemNode(StatefulNode):
                 for key, val in data.items():
                     script[key].update(val)
                 self.pm.execute_script(script)
-                
+
             except Exception as e:
                 self.log.error(f'Couldn\'t execute the thread pinning scripts: {str(e)}')
             return ret
-        
-        for c in self.children:
-            if app and c.name!=app: continue
-            ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=data, timeout=timeout)
+
+        cmd_dict = getattr(self.cfgmgr, cmd, None)
+        if cmd_dict:
+            for app_name, cmd_data in cmd_dict.items():
+                for c in self.children:
+                    if app and c.name!=app_name: continue
+                    cmd_data2 = cp.deepcopy(cmd_data)
+                    for m in cmd_data2['modules']:
+                        m['data'].update(data)
+                    ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=cmd_data2, timeout=timeout)
+        else:
+            for c in self.children:
+                if app and c.name!=app: continue
+                ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=data, timeout=timeout)
         return ret
 
     def send_expert_command(self, app, cmd, timeout) -> dict:
