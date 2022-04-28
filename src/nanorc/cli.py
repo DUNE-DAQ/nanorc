@@ -117,6 +117,7 @@ def validateCfgDir(ctx, param, path):
     return str(Path(path))
 
 def check_rc(ctx, obj):
+    if not ctx.parent: return
     if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
         ctx.exit(obj.rc.return_code)
 
@@ -183,13 +184,13 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
     port_offset = 0 + partition_number * 1_000
     rest_port = 5005 + partition_number
     webui_port = 5015 + partition_number
-    
+
     if loglevel:
         updateLogLevel(loglevel)
 
     rest_thread  = threading.Thread()
     webui_thread = threading.Thread()
-        
+
     try:
         rc = NanoRC(console = obj.console,
                     top_cfg = top_cfg,
@@ -215,13 +216,15 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
             rc_context.console = obj.console
             rc_context.top_json = top_cfg
             rc_context.rc = rc
-            
+            rc_context.commands = ctx.command.commands
+            rc_context.ctx = ctx
+
             obj.console.log(f"Starting up RESTAPI on {host}:{rest_port}")
             rest = RestApi(rc_context, host, rest_port)
             rest_thread = threading.Thread(target=rest.run, name="NanoRC_REST_API")
             rest_thread.start()
             obj.console.log(f"Started RESTAPI")
-            
+
             webui_thread = None
             obj.console.log(f'Starting up Web UI on {host}:{webui_port}')
             webui = WebServer(host, webui_port, host, rest_port)
@@ -262,6 +265,7 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
     obj.rc = rc
     obj.shell = ctx.command
     rc.ls(False)
+
     if web:
         rest_thread.join()
         webui_thread.join()
@@ -323,7 +327,7 @@ def message(obj, message):
     obj.rc.message(message)
 
 @cli.command('start')
-@click.argument('run', type=int)
+@click.argument('run_num', type=int)
 @click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.option('--resume-wait', type=int, default=0, help='Seconds to wait between Start and Resume commands')
@@ -331,18 +335,18 @@ def message(obj, message):
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def start(ctx, obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str, timeout:int):
+def start(ctx, obj:NanoContext, run_num:int, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str, timeout:int):
     """
     Start Command
 
     Args:
         obj (NanoContext): Context object
-        run (int): Run number
+        run_num (int): Run number
         disable_data_storage (bool): Flag to disable data writing to storage
 
     """
 
-    obj.rc.run_num_mgr.set_run_number(run)
+    obj.rc.run_num_mgr.set_run_number(run_num)
     obj.rc.start(disable_data_storage, "TEST", message=message, timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
