@@ -312,6 +312,6 @@ class RestApi:
         if not self.host or not self.port:
             raise RuntimeError('RestAPI: no host or port specified!')
 
-        self.app.run(host=self.host, port=self.port,
+        self.app.run(host="0.0.0.0", port=self.port,
                      debug=True, use_reloader=False,
                      threaded=True)
