@@ -43,20 +43,7 @@ function refreshIcons(states){
 })
 }
 
-function populateButtons(){
-$( "#stateButtonsDiv" ).empty()
-  for(var key in fsm.transitions) {   
-      if(fsm.transitions[key]['source']==state || fsm.transitions[key]['source']== '*'){
-        if(fsm.transitions[key]['dest'] != 'error'){
-          $("#stateButtonsDiv").append("<button id='"+fsm.transitions[key]['trigger']+"' class='green button control' style='margin:5px;'>"+fsm.transitions[key]['trigger']+"</button> &nbsp &nbsp");
-          comm = fsm.transitions[key]['trigger']
-        }
-      }
-  }
-$(".control").click(function() {
-  sendComm($(this).attr("id"),$("#runnumber").val(),$("#runtype").val());
-}); 
-}
+
 function getTree(){
 $.ajax({
   url: "http://"+serverhost+"/nanorcrest/status",
@@ -107,17 +94,19 @@ function refreshTree(tree){
     //refreshIcons(d.children)
     $('#controlTree').jstree(true).refresh();
   }
-function sendComm(command,runnumber, runtype){
-  if(command == 'start'){
-    if ($.isNumeric( runnumber )){
-      dataload = {"command":command,"run_type":runtype,"run_num":runnumber,}
-    }else{
-      alert('Runnumber must be a NUMBER!')
-      return;
-    }
-  }else{
-    dataload= "command="+command
-  }
+function sendComm(command){
+  arr = $("#"+command+"_a :input");
+  var dataload = {"command":command}
+  $.each(arr, function( index, value ) {
+      if (value.value != "") {
+        dataload[value.id]=value.value
+        if (value.type == "checkbox")
+          {
+            dataload[value.id]=value.checked
+          }
+      }
+  })
+
   clearInterval(statusTick);
   $("#state:text").val('Executing...')
   $(".control").attr("disabled", true);
@@ -141,6 +130,50 @@ function sendComm(command,runnumber, runtype){
       console.log(e)
       }
   });
+}
+function populateArgs(){
+  $.ajax({
+    url: "http://"+serverhost+"/nanorcrest/command",
+    beforeSend: function(xhr) { 
+      xhr.setRequestHeader("Authorization", "Basic " + btoa("fooUsr:barPass")); 
+    },
+    type: 'GET',
+    dataType: "text",
+    success: function (d) {
+      d = JSON.parse(d)
+      $( "#stateButtonsDiv" ).empty()
+      $("#commargs").empty()
+      $.each(d, function( index, value ) {
+        $("#stateButtonsDiv").append("<button id='"+index+"' class='green button control' style='margin:5px;'>"+index+"</button> &nbsp &nbsp");
+        $("#commargs").append("<div id="+index+"_a></div>");
+        $("#"+index+"_a").append("<h4>Arguments for "+index+":</h4>");
+        $.each(value, function( i, v ) {
+          var clss = v[Object.keys(v)[0]].type
+          var defaul = ""
+          if(v[Object.keys(v)[0]].default != null){
+            defaul = v[Object.keys(v)[0]].default
+          }
+          if(v[Object.keys(v)[0]].required){
+            clss + "required"
+          }
+          $("#"+index+"_a").append("<h6>"+Object.keys(v)[0]+"</h6>");
+          if (v[Object.keys(v)[0]].type == "BOOL"){
+            $("#"+index+"_a").append('<input type="checkbox" id="'+Object.keys(v)[0]+'" class="'+clss+'">');
+            if (defaul == true){$( "#"+Object.keys(v)[0] ).prop( "checked", true );}
+          }else{
+            $("#"+index+"_a").append('<input type="text" value="'+defaul+'" id="'+Object.keys(v)[0]+'" class="form-control '+clss+'">');
+          }
+        });
+      });
+      $(".control").click(function() {
+        sendComm($(this).attr("id"));
+      }); 
+    },
+    error: function(e){
+      console.log(e)
+    }
+  });
+  
 }
   function getStatus(regCheck=false){
     if (regCheck == true){
@@ -179,7 +212,8 @@ function sendComm(command,runnumber, runtype){
               if(url=="http://"+serverhost+"/nanorcrest/status"){
                 refreshTree(d)
               }
-              populateButtons()
+              //populateButtons()
+              populateArgs()
               $("#statustable").empty()
               statusTable({d}, 0)
             }
