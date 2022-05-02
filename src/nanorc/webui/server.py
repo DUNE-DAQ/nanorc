@@ -18,7 +18,7 @@ def index():
     if args.serverhost:
         return render_template('index.html',serverhost=args.serverhost)
     else:
-        return render_template('index.html',serverhost="localhost:5001")
+        return render_template('index.html',serverhost="localhost:5005")
 
 if __name__ == "__main__":
     app.run("0.0.0.0")
