@@ -37,6 +37,6 @@ class WebServer:
     def run(self):
         if not self.host or not self.port:
             raise RuntimeError('WebUI: no host or port specified!')
-        self.app.run(host=self.host, port=self.port,
+        self.app.run(host="0.0.0.0", port=self.port,
                      debug=True, use_reloader=False,
                      threaded=True)
