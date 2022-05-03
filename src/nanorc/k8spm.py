@@ -167,7 +167,7 @@ class K8SProcessManager(object):
                             client.V1Container(
                                 name="daq-application",
                                 image=self.daq_app_image,
-                                image_pull_policy= "Never",
+                                image_pull_policy= "IfNotPresent",
                                 # Environment variables
                                 env = [
                                     client.V1EnvVar(
@@ -368,10 +368,11 @@ class K8SProcessManager(object):
                 self.gateway = next(iter(s['Gateway'] for s in kind_network.attrs['IPAM']['Config'] if isinstance(ipaddress.ip_address(s['Gateway']), ipaddress.IPv4Address)), None)
             except Exception as exc:
                 raise RuntimeError("Identify the kind gateway address'") from exc
-            logging.info(f"kind network gateway: {kind_gateway}")
+            logging.info(f"kind network gateway: {self.gateway}")
         else:
             import socket
             self.gateway = socket.gethostbyname(socket.gethostname())
+            logging.info(f"localhost: {self.gateway}")
 
         apps = boot_info["apps"].copy()
         env_vars = boot_info["env"]
