@@ -189,6 +189,8 @@ class ConfigManager:
         # Set addresses to ips for networkmanager
         for connections in json_extract(self.init, "connections"):
             for c in connections:
+                if "queue://" in c['uri']:
+                    continue
                 from string import Formatter
                 fieldnames = [fname for _, fname, _, _ in Formatter().parse(c['uri']) if fname]
                 if len(fieldnames)>1:
@@ -202,13 +204,13 @@ class ConfigManager:
                             c['uri'] = c['uri'].replace(fieldname, "HOST_IP").format(**dico)
                         except Exception as e:
                             raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
-                # Port offsetting
-                port = urlparse(c['uri']).port
-                newport = port + self.port_offset
-                fixed = c.get('fixed')
-                if fixed :
-                    newport = port
-                c['uri'] = c['uri'].replace(str(port), str(newport))
+                if "global://" in c['uri']:
+                     c['uri'] = c['uri'].replace("global://", "tcp://")
+                else:
+                    # Port offsetting
+                    port = urlparse(c['uri']).port
+                    newport = port + self.port_offset
+                    c['uri'] = c['uri'].replace(str(port), str(newport))
 
 
 
