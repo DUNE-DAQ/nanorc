@@ -1,6 +1,9 @@
-
+from anytree.resolver import Resolver
+from os import path
+import click
 
 def validate_path_exists(prompted_path):
+    if not prompted_path: return prompted_path
     if not path.exists(prompted_path):
         raise RuntimeError(f"Couldn't find {prompted_path} in filesystem")
     return prompted_path
