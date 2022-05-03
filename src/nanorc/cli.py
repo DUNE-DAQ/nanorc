@@ -211,6 +211,11 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
                 grid.add_row("[blue]ssh -N -D 8080 your_cern_uname@lxtunnel.cern.ch[/blue] # on a different terminal window on your machine")
                 grid.add_row(f'Make sure you set up browser SOCKS proxy with port 8080 too,')
                 grid.add_row('on Chrome, \'Hotplate localhost SOCKS proxy setup\' works well).')
+            elif 'lxplus' in host:
+                grid.add_row(f"You probably need to set up a SOCKS proxy to lxplus:")
+                grid.add_row(f"[blue]ssh -N -D 8080 your_cern_uname@{host}[/blue] # on a different terminal window on your machine")
+                grid.add_row(f'Make sure you set up browser SOCKS proxy with port 8080 too,')
+                grid.add_row('on Chrome, \'Hotplate localhost SOCKS proxy setup\' works well).')
             grid.add_row()
             grid.add_row(f'[red]To stop this, ctrl-c [/red][bold red]twice[/bold red] (that will kill the REST and WebUI threads).')
             obj.console.print(Panel.fit(grid))
