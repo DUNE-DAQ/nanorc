@@ -26,6 +26,7 @@ from nanorc.runmgr import DBRunNumberManager
 from nanorc.cfgsvr import DBConfigSaver
 from nanorc.credmgr import credentials
 from . import confdata
+import nanorc.argval as argval
 
 from .cli import *
 # ------------------------------------------------------------------------------
@@ -39,7 +40,7 @@ from .cli import *
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
 @click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
-@click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=validate_partition_number)
+@click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=argval.validate_partition_number)
 @click.option('--partition-label', type=str, default=None, help='partition label to be use as prefix of partition name')
 @click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn webui')
 @click.argument('cfg_dir', type=click.Path(exists=True))

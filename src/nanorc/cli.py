@@ -35,6 +35,7 @@ from nanorc.logbook import FileLogbook
 from nanorc.credmgr import credentials
 from nanorc.rest import RestApi, NanoWebContext, rc_context
 from nanorc.webui import WebServer
+import nanorc.argval as argval
 
 class NanoContext:
     """docstring for NanoContext"""
@@ -81,50 +82,18 @@ def updateLogLevel(loglevel):
         for handler in sh_command_logger.handlers:
             handler.setLevel(sh_command_level)
 
-def validate_timeout(ctx, param, timeout):
-    if timeout is None:
-        return timeout
-    if timeout<=0:
-        raise click.BadParameter('Timeout should be >0')
-    return timeout
 
 def accept_timeout(default_timeout):
     def add_decorator(function):
-        return click.option('--timeout', type=int, default=default_timeout, help="Timeout, in seconds", callback=validate_timeout)(function)
+        return click.option('--timeout', type=int, default=default_timeout, help="Timeout, in seconds", callback=argval.validate_timeout)(function)
     return add_decorator
 
-def validatePath(ctx, param, prompted_path):
-
-    if prompted_path is None:
-        return None
-
-    if prompted_path[0] != '/':
-        prompted_path = '/'+prompted_path
-
-    hierarchy = prompted_path.split("/")
-    topnode = ctx.obj.rc.topnode
-
-    r = Resolver('name')
-    try:
-        node = r.get(topnode, prompted_path)
-        return node
-    except Exception as ex:
-        raise click.BadParameter(f"Couldn't find {prompted_path} in the tree") from ex
-
-    return node
-
-def validateCfgDir(ctx, param, path):
-    return str(Path(path))
 
 def check_rc(ctx, obj):
     if not ctx.parent: return
     if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
         ctx.exit(obj.rc.return_code)
 
-def validate_partition_number(ctx, param, number):
-    if number<0 or number>10:
-        raise click.BadParameter(f"Partition number should be between 0 and 10 (you fed {number})")
-    return number
 
 def add_custom_cmds(cli, rc_cmd_exec, cmds):
     for c,d in cmds.items():
@@ -161,10 +130,10 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
 @accept_timeout(60)
-@click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=validate_partition_number)
+@click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=argval.validate_partition_number)
 @click.option('--partition-label', type=str, default=None, help='partition label to be use as prefix of partition name')
 @click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn webui')
-@click.argument('top_cfg', type=click.Path(exists=True), callback=validateCfgDir)
+@click.argument('top_cfg', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
 def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, timeout, kerberos, partition_number, partition_label, web, top_cfg):
@@ -295,7 +264,7 @@ def boot(ctx, obj, timeout:int):
     obj.rc.status()
 
 @cli.command('init')
-@click.option('--path', type=str, default=None, callback=validatePath)
+@click.option('--path', type=str, default=None, callback=argval.validate_node_path)
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
@@ -311,7 +280,7 @@ def ls(obj):
 
 
 @cli.command('conf')
-@click.option('--path', type=str, default=None, callback=validatePath)
+@click.option('--path', type=str, default=None, callback=argval.validate_node_path)
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
@@ -399,7 +368,7 @@ def resume(ctx, obj:NanoContext, trigger_interval_ticks:int, timeout:int):
 
 
 @cli.command('scrap')
-@click.option('--path', type=str, default=None, callback=validatePath)
+@click.option('--path', type=str, default=None, callback=argval.validate_node_path)
 @click.option('--force', default=False, is_flag=True)
 @accept_timeout(None)
 @click.pass_obj
@@ -439,7 +408,7 @@ def change_rate(ctx, obj, trigger_interval_ticks, timeout):
     obj.rc.status()
 
 @cli.command('enable')
-@click.argument('path', type=str, default=None, callback=validatePath)
+@click.argument('path', type=str, default=None, callback=argval.validate_node_path)
 @click.option('--resource-name', type=str, required=True)
 @accept_timeout(None)
 @click.pass_obj
@@ -450,7 +419,7 @@ def enable(ctx, obj, path, resource_name, timeout):
     obj.rc.status()
 
 @cli.command('disable')
-@click.argument('path', type=str, default=None, callback=validatePath)
+@click.argument('path', type=str, default=None, callback=argval.validate_node_path)
 @click.option('--resource-name', type=str, required=True)
 @accept_timeout(None)
 @click.pass_obj
@@ -469,7 +438,7 @@ def terminate(obj, timeout):
     obj.rc.status()
 
 @cli.command('expert_command')
-@click.argument('app', type=str, default=None, callback=validatePath)
+@click.argument('app', type=str, default=None, callback=argval.validate_node_path)
 @click.argument('json_file', type=click.Path(exists=True))
 @accept_timeout(None)
 @click.pass_obj
