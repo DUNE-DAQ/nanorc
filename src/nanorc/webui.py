@@ -31,12 +31,12 @@ class WebServer:
             if not self.rest_host or not self.rest_port:
                 raise RuntimeError('Rest API endpoint not specified!')
             return render_template('index.html', serverhost=self.rest_host+":"+str(self.rest_port))
-        
+
         self.app.add_url_rule("/",'index',index)
 
     def run(self):
         if not self.host or not self.port:
             raise RuntimeError('WebUI: no host or port specified!')
-        self.app.run(host="0.0.0.0", port=self.port,
+        self.app.run(host=self.host, port=self.port,
                      debug=True, use_reloader=False,
                      threaded=True)
