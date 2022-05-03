@@ -108,11 +108,12 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
         if web:
             host = socket.gethostname()
 
-            # rc_context = obj
+            rc_context.obj = obj
             rc_context.console = obj.console
-            rc_context.top_json = top_cfg
+            rc_context.top_json = cfg_dir
             rc_context.rc = rc
             rc_context.commands = ctx.command.commands
+            rc_context.ctx = ctx
 
             obj.console.log(f"Starting up RESTAPI on {host}:{rest_port}")
             rest = RestApi(rc_context, host, rest_port)
