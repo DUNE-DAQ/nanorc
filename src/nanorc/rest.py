@@ -23,9 +23,11 @@ class NanoWebContext:
         self.console = console
         self.print_traceback = False
         self.rc = None
+        self.obj = None
         self.last_command = None
         self.last_path = None
         self.worker_thread = None
+        self.commands = []
 
 ## PL:
 ## I don't know how else to do this, if this is None, the variable isn't global
@@ -51,14 +53,12 @@ class node(Resource):
             return "I'm busy!"
         path = path.replace(".", "/")
         try:
-            path = argval.validate_node_path(rc_context.rc, path)
+            node = argval.validate_node_path(rc_context, None, path)
         except Exception as ex:
             resp = make_response(f"Couldn't find {path} in the tree")
             return resp
 
         r = Resolver('name')
-        path = "/".join(path)
-        node = r.get(rc_context.rc.topnode, path)
         data = status_data(node, False)
         resp = make_response(data, 200)
         return resp
@@ -104,24 +104,23 @@ def parse_argument(form, ctx):
         else:
             value = param.default
 
-        if value == None:
-            continue
+        if value != None:
+            if str(param.type) == 'INT':
+                value = int(value)
+            elif str(param.type) == 'BOOL':
+                value = bool(value)
 
         ### <hack>
         if param.name == 'timeout':
-            value = argval.validate_timeout(_, _, value)
+            value = argval.validate_timeout(None, None, value)
         elif param.name == 'path':
-            value = argval.validate_node_path(rc, value)
+            value = argval.validate_node_path(rc_context, None, value)
+        elif param.name == 'stop_wait':
+            value = argval.validate_timeout(None, None, value)
         elif param.name == 'pin_thread_file':
             value = argval.validate_path_exists(value)
         ### </hack>
-
-        if str(param.type) == 'INT':
-            ret[param.name] = int(value)
-        elif str(param.type) == 'BOOL':
-            ret[param.name] = bool(value)
-        else:
-            ret[param.name] = value
+        ret[param.name] = value
 
     return ret
 
@@ -208,8 +207,7 @@ class command(Resource):
             logs = open('rest_command.log').read()
 
             resp_data = {
-                "command"    : cmd,
-                "path"       : path,
+                "command"    : form,
                 "return_code": rc_context.rc.return_code,
                 "logs"       : logs
             }

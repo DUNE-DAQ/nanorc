@@ -181,7 +181,7 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
         if web:
             host = socket.gethostname()
 
-            # rc_context = obj
+            rc_context.obj = obj
             rc_context.console = obj.console
             rc_context.top_json = top_cfg
             rc_context.rc = rc
@@ -248,7 +248,8 @@ def status(obj: NanoContext):
 @click.option('--pin-thread-file', type=click.Path(exists=True), default=None)
 @accept_timeout(None)
 @click.pass_obj
-def pin_threads(obj:NanoContext, pin_thread_file, timeout:int):
+@click.pass_context
+def pin_threads(ctx, obj:NanoContext, pin_thread_file, timeout:int):
     data = { "script_name": 'thread_pinning' }
     if pin_thread_file:
         data["env"]: { "DUNEDAQ_THREAD_PIN_FILE": pin_thread_file }
@@ -432,7 +433,8 @@ def disable(ctx, obj, path, resource_name, timeout):
 @cli.command('terminate')
 @accept_timeout(None)
 @click.pass_obj
-def terminate(obj, timeout):
+@click.pass_context
+def terminate(ctx, obj, timeout):
     obj.rc.terminate(timeout=timeout)
     time.sleep(1)
     obj.rc.status()
