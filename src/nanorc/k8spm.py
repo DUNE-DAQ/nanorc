@@ -38,14 +38,13 @@ class K8sProcess(object):
 
 class K8SProcessManager(object):
     """docstring for K8SProcessManager"""
-    def __init__(self, console: Console, cluster, daq_app_image):
+    def __init__(self, console: Console, cluster):
         """A Kubernetes Process Manager
         
         Args:
             console (Console): Description
         """
         super(K8SProcessManager, self).__init__()
-        self.daq_app_image = daq_app_image
         self.log = logging.getLogger(__name__)
         self.console = console
         self.apps = {}
@@ -136,12 +135,21 @@ class K8SProcessManager(object):
                     target_port = int(c['address'].split(":")[-1]),
                     port = int(c['address'].split(":")[-1]),
                 )]
+            print("port", int(c['address'].split(":")[-1]), c['address'])
         return ret
     
     # ----
-    def create_daqapp_deployment(self, name: str, app_label: str, namespace: str, cmd_port: int = 3333, mount_cvmfs: bool = False, env_vars: dict = None, run_as: dict = None,
+    def create_daqapp_deployment(self,
+                                 name: str,
+                                 app_label: str,
+                                 daq_image:str,
+                                 namespace: str,
+                                 cmd_port: int = 3333,
+                                 mount_cvmfs: bool = False,
+                                 env_vars: dict = None,
+                                 run_as: dict = None,
                                  connections:list = None):
-        self.log.info(f"Creating {namespace}:{name} daq application (port: {cmd_port})")
+        self.log.info(f"Creating {namespace}:{name} daq application (port: {cmd_port}, image: {daq_image})")
         
         # Deployment
         deployment = client.V1Deployment(
@@ -166,7 +174,7 @@ class K8SProcessManager(object):
                             # Daq application container
                             client.V1Container(
                                 name="daq-application",
-                                image=self.daq_app_image,
+                                image=daq_image,
                                 image_pull_policy= "IfNotPresent",
                                 # Environment variables
                                 env = [
@@ -182,7 +190,6 @@ class K8SProcessManager(object):
                                     "-i", "influx://influxdb.monitoring:8086/write?db=influxdb"
                                     ],
                                 ports=self.get_container_port_list_from_connections(connections),
-                                # image_pull_policy="Never",
                                 volume_mounts=([
                                     client.V1VolumeMount(
                                         mount_path="/cvmfs/dunedaq.opensciencegrid.org",
@@ -228,16 +235,17 @@ class K8SProcessManager(object):
         try:
             # 
             resp = self._apps_v1_api.create_namespaced_deployment(
-                namespace=namespace, body=deployment
+                namespace = namespace,
+                body = deployment
             )
         except Exception as e:
             self.log.error(e)
             raise RuntimeError(f"Failed to create daqapp deployment {namespace}:{name}") from e
 
         service = client.V1Service(
-            metadata=client.V1ObjectMeta(name=name),
-            spec=client.V1ServiceSpec(
-                ports=self.get_service_port_list_from_connections(connections),
+            metadata = client.V1ObjectMeta(name=name),
+            spec = client.V1ServiceSpec(
+                ports = self.get_service_port_list_from_connections(connections),
                 selector = {"app": app_label}
             )
         )  # V1Service
@@ -250,7 +258,7 @@ class K8SProcessManager(object):
             raise RuntimeError(f"Failed to create daqapp service {namespace}:{name}") from e
 
     # ----
-    def create_nanorc_responder(self, name: str, app_label: str, namespace: str, ip: str, port: int):
+    def create_nanorc_responder(self, name: str, namespace: str, ip: str, port: int):
 
         self.log.info(f"Creating nanorc responder service {namespace}:{name} for {ip}:{port}")
 
@@ -260,6 +268,8 @@ class K8SProcessManager(object):
                 name=name,
             ),
             spec=client.V1ServiceSpec(
+                type='NodePort',
+                external_traffic_policy='Cluster',
                 ports=[
                     client.V1ServicePort(
                         protocol = 'TCP',
@@ -279,29 +289,29 @@ class K8SProcessManager(object):
 
         self.log.info("Creating nanorc responder endpoint")
 
-        # Create Endpoints Objects
-        endpoints = client.V1Endpoints(
-            metadata=client.V1ObjectMeta(
-                name=name,
-            ),
-            subsets=[
-                client.V1EndpointSubset(
-                    addresses=[
-                        client.V1EndpointAddress(ip=ip)
-                    ],
-                    ports=[
-                        client.V1EndpointPort(port=port)
-                    ]
-                )
-            ]
-        )
-        self.log.debug(endpoints)
+        # # Create Endpoints Objects
+        # endpoints = client.V1Endpoints(
+        #     metadata=client.V1ObjectMeta(
+        #         name=name,
+        #     ),
+        #     subsets=[
+        #         client.V1EndpointSubset(
+        #             addresses=[
+        #                 client.V1EndpointAddress(ip=ip)
+        #             ],
+        #             ports=[
+        #                 client.V1EndpointPort(port=port)
+        #             ]
+        #         )
+        #     ]
+        # )
+        # self.log.debug(endpoints)
 
-        try:
-            self._core_v1_api.create_namespaced_endpoints(namespace, endpoints)
-        except Exception as e:
-            self.log.error(e)
-            raise RuntimeError(f"Failed to create nanorc responder endpoint {namespace}:{name}") from e
+        # try:
+        #     # self._core_v1_api.create_namespaced_endpoints(namespace, endpoints)
+        # except Exception as e:
+        #     self.log.error(e)
+        #     raise RuntimeError(f"Failed to create nanorc responder endpoint {namespace}:{name}") from e
 
     """
     ---
@@ -395,7 +405,7 @@ class K8SProcessManager(object):
         for app_name, app_conf in apps.items():
 
             exec_vars = boot_info['exec'][app_conf['exec']]['env']
-
+            daq_image = boot_info['exec'][app_conf['exec']]['image']
             app_vars = {}
             app_vars.update(env_vars)
             # app_vars.update(exec_vars)
@@ -407,8 +417,17 @@ class K8SProcessManager(object):
             app_desc.pod = ''
             app_desc.port = cmd_port
             app_desc.proc = K8sProcess(self, app_name, self.partition)
-
-            self.create_daqapp_deployment(app_name, app_name, self.partition, cmd_port, mount_cvmfs=True, env_vars=app_vars, run_as=run_as, connections=connections)
+            
+            self.create_daqapp_deployment(name = app_name, # better kwargs all this...
+                                          app_label = app_name,
+                                          daq_image = daq_image,
+                                          namespace = self.partition,
+                                          cmd_port = cmd_port,
+                                          mount_cvmfs = True,
+                                          env_vars = app_vars,
+                                          run_as = run_as,
+                                          connections = connections[app_name])
+            
             self.apps[app_name] = app_desc
             
         # TODO: move (some of) this loop into k8spm?
@@ -443,7 +462,10 @@ class K8SProcessManager(object):
                 
                 time.sleep(1)
                 
-            self.create_nanorc_responder('nanorc', 'nanorc', self.partition, self.gateway, boot_info["response_listener"]["port"])
+            self.create_nanorc_responder(name = 'nanorc',
+                                         namespace = self.partition,
+                                         ip = self.gateway,
+                                         port = boot_info["response_listener"]["port"])
 
     # ---
     def check_apps(self):
