@@ -128,13 +128,16 @@ class ConfigManager:
         else:
             hosts = { "host_"+app:app for app in self.boot["apps"].keys() }
 
-        for app_name, app_init in self.init.items():
-            hosts = { v:(n if v!='host_'+app_name else '0.0.0.0') for v,n in hosts.items() }
 
+        for app_name, app_init in self.init.items():
+            hosts = {
+                v: (n if v!='host_'+app_name else '0.0.0.0') for v,n in hosts.items()
+            }
+            # bug here?
             for connections in json_extract(app_init, "nwconnections"):
                 for c in connections:
                     c['address'] = c["address"].format(**hosts)
-                    
+
 
     def runtime_start(self, data: dict) -> dict:
         """
@@ -168,7 +171,7 @@ class ConfigManager:
             for m in c:
                 m["data"].update(data)
         return resume
-    
+
 
 
 if __name__ == "__main__":
