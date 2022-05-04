@@ -246,6 +246,7 @@ class AppCommander:
             "X-Answer-Port": str(self.listener_port),
         }
         if not self.listener_host is None:
+            print("listener", self.listener_host, self.listener_port)
             headers['X-Answer-Host'] = self.listener_host
 
         ack = requests.post(

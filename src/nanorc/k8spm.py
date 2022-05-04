@@ -289,29 +289,29 @@ class K8SProcessManager(object):
 
         self.log.info("Creating nanorc responder endpoint")
 
-        # # Create Endpoints Objects
-        # endpoints = client.V1Endpoints(
-        #     metadata=client.V1ObjectMeta(
-        #         name=name,
-        #     ),
-        #     subsets=[
-        #         client.V1EndpointSubset(
-        #             addresses=[
-        #                 client.V1EndpointAddress(ip=ip)
-        #             ],
-        #             ports=[
-        #                 client.V1EndpointPort(port=port)
-        #             ]
-        #         )
-        #     ]
-        # )
-        # self.log.debug(endpoints)
+        # Create Endpoints Objects
+        endpoints = client.V1Endpoints(
+            metadata=client.V1ObjectMeta(
+                name=name,
+            ),
+            subsets=[
+                client.V1EndpointSubset(
+                    addresses=[
+                        client.V1EndpointAddress(ip=ip)
+                    ],
+                    ports=[
+                        client.V1EndpointPort(port=port)
+                    ]
+                )
+            ]
+        )
+        self.log.debug(endpoints)
 
-        # try:
-        #     # self._core_v1_api.create_namespaced_endpoints(namespace, endpoints)
-        # except Exception as e:
-        #     self.log.error(e)
-        #     raise RuntimeError(f"Failed to create nanorc responder endpoint {namespace}:{name}") from e
+        try:
+            self._core_v1_api.create_namespaced_endpoints(namespace, endpoints)
+        except Exception as e:
+            self.log.error(e)
+            raise RuntimeError(f"Failed to create nanorc responder endpoint {namespace}:{name}") from e
 
     """
     ---
