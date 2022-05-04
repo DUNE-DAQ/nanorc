@@ -89,7 +89,9 @@ class SubsystemNode(StatefulNode):
         for n,d in self.pm.apps.items():
             if event.kwargs['process'] == 'kind' or event.kwargs['process'] == 'np04cluster':
                 response_host = 'nanorc.'+d.partition
-                proxy = ('127.0.0.1', 31000)
+                proxy = ('np04-srv-015', 31000)
+                if event.kwargs['process'] == 'kind':
+                    proxy = ('127.0.0.1', 31000)
                 child = ApplicationNode(name=n,
                                         console=self.console,
                                         sup=AppSupervisor(self.console, d, self.listener, response_host, proxy),
@@ -150,6 +152,7 @@ class SubsystemNode(StatefulNode):
             self.listener.terminate()
         if self.pm:
             self.pm.terminate()
+            self.pm = None
         self.end_terminate()
 
     def _on_enter_callback(self, event):
