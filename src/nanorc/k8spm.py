@@ -357,19 +357,34 @@ class K8SProcessManager(object):
         start=datetime.datetime.now(datetime.timezone.utc)
         watcher=watch.Watch()
 
-        for ev in watcher.stream(self._core_v1_api.list_namespaced_event,
-                                 namespace):
-            evobj=ev['object']
-            obj=evobj.involved_object
-            pname=obj.name.split('-')
-            name=pname[0]
-            #print(f'app {name}: {evobj.reason}')
-            if evobj.last_timestamp>start and name in apps:
-                if evobj.type=='Normal':
-                    if evobj.reason=='Started' and evobj.count>1:
-                        self.log.error(f'app {name} died and was restarted {evobj.count-1} times')
-                elif evobj.type=='Warning':
-                    self.log.warn(f'app {name}: {evobj.message}')
+        while True:
+            evlist=self._core_v1_api.list_namespaced_event(namespace)
+            rv=evlist.metadata.resource_version
+            try:
+                for ev in watcher.stream(self._core_v1_api.list_namespaced_event,
+                                         namespace, resource_version=rv):
+                    evobj=ev['object']
+                    #self.log.info(f'event: resource_version={evobj.metadata.resource_version}')
+                    obj=evobj.involved_object
+                    pname=obj.name.split('-')
+                    name=pname[0]
+                    #print(f'app {name}: {evobj.reason}')
+                    if evobj.last_timestamp>start and name in apps:
+                        if evobj.type=='Normal':
+                            #restarts=0
+                            #podList=self._core_v1_api.list_namespaced_pod('gordon')
+                            #for pod in podList.items:
+                            #    if pod.metadata.name == obj.name:
+                            #        restarts=pod.status.container_statuses[0].restart_count
+                            #        print(f'obj={obj.name} restarts={restarts}')
+                            #        break
+                            restarts=evobj.count-1
+                            if evobj.reason=='Started' and restarts>0:
+                                self.log.error(f'app {name} died and was restarted {restarts} times. resource_version={evobj.metadata.resource_version}')
+                            elif evobj.type=='Warning':
+                                self.log.warn(f'app {name}: {evobj.message}')
+            except client.exceptions.ApiException as ex:
+                self.log.info(f"Caught API exception code {ex}") 
     #---
     def boot(self, boot_info, partition, connections):
 
