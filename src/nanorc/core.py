@@ -30,15 +30,12 @@ class NanoRC:
 
     def __init__(self, console: Console, top_cfg: str, run_num_mgr, run_registry, logbook_type:str, timeout: int,
                  use_kerb=True, logbook_prefix="", fsm_cfg="partition",
-                 k8s=None, daq_app_image=None):
-        
+                 process=None):
+
         super(NanoRC, self).__init__()
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
-        self.k8s = k8s
-        self.daq_app_image = daq_app_image
-        if not k8s and not daq_app_image:
-            raise RuntimeError("You need to supply a daq_app_image")
+        self.process = process
 
         ssh_conf = []
         if not use_kerb:
@@ -49,7 +46,7 @@ class NanoRC:
                                console=self.console,
                                ssh_conf=ssh_conf,
                                fsm_conf=fsm_cfg,
-                               resolve_hostname = (k8s==None))
+                               resolve_hostname = (process=='ssh'))
 
         self.apparatus_id = self.cfg.apparatus_id
 
@@ -97,7 +94,7 @@ class NanoRC:
             return
 
         transition = getattr(self.topnode, command)
-        kwargs['k8s'] = self.k8s
+        kwargs['process'] = self.process
         transition(*args, **kwargs)
         self.return_code = self.topnode.return_code.value
 
@@ -123,10 +120,7 @@ class NanoRC:
         """
         Boots applications
         """
-        if self.k8s:
-            self.execute_command("boot", timeout=self.timeout, log=self.log_path, partition=partition, daq_app_image=self.daq_app_image)
-        else:
-            self.execute_command("boot", timeout=self.timeout, log=self.log_path, partition=partition)
+        self.execute_command("boot", timeout=self.timeout, log=self.log_path, partition=partition)
 
 
     def terminate(self) -> NoReturn:
