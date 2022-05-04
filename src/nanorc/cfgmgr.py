@@ -130,13 +130,12 @@ class ConfigManager:
 
 
         for app_name, app_init in self.init.items():
-            hosts = {
+            hosts_new = {
                 v: (n if v!='host_'+app_name else '0.0.0.0') for v,n in hosts.items()
             }
-            # bug here?
             for connections in json_extract(app_init, "nwconnections"):
                 for c in connections:
-                    c['address'] = c["address"].format(**hosts)
+                    c['address'] = c["address"].format(**hosts_new)
 
 
     def runtime_start(self, data: dict) -> dict:
