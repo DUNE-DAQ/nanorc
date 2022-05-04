@@ -77,7 +77,7 @@ class FlaskManager(threading.Thread):
                 self.log.error('This can happen if the web proxy is on at NP04.'+
                                '\nExit NanoRC and try again after executing:'+
                                '\nsource ~np04daq/bin/web_proxy.sh -u')
-                break
+                raise RuntimeError("Cannot create a response listener")
             tries += 1
             try:
                 resp = requests.get(f"http://0.0.0.0:{self.port}/")
@@ -101,6 +101,7 @@ class FlaskManager(threading.Thread):
     def _create_and_join_flask(self):
         if not self.ready_lock.locked:
             self.ready_lock.acquire()
+
         self.flask = self._create_flask()
         self.flask.join()
         self.log.info(f'ResponseListener: Flask joined')
@@ -124,7 +125,8 @@ class ResponseListener:
     def create_manager(self):
         fm = FlaskManager(self.log, self.response_queue, self.port) # locked
         fm.start() # should unlock
-        fm.ready_lock.acquire() # make sure that everything is ready
+        if not fm.ready_lock.acquire(timeout=12): # make sure that everything is ready
+            raise RuntimeError("Cannot create a response listener")
         fm.ready_lock.release()
         return fm
 
