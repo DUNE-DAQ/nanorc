@@ -160,6 +160,7 @@ class ConfigManager:
                             raise ValueError("Key " + k + " is not in environment and no default specified!")
 
         # partition renaming using partition label and number
+        partition_from_config = self.boot["env"]["DUNEDAQ_PARTITION"]
         if self.partition_label:
             self.boot["env"]["DUNEDAQ_PARTITION"] = f"{self.partition_label}"
 
@@ -204,11 +205,12 @@ class ConfigManager:
                             c['uri'] = c['uri'].replace(fieldname, "HOST_IP").format(**dico)
                         except Exception as e:
                             raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
-                if c['partition'] is self.boot["env"]["DUNEDAQ_PARTITION"]:
+                if c['partition'] is partition_from_config:
                     # Port offsetting
                     port = urlparse(c['uri']).port
                     newport = port + self.port_offset
                     c['uri'] = c['uri'].replace(str(port), str(newport))
+                    c['partition'] = self.boot["env"]["DUNEDAQ_PARTITION"] # Update partition name in case it changed
 
 
 
