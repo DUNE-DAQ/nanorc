@@ -204,9 +204,7 @@ class ConfigManager:
                             c['uri'] = c['uri'].replace(fieldname, "HOST_IP").format(**dico)
                         except Exception as e:
                             raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
-                if "global://" in c['uri']:
-                     c['uri'] = c['uri'].replace("global://", "tcp://")
-                else:
+                if c['partition'] is self.boot["env"]["DUNEDAQ_PARTITION"]:
                     # Port offsetting
                     port = urlparse(c['uri']).port
                     newport = port + self.port_offset
