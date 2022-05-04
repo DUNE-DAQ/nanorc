@@ -57,31 +57,37 @@ class SubsystemNode(StatefulNode):
         self.log.info(f'Subsystem {self.name} is booting')
         try:
             if self.pm is None:
-                if event.kwargs['k8s']:
-                    if not event.kwargs['partition']:
-                        from .credmgr import credentials
-                        event.kwargs['partition'] = credentials.user+"-dunedaq"
+                if event.kwargs['process'] == 'kind' or event.kwargs['process'] == 'np04cluster':
+                    if not event.kwargs.get('partition'):
+                        self.log.error('You need to provide a partition name on boot')
+                        response = {
+                            "node": self.name,
+                            "status_code": 1,
+                            "command": "boot",
+                            "error": "no partition name",
+                        }
+                        self.to_error(event=event, response=response)
+
                     self.console.log(f'Creating a namespace \'{event.kwargs["partition"]}\' in kubernetes to hold your DAQ applications')
                     self.pm = K8SProcessManager(self.console,
-                                                cluster=event.kwargs['k8s'],
-                                                daq_app_image=event.kwargs['daq_app_image'])
+                                                cluster=event.kwargs['process'])
                     # Yes, we need the list of connections here
                     # I hate it dearly too
                     # That and many other things. (I'M SUCH A HATER)
-                    connections = list(self.cfgmgr.init.values())[0]['nwconnections']
+                    connections = { app: data['nwconnections'] for app, data in self.cfgmgr.init.items() }
                     self.pm.boot(self.cfgmgr.boot, event.kwargs['partition'], connections)
-                else: 
+                else:
                     self.pm = SSHProcessManager(self.console, self.ssh_conf)
                     self.pm.boot(self.cfgmgr.boot, event.kwargs.get('log'))
         except Exception as e:
             self.console.print_exception()
 
         self.listener = ResponseListener(self.cfgmgr.boot["response_listener"]["port"])
-        
+
         children = []
         failed = []
         for n,d in self.pm.apps.items():
-            if event.kwargs['k8s']:
+            if event.kwargs['process'] == 'kind' or event.kwargs['process'] == 'np04cluster':
                 response_host = 'nanorc.'+d.partition
                 proxy = ('127.0.0.1', 31000)
                 child = ApplicationNode(name=n,
@@ -95,7 +101,7 @@ class SubsystemNode(StatefulNode):
                                         sup=AppSupervisor(self.console, d, self.listener),
                                         parent=self,
                                         fsm_conf=self.fsm_conf)
-                
+
 
             if child.sup.desc.proc.is_alive() and child.sup.commander.ping():
                 # nothing really happens in these 2:
@@ -206,7 +212,7 @@ class SubsystemNode(StatefulNode):
 
                 child_node.trigger(command)
                 ## APP now in *_ing
-                
+
                 child_node.sup.send_command(command, cmd_data=data[child_node.name] if data else {}, entry_state=entry_state, exit_state=exit_state)
 
 
