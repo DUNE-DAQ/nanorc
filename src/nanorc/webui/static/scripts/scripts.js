@@ -1,4 +1,4 @@
-var fsm = {};
+var commands = {};
 var root = "";
 var state = "";
 var statusTmp = {};
@@ -95,9 +95,13 @@ function refreshTree(tree){
     $('#controlTree').jstree(true).refresh();
   }
 function sendComm(command){
-  arr = $("#"+command+"_a :input");
+  invalidVals = ""
+  arr = $("#modalBody :input");
   var dataload = {"command":command}
-  $.each(arr, function( index, value ) {
+  r = $.each(arr, function( index, value ) {
+      if(!value.checkValidity()){
+        invalidVals = invalidVals + value.id + ", "
+      }
       if (value.value != "") {
         dataload[value.id]=value.value
         if (value.type == "checkbox")
@@ -106,7 +110,11 @@ function sendComm(command){
           }
       }
   })
-
+  if(invalidVals!=""){
+    alert("Provide correct input for "+invalidVals.slice(0,-2))
+    return
+  }
+  $('#argumentsModal').modal('toggle');
   clearInterval(statusTick);
   $("#state:text").val('Executing...')
   $(".control").attr("disabled", true);
@@ -131,7 +139,7 @@ function sendComm(command){
       }
   });
 }
-function populateArgs(){
+function fetchCommands(){
   $.ajax({
     url: "http://"+serverhost+"/nanorcrest/command",
     beforeSend: function(xhr) { 
@@ -141,32 +149,13 @@ function populateArgs(){
     dataType: "text",
     success: function (d) {
       d = JSON.parse(d)
+      commands = d;
       $( "#stateButtonsDiv" ).empty()
-      $("#commargs").empty()
       $.each(d, function( index, value ) {
-        $("#stateButtonsDiv").append("<button id='"+index+"' class='green button control' style='margin:5px;'>"+index+"</button> &nbsp &nbsp");
-        $("#commargs").append("<div id="+index+"_a></div>");
-        $("#"+index+"_a").append("<h4>Arguments for "+index+":</h4>");
-        $.each(value, function( i, v ) {
-          var clss = v[Object.keys(v)[0]].type
-          var defaul = ""
-          if(v[Object.keys(v)[0]].default != null){
-            defaul = v[Object.keys(v)[0]].default
-          }
-          if(v[Object.keys(v)[0]].required){
-            clss + "required"
-          }
-          $("#"+index+"_a").append("<h6>"+Object.keys(v)[0]+"</h6>");
-          if (v[Object.keys(v)[0]].type == "BOOL"){
-            $("#"+index+"_a").append('<input type="checkbox" id="'+Object.keys(v)[0]+'" class="'+clss+'">');
-            if (defaul == true){$( "#"+Object.keys(v)[0] ).prop( "checked", true );}
-          }else{
-            $("#"+index+"_a").append('<input type="text" value="'+defaul+'" id="'+Object.keys(v)[0]+'" class="form-control '+clss+'">');
-          }
-        });
+        $("#stateButtonsDiv").append("<button id='"+index+"' class='green button control' data-toggle='modal' data-target='#argumentsModal' style='margin:5px;'>"+index+"</button> &nbsp &nbsp");
       });
       $(".control").click(function() {
-        sendComm($(this).attr("id"));
+        populateArgs($(this).attr("id"));
       }); 
     },
     error: function(e){
@@ -174,6 +163,53 @@ function populateArgs(){
     }
   });
   
+}
+function populateArgs(command){
+  $("#ModalLabel").text("Arguments for "+command+":");
+  $("#executeBtn").text("Execute "+command+" command");
+  $("#modalBody").empty()
+  $("#modalBody").append("<form id='argForm' class='needs-validation' novalidate>");
+  console.log(commands)
+      $.each(commands[command], function( index, value ) {
+        $.each(value, function( i, v ) {
+          var clss = v.type
+          var defaul = ""
+          var apendix = ""
+          if(v.default != null){
+            defaul = v.default
+          }
+          if(v.required){
+            apendix = apendix + "required"
+            clss += " required"
+          }
+          $("#modalBody").append("<h6>"+i+"</h6>");
+          if (v.type == "BOOL"){
+            $("#modalBody").append('<input type="checkbox" id="'+i+'" class="'+clss+'"><br>');
+            if (defaul == true){$( "#"+i ).prop( "checked", true );}
+          }else if (v.type == "INT"){
+            $("#modalBody").append('<input type="number" value="'+defaul+'" id="'+i+'" class="form-control '+clss+'" '+apendix+'>');
+          }else if(/choice/i.test(v.type)){
+            console.log(v.type)
+            choices = (v.type).match(/\[(.*?)\]/);
+            choices = choices[1].split(',');
+            console.log(choices)
+            $("#modalBody").append('<select id="'+i+'"></select><br>');
+            $.each(choices, function( j, w ) {
+              console.log(w)
+              w = w.replace(/'/g, "");
+              $("#"+i).append('<option value="'+w+'">'+w+'</option>');
+            })
+          }else{
+            $("#modalBody").append('<input type="text" value="'+defaul+'" id="'+i+'" class="form-control '+clss+'" '+apendix+'>');
+          }
+          $("#modalBody").append("<small><i>"+clss+"</i></small>");
+        });
+      });
+      $("#modalBody").append("</form>");
+      $("#executeBtn").unbind();
+      $("#executeBtn").click(function() {
+        sendComm(command);
+      });
 }
   function getStatus(regCheck=false){
     if (regCheck == true){
@@ -213,7 +249,7 @@ function populateArgs(){
                 refreshTree(d)
               }
               //populateButtons()
-              populateArgs()
+              fetchCommands()
               $("#statustable").empty()
               statusTable({d}, 0)
             }
@@ -226,23 +262,7 @@ function populateArgs(){
         }
     });
   }
-  function getFsm(){
-  $.ajax({
-      url: "http://"+serverhost+"/nanorcrest/fsm",
-      beforeSend: function(xhr) { 
-        xhr.setRequestHeader("Authorization", "Basic " + btoa("fooUsr:barPass")); 
-      },
-      type: 'GET',
-      dataType: "text",
-      success: function (d) {
-        d = JSON.parse(d)
-        fsm = d
-
-      },
-      error: function(e){
-        console.log(e)
-      }
-  });}
+  
 
   $('#controlTree').on('changed.jstree', function () {
     selectedNode = $("#controlTree").jstree("get_selected",true)[0]
@@ -261,7 +281,6 @@ function populateArgs(){
 		 // $('#data .content').height(h).filter('.default').css('height', h + 'px');
 	}).resize();
     $(document).ready(function() {
-      getFsm()
       statusTick = setInterval(getStatus, 1000, true);
       $.ajax({
         url: "http://"+serverhost+"/nanorcrest/tree",
