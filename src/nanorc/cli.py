@@ -303,6 +303,8 @@ def message(obj, message):
 
 @cli.command('start')
 @click.argument('run_num', type=int)
+@click.argument('run-type', required=True,
+                type=click.Choice(['TEST', 'PROD']))
 @click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.option('--resume-wait', type=int, default=0, help='Seconds to wait between Start and Resume commands')
@@ -310,7 +312,7 @@ def message(obj, message):
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def start(ctx, obj:NanoContext, run_num:int, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str, timeout:int):
+def start(ctx, obj:NanoContext, run_num:int, run_type:str, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str, timeout:int):
     """
     Start Command
 
@@ -321,6 +323,7 @@ def start(ctx, obj:NanoContext, run_num:int, disable_data_storage:bool, trigger_
 
     """
 
+    obj.rc.console.print(f'Run {run_num} ({run_type}) is starting!!')
     obj.rc.run_num_mgr.set_run_number(run_num)
     obj.rc.start(disable_data_storage, "TEST", message=message, timeout=timeout)
     check_rc(ctx,obj)
