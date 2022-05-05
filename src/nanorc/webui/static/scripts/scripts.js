@@ -189,13 +189,10 @@ function populateArgs(command){
           }else if (v.type == "INT"){
             $("#modalBody").append('<input type="number" value="'+defaul+'" id="'+i+'" class="form-control '+clss+'" '+apendix+'>');
           }else if(/choice/i.test(v.type)){
-            console.log(v.type)
             choices = (v.type).match(/\[(.*?)\]/);
             choices = choices[1].split(',');
-            console.log(choices)
             $("#modalBody").append('<select id="'+i+'"></select><br>');
             $.each(choices, function( j, w ) {
-              console.log(w)
               w = w.replace(/'/g, "");
               $("#"+i).append('<option value="'+w+'">'+w+'</option>');
             })
