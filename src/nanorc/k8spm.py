@@ -72,7 +72,7 @@ class K8SProcessManager(object):
 
     # ----
     def create_namespace(self, namespace : str):
-        self.log.info(f"Creating {namespace} namespace")
+        self.log.info(f"Creating \"{namespace}\" namespace")
 
         ns = client.V1Namespace(
             metadata=client.V1ObjectMeta(name=namespace)
@@ -84,11 +84,11 @@ class K8SProcessManager(object):
             )
         except Exception as e:
             self.log.error(e)
-            raise RuntimeError(f"Failed to create namespace {namespace}") from e
+            raise RuntimeError(f"Failed to create namespace \"{namespace}\"") from e
 
     # ----
     def delete_namespace(self, namespace: str):
-        self.log.info(f"Deleting {namespace} namespace")
+        self.log.info(f"Deleting \"{namespace}\" namespace")
         try:
             # 
             resp = self._core_v1_api.delete_namespace(
@@ -96,7 +96,7 @@ class K8SProcessManager(object):
             )
         except Exception as e:
             self.log.error(e)
-            raise RuntimeError(f"Failed to delete namespace {namespace}") from e
+            raise RuntimeError(f"Failed to delete namespace \"{namespace}\"") from e
 
     def get_container_port_list_from_connections(self, connections:list=None):
         ret = [
@@ -107,6 +107,7 @@ class K8SProcessManager(object):
             )]
         
         for c in connections:
+            if '0.0.0.0' not in c['address']: continue
             ret += [
                 client.V1ContainerPort(
                     # My sympathy for the nwmgr took yet another hit here
@@ -127,6 +128,7 @@ class K8SProcessManager(object):
             )]
 
         for c in connections:
+            if '0.0.0.0' not in c['address']: continue
             ret += [
                 client.V1ServicePort(
                     # My sympathy for the nwmgr took yet another hit here
@@ -135,7 +137,6 @@ class K8SProcessManager(object):
                     target_port = int(c['address'].split(":")[-1]),
                     port = int(c['address'].split(":")[-1]),
                 )]
-            print("port", int(c['address'].split(":")[-1]), c['address'])
         return ret
     
     # ----
@@ -149,7 +150,7 @@ class K8SProcessManager(object):
                                  env_vars: dict = None,
                                  run_as: dict = None,
                                  connections:list = None):
-        self.log.info(f"Creating {namespace}:{name} daq application (port: {cmd_port}, image: {daq_image})")
+        self.log.info(f"Creating \"{namespace}:{name}\" daq application (port: {cmd_port}, image: \"{daq_image}\")")
         
         # Deployment
         deployment = client.V1Deployment(
@@ -240,7 +241,7 @@ class K8SProcessManager(object):
             )
         except Exception as e:
             self.log.error(e)
-            raise RuntimeError(f"Failed to create daqapp deployment {namespace}:{name}") from e
+            raise RuntimeError(f"Failed to create daqapp deployment \"{namespace}:{name}\"") from e
 
         service = client.V1Service(
             metadata = client.V1ObjectMeta(name=name),
@@ -255,12 +256,12 @@ class K8SProcessManager(object):
             resp = self._core_v1_api.create_namespaced_service(namespace, service)
         except Exception as e:
             self.log.error(e)
-            raise RuntimeError(f"Failed to create daqapp service {namespace}:{name}") from e
+            raise RuntimeError(f"Failed to create daqapp service \"{namespace}:{name}\"") from e
 
     # ----
     def create_nanorc_responder(self, name: str, namespace: str, ip: str, port: int):
 
-        self.log.info(f"Creating nanorc responder service {namespace}:{name} for {ip}:{port}")
+        self.log.info(f"Creating nanorc responder service \"{namespace}:{name}\" for \"{ip}:{port}\"")
 
         # Creating Service object
         service = client.V1Service(
@@ -285,7 +286,7 @@ class K8SProcessManager(object):
             resp = self._core_v1_api.create_namespaced_service(namespace, service)
         except Exception as e:
             self.log.error(e)
-            raise RuntimeError(f"Failed to create nanorc responder service {namespace}:{name}") from e
+            raise RuntimeError(f"Failed to create nanorc responder service \"{namespace}:{name}\"") from e
 
         self.log.info("Creating nanorc responder endpoint")
 
@@ -311,7 +312,7 @@ class K8SProcessManager(object):
             self._core_v1_api.create_namespaced_endpoints(namespace, endpoints)
         except Exception as e:
             self.log.error(e)
-            raise RuntimeError(f"Failed to create nanorc responder endpoint {namespace}:{name}") from e
+            raise RuntimeError(f"Failed to create nanorc responder endpoint \"{namespace}:{name}\"") from e
 
     """
     ---
@@ -351,7 +352,7 @@ class K8SProcessManager(object):
             self._core_v1_api.create_namespaced_persistent_volume_claim(namespace, claim)
         except Exception as e:
             self.log.error(e)
-            raise RuntimeError(f"Failed to create persistent volume claim {namespace}:{name}") from e
+            raise RuntimeError(f"Failed to create persistent volume claim \"{namespace}:{name}\"") from e
 
     #---
     def boot(self, boot_info, partition, connections):
@@ -378,11 +379,10 @@ class K8SProcessManager(object):
                 self.gateway = next(iter(s['Gateway'] for s in kind_network.attrs['IPAM']['Config'] if isinstance(ipaddress.ip_address(s['Gateway']), ipaddress.IPv4Address)), None)
             except Exception as exc:
                 raise RuntimeError("Identify the kind gateway address'") from exc
-            logging.info(f"kind network gateway: {self.gateway}")
+            logging.info(f"Kind network gateway: {self.gateway}")
         else:
-            import socket
             self.gateway = socket.gethostbyname(socket.gethostname())
-            logging.info(f"localhost: {self.gateway}")
+            logging.info(f"Gateway: {self.gateway}")
 
         apps = boot_info["apps"].copy()
         env_vars = boot_info["env"]
