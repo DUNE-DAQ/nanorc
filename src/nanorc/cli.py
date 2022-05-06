@@ -135,6 +135,13 @@ def validate_pm(ctx, param, pm):
     return pm_desc(pm)
 
 
+def validate_partition(ctx, param, partition):
+    if ctx.obj.rc.pm.use_k8spm() and not partition:
+        raise click.BadParameter(f'You need to feed a partition to run with k8s')
+    if not partition.replace('-', '').isalnum():
+        raise click.BadParameter(f'Partition {partition} should be alpha-numeric only (hyphens are allowed)!')
+    return partition
+
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 @click.version_option(__version__)
@@ -202,7 +209,7 @@ def status(obj: NanoContext):
     obj.rc.status()
 
 @cli.command('boot')
-@click.argument('partition', type=str)
+@click.argument('partition', type=str, callback=validate_partition)
 @click.pass_obj
 @click.pass_context
 def boot(ctx, obj, partition):
