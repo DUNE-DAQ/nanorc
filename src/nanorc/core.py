@@ -44,7 +44,7 @@ class NanoRC:
                                console=self.console,
                                ssh_conf=ssh_conf,
                                fsm_conf=fsm_cfg,
-                               resolve_hostname = (pm=='ssh'))
+                               resolve_hostname = pm.use_sshpm())
 
         self.apparatus_id = self.cfg.apparatus_id
 
