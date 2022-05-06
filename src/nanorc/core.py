@@ -1,7 +1,5 @@
 import logging
 import time
-from .sshpm import SSHProcessManager
-from .k8spm import K8SProcessManager
 from .cfgmgr import ConfigManager
 from .appctrl import AppSupervisor, ResponseListener
 import json
@@ -30,12 +28,12 @@ class NanoRC:
 
     def __init__(self, console: Console, top_cfg: str, run_num_mgr, run_registry, logbook_type:str, timeout: int,
                  use_kerb=True, logbook_prefix="", fsm_cfg="partition",
-                 process=None):
+                 pm=None):
 
         super(NanoRC, self).__init__()
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
-        self.process = process
+        self.pm = pm
 
         ssh_conf = []
         if not use_kerb:
@@ -46,7 +44,7 @@ class NanoRC:
                                console=self.console,
                                ssh_conf=ssh_conf,
                                fsm_conf=fsm_cfg,
-                               resolve_hostname = (process=='ssh'))
+                               resolve_hostname = (pm=='ssh'))
 
         self.apparatus_id = self.cfg.apparatus_id
 
@@ -94,7 +92,7 @@ class NanoRC:
             return
 
         transition = getattr(self.topnode, command)
-        kwargs['process'] = self.process
+        kwargs['pm'] = self.pm
         transition(*args, **kwargs)
         self.return_code = self.topnode.return_code.value
 

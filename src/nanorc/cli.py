@@ -97,6 +97,44 @@ def check_rc(ctx, obj):
     if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
         ctx.exit(obj.rc.return_code)
 
+class pm_desc:
+    def __init__(self, pm_arg):
+        self.arg = pm_arg
+        self.is_ssh = (self.arg=='ssh')
+        self.is_kind = (self.arg.find('kind')==0)
+        self.is_k8s_cluster = (self.arg.find('k8s')==0)
+        if not self.is_ssh and not self.is_kind and not self.is_k8s_cluster:
+            raise click.BadParameter(f'--pm should be either ssh, kind, or k8s')
+
+        if self.is_kind or self.is_k8s_cluster:
+            self.address = self.arg
+            self.address = self.address.replace('kind', '')
+            self.address = self.address.replace('k8s', '')
+            self.address = self.address.replace('://', '')
+            if not self.address:
+                self.address = 'localhost'
+                self.port = '31000'
+            else:
+                address_and_port = self.address.split(':')
+                if len(address_and_port) == 2:
+                    self.address = address_and_port[0]
+                    self.port = address_and_port[1]
+                else:
+                    raise click.BadParameter(f'Bady formed k8s address: {self.address}')
+
+            print(self.address, self.port)
+
+    def use_k8spm(self):
+        return self.is_kind or self.is_k8s_cluster
+
+    def use_sshpm(self):
+        return self.is_ssh
+
+
+def validate_pm(ctx, param, pm):
+    return pm_desc(pm)
+
+
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 @click.version_option(__version__)
@@ -107,11 +145,11 @@ def check_rc(ctx, obj):
 @click.option('--log-path', type=click.Path(exists=True), default=None, help='Where the logs should go (on localhost of applications)')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
-@click.option('--process', type=click.Choice(['ssh', 'kind', 'np04cluster'], case_sensitive=False), default="ssh", help='Which process manager?')
+@click.option('--pm', type=str, default="ssh", help='Process manager, can be: ssh, kind, or k8s://np04-srv-015:31000, for example', callback=validate_pm)
 @click.argument('top_cfg', type=click.Path(exists=True))
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, process, top_cfg):
+def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_prefix, kerberos, pm, top_cfg):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f'{credentials.user}@rc> '
@@ -138,7 +176,7 @@ def cli(ctx, obj, traceback, loglevel, timeout, cfg_dumpdir, log_path, logbook_p
                     timeout = timeout,
                     use_kerb = kerberos,
                     logbook_prefix = logbook_prefix,
-                    process = process.lower())
+                    pm = pm)
 
         if log_path:
             rc.log_path = os.path.abspath(log_path)

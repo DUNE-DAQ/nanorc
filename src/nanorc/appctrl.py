@@ -113,6 +113,16 @@ class ResponseListener:
     """
     This class describes a notification listener.
     """
+    def terminate(self):
+        """
+        Terminate the listener
+        """
+        if self.flask_manager:
+            self.flask_manager.stop()
+
+        self.flask_manager = None
+        self.dispatcher.stop()
+
     def __init__(self, port : int ):
         self.log = logging.getLogger("ResponseListener")
         self.port = port
@@ -126,22 +136,13 @@ class ResponseListener:
         fm = FlaskManager(self.log, self.response_queue, self.port) # locked
         fm.start() # should unlock
         if not fm.ready_lock.acquire(timeout=12): # make sure that everything is ready
-            raise RuntimeError("Cannot create a response listener")
+            raise RuntimeError("Cannot create a response listener!!")
         fm.ready_lock.release()
         return fm
 
     def __del__(self):
         self.terminate()
 
-    def terminate(self):
-        """
-        Terminate the listener
-        """
-        if self.flask_manager:
-            self.flask_manager.stop()
-
-        self.flask_manager = None
-        self.dispatcher.stop()
 
     def register(self, app: str, handler):
         """
@@ -222,7 +223,9 @@ class AppCommander:
         else:
             s = socks.socksocket(socket.AF_INET, socket.SOCK_STREAM)
             s.set_proxy(socks.SOCKS5, self.proxy[0], self.proxy[1])
+            print(self.proxy)
         try:
+            print(self.app_host, self.app_port)
             s.connect((self.app_host, self.app_port))
             s.shutdown(2)
             return True
