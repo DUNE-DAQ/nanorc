@@ -118,9 +118,9 @@ class pm_desc:
                 address_and_port = self.address.split(':')
                 if len(address_and_port) == 2:
                     self.address = address_and_port[0]
-                    self.port = address_and_port[1]
+                    self.port = int(address_and_port[1])
                 else:
-                    raise click.BadParameter(f'Badly formed k8s address: {self.address}')
+                    raise click.BadParameter(f'Badly formed k8s address: {self.address}, should be of the form: server_name:port_number')
 
         if self.is_kind and self.address != "localhost":
             raise click.BadParameter(f'Kind address can only be localhost for now!')
