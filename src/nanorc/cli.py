@@ -120,9 +120,10 @@ class pm_desc:
                     self.address = address_and_port[0]
                     self.port = address_and_port[1]
                 else:
-                    raise click.BadParameter(f'Bady formed k8s address: {self.address}')
+                    raise click.BadParameter(f'Badly formed k8s address: {self.address}')
 
-            print(self.address, self.port)
+        if self.is_kind and self.address != "localhost":
+            raise click.BadParameter(f'Kind address can only be localhost for now!')
 
     def use_k8spm(self):
         return self.is_kind or self.is_k8s_cluster
