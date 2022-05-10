@@ -137,6 +137,16 @@ class ConfigManager:
                 for c in connections:
                     c['address'] = c["address"].format(**hosts_new)
 
+        for app_name, app_conf in self.conf.items():
+            for mod in app_conf['modules']:
+                if not 'data' in mod: continue
+                mod_data = mod['data']
+                if 'data_store_parameters' in mod_data:
+                    od = mod_data['data_store_parameters']['directory_path']
+                    if not os.path.isabs(od):
+                        mod_data['data_store_parameters']['directory_path'] = os.path.abspath(od)
+
+
 
     def runtime_start(self, data: dict) -> dict:
         """

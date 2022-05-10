@@ -74,7 +74,16 @@ class SubsystemNode(StatefulNode):
                     # I hate it dearly too
                     # That and many other things. (I'M SUCH A HATER)
                     connections = { app: data['nwconnections'] for app, data in self.cfgmgr.init.items() }
-                    self.pm.boot(self.cfgmgr.boot, event.kwargs['partition'], connections)
+                    out_dir = {}
+                    for app, vals in self.cfgmgr.conf.items():
+                        for mod in vals['modules']:
+                            if not 'data' in mod: continue
+                            mod_data = mod['data']
+                            print (mod_data)
+                            if 'data_store_parameters' in mod_data:
+                                out_dir[app] = mod_data['data_store_parameters']['directory_path']
+
+                    self.pm.boot(self.cfgmgr.boot, event.kwargs['partition'], connections, out_dir=out_dir)
                 elif event.kwargs['pm'].use_sshpm():
                     self.pm = SSHProcessManager(self.console, self.ssh_conf)
                     self.pm.boot(self.cfgmgr.boot, event.kwargs.get('log'))

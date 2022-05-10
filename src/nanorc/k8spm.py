@@ -394,7 +394,7 @@ class K8SProcessManager(object):
             raise RuntimeError(f"Failed to create persistent volume claim \"{namespace}:{name}\"") from e
 
     #---
-    def boot(self, boot_info, partition, connections):
+    def boot(self, boot_info, partition, connections, out_dir):
 
         if self.apps:
             raise RuntimeError(
@@ -469,7 +469,7 @@ class K8SProcessManager(object):
                 run_as = run_as,
                 connections = connections[app_name],
                 use_flx = 'flx' in app_name,
-                out_dir = ''
+                out_dir = out_dir.get(app_name)
             )
 
             self.apps[app_name] = app_desc
