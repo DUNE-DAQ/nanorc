@@ -38,9 +38,9 @@ class K8sProcess(object):
 
 class K8SProcessManager(object):
     """docstring for K8SProcessManager"""
-    def __init__(self, console: Console, cluster):
+    def __init__(self, console: Console, cluster_config):
         """A Kubernetes Process Manager
-        
+
         Args:
             console (Console): Description
         """
@@ -49,8 +49,8 @@ class K8SProcessManager(object):
         self.console = console
         self.apps = {}
         self.partition = None
-        self.cluster = cluster
-        
+        self.cluster_config = cluster_config
+
         config.load_kube_config()
 
         self._core_v1_api = client.CoreV1Api()
@@ -78,7 +78,7 @@ class K8SProcessManager(object):
             metadata=client.V1ObjectMeta(name=namespace)
         )
         try:
-            # 
+            #
             resp = self._core_v1_api.create_namespace(
                 body=ns
             )
@@ -90,7 +90,7 @@ class K8SProcessManager(object):
     def delete_namespace(self, namespace: str):
         self.log.info(f"Deleting \"{namespace}\" namespace")
         try:
-            # 
+            #
             resp = self._core_v1_api.delete_namespace(
                 name=namespace
             )
@@ -105,7 +105,7 @@ class K8SProcessManager(object):
                 protocol = "TCP",
                 container_port = 3333,
             )]
-        
+
         for c in connections:
             if '0.0.0.0' not in c['address']: continue
             ret += [
@@ -116,7 +116,7 @@ class K8SProcessManager(object):
                     container_port = int(c['address'].split(":")[-1]),
                 )]
         return ret
-    
+
 
     def get_service_port_list_from_connections(self, connections:list=None):
         ret = [
@@ -138,7 +138,7 @@ class K8SProcessManager(object):
                     port = int(c['address'].split(":")[-1]),
                 )]
         return ret
-    
+
     # ----
     def create_daqapp_deployment(self,
                                  name: str,
@@ -149,9 +149,11 @@ class K8SProcessManager(object):
                                  mount_cvmfs: bool = False,
                                  env_vars: dict = None,
                                  run_as: dict = None,
-                                 connections:list = None):
+                                 connections:list = None,
+                                 use_flx:bool = False,
+                                 out_dir:str = None):
         self.log.info(f"Creating \"{namespace}:{name}\" daq application (port: {cmd_port}, image: \"{daq_image}\")")
-        
+
         # Deployment
         deployment = client.V1Deployment(
             # api_version="apps/v1",
@@ -168,7 +170,7 @@ class K8SProcessManager(object):
                         # Required in kind environment to create non-root files in shared folders
                         security_context=client.V1PodSecurityContext(
                             run_as_user=run_as['uid'],
-                            run_as_group=run_as['gid'],                            
+                            run_as_group=run_as['gid'],
                         ) if run_as else None,
                         # List of processes
                         containers=[
@@ -178,6 +180,12 @@ class K8SProcessManager(object):
                                 image=daq_image,
                                 image_pull_policy= "IfNotPresent",
                                 # Environment variables
+
+                                resources = (
+                                    client.V1ResourceRequirements(
+                                        client.V1Limits({"felix.cern/flx": "2"}) # requesting 2 FLXs
+                                    )
+                                ) if use_flx else None,
                                 env = [
                                     client.V1EnvVar(
                                         name=k,
@@ -186,46 +194,73 @@ class K8SProcessManager(object):
                                     for k,v in env_vars.items()
                                 ] if env_vars else None,
                                 args=[
-                                    "--name", name, 
+                                    "--name", name,
                                     "-c", "rest://localhost:3333",
                                     "-i", "influx://influxdb.monitoring:8086/write?db=influxdb"
                                     ],
                                 ports=self.get_container_port_list_from_connections(connections),
-                                volume_mounts=([
-                                    client.V1VolumeMount(
-                                        mount_path="/cvmfs/dunedaq.opensciencegrid.org",
-                                        name="dunedaq",
-                                        read_only=True
-                                    )
-                                ] if mount_cvmfs else []) +
-                                [
-                                    client.V1VolumeMount(
-                                        mount_path="/dunedaq/pocket",
-                                        name="pocket",
-                                        read_only=False
-                                    )
-                                ]
+                                volume_mounts=(
+                                    [
+                                        client.V1VolumeMount(
+                                            mount_path="/cvmfs/dunedaq.opensciencegrid.org",
+                                            name="dunedaq",
+                                            read_only=True
+                                        )
+                                    ] if mount_cvmfs else [] +
+                                    [
+                                        client.V1VolumeMount(
+                                            mount_path="/dunedaq/pocket",
+                                            name="pocket",
+                                            read_only=False
+                                        )
+                                    ] if self.cluster_config.is_kind else [] +
+                                    [
+                                        client.V1VolumeMount(
+                                            mount_path="/dev",
+                                            name="devfs",
+                                        )
+
+                                    ] if use_flx else [] +
+                                    [
+                                        client.V1VolumeMount(
+                                            mount_path=out_dir,
+                                            name="outdir",
+                                        )
+
+                                    ] if out_dir else []
+
+                                )
                             )
                         ],
-                        volumes=([
-                            client.V1Volume(
-                                name="dunedaq",
-                                host_path=client.V1HostPathVolumeSource(
-                                    path='/cvmfs/dunedaq.opensciencegrid.org',
+                        volumes=(
+                            [
+                                client.V1Volume(
+                                    name="dunedaq",
+                                    host_path=client.V1HostPathVolumeSource(path='/cvmfs/dunedaq.opensciencegrid.org')
                                 )
-                            )
-                        ] if mount_cvmfs else []) +
-                        [
-                            client.V1Volume(
-                                name="pocket",
-                                host_path=client.V1HostPathVolumeSource(
-                                    path='/pocket',
+                            ] if mount_cvmfs else [] +
+                            [
+                                client.V1Volume(
+                                    name="pocket",
+                                    host_path=client.V1HostPathVolumeSource(path='/pocket')
                                 )
-                            )
-                        ]
-                    ))
+                            ] if self.cluster_config.is_kind else [] +
+                            [
+                                client.V1Volume(
+                                    name="devfs",
+                                    host_path=client.V1HostPathVolumeSource(path='/dev')
+                                )
+                            ] if use_flx else [] +
+                            [
+                                client.V1Volume(
+                                    name="outdir",
+                                    host_path=client.V1HostPathVolumeSource(path=out_dir)
+                                )
+                            ] if out_dir else []
+                        )
+                    )
+                )
             )
-
         )
 
 
@@ -234,7 +269,7 @@ class K8SProcessManager(object):
         # Creation of the Deployment in specified namespace
         # (Can replace "default" with a namespace you may have created)
         try:
-            # 
+            #
             resp = self._apps_v1_api.create_namespaced_deployment(
                 namespace = namespace,
                 body = deployment
@@ -280,7 +315,7 @@ class K8SProcessManager(object):
                 ],
             )
         )  # V1Service
-        
+
         self.log.debug(service)
         try:
             resp = self._core_v1_api.create_namespaced_service(namespace, service)
@@ -331,7 +366,7 @@ class K8SProcessManager(object):
     """
     def create_cvmfs_pvc(self, name: str, namespace: str):
 
-        # Create claim 
+        # Create claim
         claim = client.V1PersistentVolumeClaim(
             # Meta-data
             metadata=client.V1ObjectMeta(
@@ -362,7 +397,7 @@ class K8SProcessManager(object):
                 f"ERROR: apps have already been booted {' '.join(self.apps.keys())}. Terminate them all before booting a new set."
             )
 
-        if self.cluster == 'kind':
+        if self.cluster_config.is_kind:
             logging.info('Resolving the kind gateway')
             import docker, ipaddress
             # Detect docker environment
@@ -381,17 +416,17 @@ class K8SProcessManager(object):
                 raise RuntimeError("Identify the kind gateway address'") from exc
             logging.info(f"Kind network gateway: {self.gateway}")
         else:
-            self.gateway = socket.gethostbyname(socket.gethostname())
-            logging.info(f"Gateway: {self.gateway}")
+            self.gateway = socket.gethostbyname(self.cluster_config.address)
+            logging.info(f"Gateway: {self.gateway} ({self.cluster_config.address})")
 
         apps = boot_info["apps"].copy()
         env_vars = boot_info["env"]
         # TODO: move into the rc boot method. The PM should not know about DUNEDAQ_PARTITION
         env_vars['DUNEDAQ_PARTITION'] = partition
-        
+
         self.partition = partition
         cmd_port = 3333
-        
+
         # Create partition
         self.create_namespace(self.partition)
         # Create the persistent volume claim
@@ -401,7 +436,7 @@ class K8SProcessManager(object):
             'uid': os.getuid(),
             'gid': os.getgid(),
         }
-        
+
         for app_name, app_conf in apps.items():
 
             exec_vars = boot_info['exec'][app_conf['exec']]['env']
@@ -417,19 +452,24 @@ class K8SProcessManager(object):
             app_desc.pod = ''
             app_desc.port = cmd_port
             app_desc.proc = K8sProcess(self, app_name, self.partition)
-            
-            self.create_daqapp_deployment(name = app_name, # better kwargs all this...
-                                          app_label = app_name,
-                                          daq_image = daq_image,
-                                          namespace = self.partition,
-                                          cmd_port = cmd_port,
-                                          mount_cvmfs = True,
-                                          env_vars = app_vars,
-                                          run_as = run_as,
-                                          connections = connections[app_name])
-            
+
+
+            self.create_daqapp_deployment(
+                name = app_name, # better kwargs all this...
+                app_label = app_name,
+                daq_image = daq_image,
+                namespace = self.partition,
+                cmd_port = cmd_port,
+                mount_cvmfs = True,
+                env_vars = app_vars,
+                run_as = run_as,
+                connections = connections[app_name],
+                use_flx = 'flx' in app_name,
+                out_dir = ''
+            )
+
             self.apps[app_name] = app_desc
-            
+
         # TODO: move (some of) this loop into k8spm?
         timeout = 60
         with Progress(
@@ -459,9 +499,9 @@ class K8SProcessManager(object):
                 if list(ready.keys()) == list(self.apps.keys()):
                     progress.update(waiting, visible=False)
                     break
-                
+
                 time.sleep(1)
-                
+
             self.create_nanorc_responder(name = 'nanorc',
                                          namespace = self.partition,
                                          ip = self.gateway,

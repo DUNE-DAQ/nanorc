@@ -69,7 +69,7 @@ class SubsystemNode(StatefulNode):
                         self.to_error(event=event, response=response)
 
                     self.pm = K8SProcessManager(self.console,
-                                                cluster=event.kwargs['pm'])
+                                                cluster_config=event.kwargs['pm'])
                     # Yes, we need the list of connections here
                     # I hate it dearly too
                     # That and many other things. (I'M SUCH A HATER)
