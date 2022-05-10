@@ -152,7 +152,7 @@ class K8SProcessManager(object):
                                  connections:list = None,
                                  use_flx:bool = False,
                                  out_dir:str = None):
-        self.log.info(f"Creating \"{namespace}:{name}\" daq application (port: {cmd_port}, image: \"{daq_image}\")")
+        self.log.info(f"Creating \"{namespace}:{name}\" daq application (port: {cmd_port}, image: \"{daq_image}\", use_flx={use_flx}, out_dir={out_dir})")
 
         # Deployment
         deployment = client.V1Deployment(
@@ -180,11 +180,12 @@ class K8SProcessManager(object):
                                 image=daq_image,
                                 image_pull_policy= "IfNotPresent",
                                 # Environment variables
-
+                                security_context = client.V1SecurityContext(privileged=use_flx),
                                 resources = (
-                                    client.V1ResourceRequirements(
-                                        client.V1Limits({"felix.cern/flx": "2"}) # requesting 2 FLXs
-                                    )
+                                    client.V1ResourceRequirements({
+                                        "felix.cern/flx": "2", # requesting 2 FLXs
+                                        "memory": "32Gi" # yes bro
+                                    })
                                 ) if use_flx else None,
                                 env = [
                                     client.V1EnvVar(
@@ -200,63 +201,66 @@ class K8SProcessManager(object):
                                     ],
                                 ports=self.get_container_port_list_from_connections(connections),
                                 volume_mounts=(
-                                    [
+                                    ([
                                         client.V1VolumeMount(
                                             mount_path="/cvmfs/dunedaq.opensciencegrid.org",
                                             name="dunedaq",
                                             read_only=True
                                         )
-                                    ] if mount_cvmfs else [] +
-                                    [
+                                    ] if mount_cvmfs else []) +
+                                    ([
                                         client.V1VolumeMount(
                                             mount_path="/dunedaq/pocket",
                                             name="pocket",
                                             read_only=False
                                         )
-                                    ] if self.cluster_config.is_kind else [] +
-                                    [
+                                    ] if self.cluster_config.is_kind else []) +
+                                    ([
                                         client.V1VolumeMount(
                                             mount_path="/dev",
                                             name="devfs",
+                                            read_only=False
                                         )
 
-                                    ] if use_flx else [] +
-                                    [
+                                    ] if use_flx else []) +
+                                    ([
                                         client.V1VolumeMount(
                                             mount_path=out_dir,
                                             name="outdir",
+                                            read_only=False
                                         )
 
                                     ] if out_dir else []
+                                     )
 
                                 )
                             )
                         ],
                         volumes=(
-                            [
+                            ([
                                 client.V1Volume(
                                     name="dunedaq",
                                     host_path=client.V1HostPathVolumeSource(path='/cvmfs/dunedaq.opensciencegrid.org')
                                 )
-                            ] if mount_cvmfs else [] +
-                            [
+                            ] if mount_cvmfs else []) +
+                            ([
                                 client.V1Volume(
                                     name="pocket",
                                     host_path=client.V1HostPathVolumeSource(path='/pocket')
                                 )
-                            ] if self.cluster_config.is_kind else [] +
-                            [
+                            ] if self.cluster_config.is_kind else [])+
+                            ([
                                 client.V1Volume(
                                     name="devfs",
                                     host_path=client.V1HostPathVolumeSource(path='/dev')
                                 )
-                            ] if use_flx else [] +
-                            [
+                            ] if use_flx else []) +
+                            ([
                                 client.V1Volume(
                                     name="outdir",
                                     host_path=client.V1HostPathVolumeSource(path=out_dir)
                                 )
-                            ] if out_dir else []
+                            ] if out_dir else [])
                         )
                     )
                 )

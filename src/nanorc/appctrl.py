@@ -254,6 +254,8 @@ class AppCommander:
             print("listener", self.listener_host, self.listener_port)
             headers['X-Answer-Host'] = self.listener_host
 
+        self.log.debug(headers)
+
         ack = requests.post(
             self.app_url,
             data=json.dumps(cmd),
