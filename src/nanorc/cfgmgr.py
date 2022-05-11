@@ -146,6 +146,12 @@ class ConfigManager:
                     if not os.path.isabs(od):
                         mod_data['data_store_parameters']['directory_path'] = os.path.abspath(od)
 
+                if 'link_confs' in mod_data:
+                    for link_conf in mod_data['link_confs']:
+                        if 'data_filename' in link_conf:
+                            link_conf['data_filename'] = os.path.abspath(link_conf['data_filename'])
+
+                    # data_filename
 
 
     def runtime_start(self, data: dict) -> dict:

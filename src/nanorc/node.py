@@ -13,6 +13,7 @@ from .k8spm import K8SProcessManager
 from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
 from typing import Union, NoReturn
 from .fsm import FSM
+import os.path
 from .statefulnode import StatefulNode, ErrorCode
 from rich.progress import *
 
@@ -65,7 +66,7 @@ class SubsystemNode(StatefulNode):
                     if not event.kwargs.get('partition'):
                         self.log.error('You need to provide a partition name on boot')
                         response['status_code'] = 1
-                        response["error"]=  "no partition name"
+                        response["error"] = "no partition name"
                         self.to_error(event=event, response=response)
 
                     self.pm = K8SProcessManager(self.console,
@@ -75,13 +76,20 @@ class SubsystemNode(StatefulNode):
                     # That and many other things. (I'M SUCH A HATER)
                     connections = { app: data['nwconnections'] for app, data in self.cfgmgr.init.items() }
                     out_dir = {}
+
+                    ## even more hacks
                     for app, vals in self.cfgmgr.conf.items():
                         for mod in vals['modules']:
                             if not 'data' in mod: continue
                             mod_data = mod['data']
-                            print (mod_data)
                             if 'data_store_parameters' in mod_data:
                                 out_dir[app] = mod_data['data_store_parameters']['directory_path']
+
+                            # and this is a hack within the hack
+                            if 'link_confs' in mod_data:
+                                for link_conf in mod_data['link_confs']:
+                                    if 'data_filename' in link_conf:
+                                        out_dir[app] = os.path.dirname(link_conf['data_filename'])
 
                     self.pm.boot(self.cfgmgr.boot, event.kwargs['partition'], connections, out_dir=out_dir)
                 elif event.kwargs['pm'].use_sshpm():

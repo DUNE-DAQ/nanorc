@@ -393,6 +393,63 @@ class K8SProcessManager(object):
             self.log.error(e)
             raise RuntimeError(f"Failed to create persistent volume claim \"{namespace}:{name}\"") from e
 
+    def create_opmon_ers_service(ers_address='',
+                                 opmon_address='',
+                                 namespace=None):
+        if ers_address:
+            # Create Endpoints Objects
+            endpoints = client.V1Endpoints(
+                metadata=client.V1ObjectMeta(
+                    name=ers_address[0],
+                ),
+                subsets=[
+                    client.V1EndpointSubset(
+                        addresses=[
+                            client.V1EndpointAddress(ip=ers_address[0])
+                        ],
+                        ports=[
+                            client.V1EndpointPort(port=ers_address[1])
+                        ]
+                    )
+                ]
+            )
+            self.log.debug(endpoints)
+
+            try:
+                resp = self._core_v1_api.create_namespaced_service(namespace, service)
+            except Exception as e:
+                self.log.error(e)
+                raise RuntimeError(f"Failed to create nanorc responder service \"{namespace}:{name}\"") from e
+
+
+        if opmon_address:
+            service = client.V1Service(
+                metadata=client.V1ObjectMeta(
+                    name=opmon_address[0],
+                ),
+                spec=client.V1ServiceSpec(
+                    type='NodePort',
+                    external_traffic_policy='Cluster',
+                    ports=[
+                        client.V1ServicePort(
+                            protocol = 'TCP',
+                            target_port = port,
+                            port = port,
+                        )
+                    ],
+                )
+            )  # V1Service
+
+            self.log.debug(service)
+
+            try:
+                resp = self._core_v1_api.create_namespaced_service(namespace, service)
+            except Exception as e:
+                self.log.error(e)
+                raise RuntimeError(f"Failed to create nanorc responder service \"{namespace}:{name}\"") from e
+
+
+
     #---
     def boot(self, boot_info, partition, connections, out_dir):
 
@@ -436,11 +493,30 @@ class K8SProcessManager(object):
         # Create the persistent volume claim
         self.create_cvmfs_pvc('dunedaq.opensciencegrid.org', self.partition)
 
+        ers_address = ''
+        opmon_address = ''
+        for env_name, env in boot_info['env'].items():
+            if 'DUNEDAQ_ERS' in env_name:
+                start = env.find('(')
+                end = env.find(')')
+                if start>=0 and end>=0:
+                    ers_address = env[start+1:end]
+
+        for arg in boot_info['exec']['daq_application']['cmd']:
+            if 'INFO_SVC=influx://' in arg:
+                narg = arg.replace('INFO_SVC=influx://', '')
+                opmon_address = narg
+
+        # Let's not do that for now
+        # self.create_opmon_ers_service(ers_address,
+        #                               opmon_address,
+        #                               namespace=self.partition)
+
         run_as = {
             'uid': os.getuid(),
             'gid': os.getgid(),
         }
-
+        return
         for app_name, app_conf in apps.items():
 
             exec_vars = boot_info['exec'][app_conf['exec']]['env']
