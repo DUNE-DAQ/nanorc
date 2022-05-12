@@ -61,17 +61,17 @@ def timingcli(ctx, obj, traceback, loglevel, log_path, cfg_dumpdir, kerberos, ti
         updateLogLevel(loglevel)
 
     try:
-        rc = NanoRC(console = obj.console,
-                    fsm_cfg = "timing",
-                    top_cfg = cfg_dir,
-                    run_num_mgr = None,
-                    run_registry = None,
-                    logbook_type = None,
-                    timeout = timeout,
-                    use_kerb = kerberos,
-                    port_offset = port_offset,
-                    partition_label = None,
-                    partition_number = None)
+        rc = NanoRC(
+            console = obj.console,
+            fsm_cfg = "timing",
+            top_cfg = cfg_dir,
+            run_num_mgr = None,
+            run_registry = None,
+            logbook_type = None,
+            timeout = timeout,
+            use_kerb = kerberos,
+            port_offset = port_offset
+        )
 
         rc.log_path = os.path.abspath(log_path)
         add_custom_cmds(ctx.command, rc.execute_custom_command, rc.custom_cmd)
