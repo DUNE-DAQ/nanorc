@@ -3,7 +3,7 @@ from .node import *
 from anytree import RenderTree, PreOrderIter
 import logging as log
 from rich.console import Console
-
+import sh
 def status_data(node, get_children=True) -> dict:
     ret = {}
     if isinstance(node, ApplicationNode):
@@ -31,8 +31,8 @@ def status_data(node, get_children=True) -> dict:
     return ret
 
 
-def print_status(topnode, console, apparatus_id='') -> int:
-    table = Table(title=f"{apparatus_id} apps")
+def print_status(topnode, console, apparatus_id='', partition='') -> int:
+    table = Table(title=f"[bold]{apparatus_id}[/bold] applications" + (f" in partition [bold]{partition}[/bold]" if partition else ''))
     table.add_column("name", style="blue")
     table.add_column("state", style="blue")
     table.add_column("host", style="magenta")
@@ -43,15 +43,19 @@ def print_status(topnode, console, apparatus_id='') -> int:
     for pre, _, node in RenderTree(topnode):
         if isinstance(node, ApplicationNode):
             sup = node.sup
+
             if sup.desc.proc.is_alive():
                 alive = 'alive'
+            elif not sup.desc.proc:
+                alive = ''
             else:
                 try:
                     exit_code = sup.desc.proc.exit_code
                 except sh.ErrorReturnCode as e:
                     exit_code = e.exit_code
                 alive = f'dead[{exit_code}]'
-            ping  = sup.commander.ping()
+
+            ping = sup.commander.ping()
             last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
 
             state_str = Text()
