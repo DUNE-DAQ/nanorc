@@ -5,9 +5,8 @@ import rich
 import socket
 import time
 import os
-import threading
 import datetime
-from kubernetes import client, config, watch
+from kubernetes import client, config
 from rich.console import Console
 from rich.progress import *
 
@@ -352,39 +351,6 @@ class K8SProcessManager(object):
             raise RuntimeError(f"Failed to create persistent volume claim {namespace}:{name}") from e
 
 
-    def event_listener(self, namespace: str, apps):
-        self.log.info("event_listener thread started")
-        start=datetime.datetime.now(datetime.timezone.utc)
-        watcher=watch.Watch()
-
-        while True:
-            evlist=self._core_v1_api.list_namespaced_event(namespace)
-            rv=evlist.metadata.resource_version
-            try:
-                for ev in watcher.stream(self._core_v1_api.list_namespaced_event,
-                                         namespace, resource_version=rv):
-                    evobj=ev['object']
-                    #self.log.info(f'event: resource_version={evobj.metadata.resource_version}')
-                    obj=evobj.involved_object
-                    pname=obj.name.split('-')
-                    name=pname[0]
-                    #print(f'app {name}: {evobj.reason}')
-                    if evobj.last_timestamp>start and name in apps:
-                        if evobj.type=='Normal':
-                            #restarts=0
-                            #podList=self._core_v1_api.list_namespaced_pod('gordon')
-                            #for pod in podList.items:
-                            #    if pod.metadata.name == obj.name:
-                            #        restarts=pod.status.container_statuses[0].restart_count
-                            #        print(f'obj={obj.name} restarts={restarts}')
-                            #        break
-                            restarts=evobj.count-1
-                            if evobj.reason=='Started' and restarts>0:
-                                self.log.error(f'app {name} died and was restarted {restarts} times. resource_version={evobj.metadata.resource_version}')
-                            elif evobj.type=='Warning':
-                                self.log.warn(f'app {name}: {evobj.message}')
-            except client.exceptions.ApiException as ex:
-                self.log.info(f"Caught API exception code {ex}") 
     #---
     def boot(self, boot_info, partition, connections):
 
@@ -442,10 +408,6 @@ class K8SProcessManager(object):
             }
             image = "pocket-daq-cvmfs:v0.1.0"
 
-        self.listen_thread=threading.Thread(target=self.event_listener,
-                                            args=(self.partition,apps))
-        self.listen_thread.daemon=True
-        self.listen_thread.start()
 
         for app_name, app_conf in apps.items():
             if 'class' in app_conf:

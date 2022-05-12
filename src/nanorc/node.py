@@ -2,7 +2,7 @@ from anytree import NodeMixin, RenderTree, PreOrderIter
 from anytree.resolver import Resolver
 import requests
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
@@ -10,6 +10,8 @@ from rich.panel import Panel
 import logging
 from .sshpm import SSHProcessManager
 from .k8spm import K8SProcessManager
+import threading
+from kubernetes import client, watch
 from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
 from typing import Union, NoReturn
 from .fsm import FSM
@@ -52,6 +54,43 @@ class SubsystemNode(StatefulNode):
         self.pm = None
         self.listener = None
 
+    def k8s_watcher(self, namespace: str, apps):
+        self.log.info("k8s event watcher thread started")
+        start=datetime.now(timezone.utc)
+        watcher=watch.Watch()
+        startcount={}
+        while True:
+            evlist=self.pm._core_v1_api.list_namespaced_event(namespace)
+            rv=evlist.metadata.resource_version
+            try:
+                for ev in watcher.stream(self.pm._core_v1_api.list_namespaced_event,
+                                         namespace, resource_version=rv):
+                    evobj=ev['object']
+                    #self.log.info(f'event: resource_version={evobj.metadata.resource_version}')
+                    obj=evobj.involved_object
+                    pname=obj.name.split('-')
+                    name=pname[0]
+                    #print(f'app {name}: {evobj.reason}')
+                    if evobj.last_timestamp>start and name in apps:
+                        if evobj.type=='Normal':
+                            restarts=evobj.count-1
+                            if name in startcount:
+                                count=startcount[name]
+                            else:
+                                count=0
+                            if evobj.reason=='Started' and restarts>count:
+                                startcount[name]=restarts
+                                self.log.error(f'app {name} died and was restarted {restarts} times. resource_version={evobj.metadata.resource_version}')
+                                sup=apps[name].sup
+                                sup.last_sent_command=None
+                                node=apps[name]
+                                while node != None:
+                                    node.to_error()
+                                    node=node.parent
+                            elif evobj.type=='Warning':
+                                self.log.warn(f'app {name}: {evobj.message}')
+            except client.exceptions.ApiException as ex:
+                self.log.info(f"Caught API exception code {ex}") 
 
     def on_enter_boot_ing(self, event) -> NoReturn:
         self.log.info(f'Subsystem {self.name} is booting')
@@ -78,6 +117,7 @@ class SubsystemNode(StatefulNode):
         
         children = []
         failed = []
+        nodes = {}
         for n,d in self.pm.apps.items():
             if event.kwargs['k8s']:
                 response_host = 'nanorc.'+d.partition
@@ -87,6 +127,7 @@ class SubsystemNode(StatefulNode):
                                         sup=AppSupervisor(self.console, d, self.listener, response_host, proxy),
                                         parent=self,
                                         fsm_conf=self.fsm_conf)
+                nodes[n] = child
             else:
                 child = ApplicationNode(name=n,
                                         console=self.console,
@@ -128,6 +169,13 @@ class SubsystemNode(StatefulNode):
             self.to_error(event=event, response=response)
         else:
             self.end_boot(response=response)
+
+        if event.kwargs['k8s']:
+            self.k8s_watcher_thread=threading.Thread(
+                target=self.k8s_watcher,
+                args=(self.pm.partition,nodes))
+            self.k8s_watcher_thread.daemon=True
+            self.k8s_watcher_thread.start()
 
 
     def on_enter_terminate_ing(self, _) -> NoReturn:
