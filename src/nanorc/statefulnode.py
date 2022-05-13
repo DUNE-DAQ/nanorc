@@ -16,9 +16,9 @@ class ErrorCode(Enum):
     Aborted=40
 
 class StatefulNode(NodeMixin):
-    def __init__(self, name:str, console, fsm_conf, parent=None, children=None, order=None, verbose=False):
+    def __init__(self, name:str, console, log, fsm_conf, parent=None, children=None, order=None, verbose=False):
         self.console = console
-        self.log = logging.getLogger(self.__class__.__name__+"_"+name)
+        self.log = log
 
         self.name = name
 

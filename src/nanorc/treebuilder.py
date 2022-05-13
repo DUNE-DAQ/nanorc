@@ -25,12 +25,14 @@ class TreeBuilder:
             if isinstance(d, dict):
                 child = StatefulNode(name=n,
                                      parent=mother,
+                                     log= self.log,
                                      console=self.console,
                                      fsm_conf = fsm_conf)
                 self.extract_json_to_nodes(d, child, fsm_conf = fsm_conf)
             elif isinstance(d, str):
                 node = SubsystemNode(name=n,
                                      ssh_conf=self.ssh_conf,
+                                     log = self.log,
                                      cfgmgr=ConfigManager(log=self.log,
                                                           cfg_dir=d,
                                                           port_offset=self.port_offset,
@@ -91,7 +93,7 @@ class TreeBuilder:
         if cmd_order:
             del self.top_cfg['command_order']
 
-        self.topnode = StatefulNode(self.apparatus_id, console=self.console,
+        self.topnode = StatefulNode(self.apparatus_id, console=self.console, log=self.log,
                                     fsm_conf=self.fsm_conf, order=cmd_order, verbose=True)
         self.extract_json_to_nodes(self.top_cfg, self.topnode, fsm_conf=self.fsm_conf)
 
