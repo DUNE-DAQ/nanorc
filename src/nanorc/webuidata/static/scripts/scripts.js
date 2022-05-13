@@ -118,7 +118,6 @@ function sendComm(command){
     clearInterval(statusTick);
     $("#state:text").val('Executing...')
     $(".control").attr("disabled", true);
-    console.log(dataload)
 
     $.ajax({
         url: "http://"+serverhost+"/nanorcrest/command",
@@ -171,7 +170,6 @@ function populateArgs(command){
     $("#executeBtn").text("Execute "+command+" command");
     $("#modalBody").empty()
     $("#modalBody").append("<form id='argForm' class='needs-validation' novalidate>");
-    console.log(commands)
     $.each(commands[command], function( index, value ) {
         $.each(value, function( i, v ) {
             var clss = v.type
