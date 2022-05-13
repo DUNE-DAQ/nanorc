@@ -116,7 +116,7 @@ def parse_argument(form, ctx):
         elif param.name == 'path':
             value = argval.validate_node_path(rc_context, None, value)
         elif param.name == 'stop_wait':
-            value = argval.validate_timeout(None, None, value)
+            value = argval.validate_stop_wait(None, None, value)
         elif param.name == 'pin_thread_file':
             value = argval.validate_path_exists(value)
         ### </hack>

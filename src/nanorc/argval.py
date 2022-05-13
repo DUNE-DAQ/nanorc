@@ -16,6 +16,13 @@ def validate_timeout(ctx, param, timeout):
         raise click.BadParameter('Timeout should be >0')
     return timeout
 
+def validate_stop_wait(ctx, param, stop_wait):
+    if stop_wait is None:
+        return stop_wait
+    if stop_wait<0:
+        raise click.BadParameter('Stop wait should be >=0')
+    return stop_wait
+
 def validate_node_path(ctx, param, prompted_path):
 
     if prompted_path is None:
