@@ -134,7 +134,15 @@ class SubsystemNode(StatefulNode):
             self.to_error(event=event, response=response)
             return
 
-        self.listener = ResponseListener(self.cfgmgr.boot["response_listener"]["port"])
+        try:
+            self.listener = ResponseListener(self.cfgmgr.boot["response_listener"]["port"])
+        except Exception as e:
+            self.log.error(f'Couldn\'t create a response listener for {self.name}')
+            self.log.error(str(e))
+            response['error'] = str(e)
+            response['status_code'] = ErrorCode.Failed
+            self.to_error(event=event, response=response)
+            return
 
         children = []
         failed = []

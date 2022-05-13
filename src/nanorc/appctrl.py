@@ -114,6 +114,16 @@ class ResponseListener:
     def __init__(self, port : int ):
         self.log = logging.getLogger("ResponseListener")
         self.port = port
+        self.response_queue = None
+        self.flask_manager = None
+        self.dispatcher = None
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        result = sock.connect_ex(('localhost',self.port))
+        if result == 0:
+            raise RuntimeError('Port clash for the Response listener!')
+        sock.close()
+
         self.response_queue = Queue()
         self.handlers = {}
         self.flask_manager = self.create_manager()
@@ -136,9 +146,12 @@ class ResponseListener:
         """
         if self.flask_manager:
             self.flask_manager.stop()
-
         self.flask_manager = None
-        self.dispatcher.stop()
+
+        if self.dispatcher:
+            self.dispatcher.stop()
+        self.dispatcher = None
+
 
     def register(self, app: str, handler):
         """
