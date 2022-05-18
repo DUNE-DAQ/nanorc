@@ -181,6 +181,7 @@ class ConfigManager:
                 if "queue://" in c['uri']:
                     continue
                 from string import Formatter
+                origuri = c['uri']
                 fieldnames = [fname for _, fname, _, _ in Formatter().parse(c['uri']) if fname]
                 if len(fieldnames)>1:
                     raise RuntimeError(f"Too many fields in connection {c['uri']}")
@@ -193,10 +194,11 @@ class ConfigManager:
                             c['uri'] = c['uri'].replace(fieldname, "HOST_IP").format(**dico)
                         except Exception as e:
                             raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
-                # Port offsetting
-                port = urlparse(c['uri']).port
-                newport = port + self.port_offset
-                c['uri'] = c['uri'].replace(str(port), str(newport))
+                if c['uri'] != origuri: # External connections won't have hostname substitution done
+                    # Port offsetting
+                    port = urlparse(c['uri']).port
+                    newport = port + self.port_offset
+                    c['uri'] = c['uri'].replace(str(port), str(newport))
 
 
 
