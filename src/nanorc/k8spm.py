@@ -32,9 +32,15 @@ class K8sProcess(object):
         self.namespace = namespace
 
     def is_alive(self):
-        s = self.pm._apps_v1_api.read_namespaced_deployment_status(self.name, self.namespace)
-        return s.status.updated_replicas == s.spec.replicas
+        s = self.pm._core_v1_api.read_namespaced_pod_status(self.name, self.namespace)
+        for cond in s.status.conditions:
+            if cond.type == "Ready" and cond.status == "True":
+                return True
+        return False
 
+    def status(self):
+        s = self.pm._core_v1_api.read_namespaced_pod_status(self.name, self.namespace)
+        return c.phase
 
 class K8SProcessManager(object):
     """docstring for K8SProcessManager"""
@@ -140,147 +146,130 @@ class K8SProcessManager(object):
         return ret
 
     # ----
-    def create_daqapp_deployment(self,
-                                 name: str,
-                                 app_label: str,
-                                 daq_image:str,
-                                 namespace: str,
-                                 cmd_port: int = 3333,
-                                 mount_cvmfs: bool = False,
-                                 env_vars: dict = None,
-                                 run_as: dict = None,
-                                 connections:list = None,
-                                 use_flx:bool = False,
-                                 out_dir:str = None):
+    def create_daqapp_pod(
+            self,
+            name: str,
+            app_label: str,
+            daq_image:str,
+            namespace: str,
+            cmd_port: int = 3333,
+            mount_cvmfs: bool = False,
+            env_vars: dict = None,
+            run_as: dict = None,
+            connections:list = None,
+            use_flx:bool = False,
+            out_dir:str = None):
+
         self.log.info(f"Creating \"{namespace}:{name}\" daq application (port: {cmd_port}, image: \"{daq_image}\", use_flx={use_flx}, out_dir={out_dir})")
 
-        # Deployment
-        deployment = client.V1Deployment(
-            # api_version="apps/v1",
-            kind="Deployment",
-            metadata=client.V1ObjectMeta(name=name),
-            spec=client.V1DeploymentSpec(
-                selector=client.V1LabelSelector(match_labels={"app": app_label}),
-                replicas=1,
-                template=client.V1PodTemplateSpec(
-                    metadata=client.V1ObjectMeta(labels={"app": app_label}),
-                    # Pod specifications start here
-                    spec=client.V1PodSpec(
-                        # Run the pod wuth same user id and group id as the current user
-                        # Required in kind environment to create non-root files in shared folders
-                        security_context=client.V1PodSecurityContext(
-                            run_as_user=run_as['uid'],
-                            run_as_group=run_as['gid'],
-                        ) if run_as else None,
-                        # List of processes
-                        containers=[
-                            # Daq application container
-                            client.V1Container(
-                                name="daq-application",
-                                image=daq_image,
-                                image_pull_policy= "IfNotPresent",
-                                # Environment variables
-                                security_context = client.V1SecurityContext(privileged=use_flx),
-                                resources = (
-                                    client.V1ResourceRequirements({
-                                        "felix.cern/flx": "2", # requesting 2 FLXs
-                                        "memory": "32Gi" # yes bro
-                                    })
-                                ) if use_flx else None,
-                                env = [
-                                    client.V1EnvVar(
-                                        name=k,
-                                        value=str(v)
-                                        )
-                                    for k,v in env_vars.items()
-                                ] if env_vars else None,
-                                args=[
-                                    "--name", name,
-                                    "-c", "rest://localhost:3333",
-                                    "-i", "influx://influxdb.monitoring:8086/write?db=influxdb"
-                                    ],
-                                ports=self.get_container_port_list_from_connections(connections),
-                                volume_mounts=(
-                                    ([
-                                        client.V1VolumeMount(
-                                            mount_path="/cvmfs/dunedaq.opensciencegrid.org",
-                                            name="dunedaq",
-                                            read_only=True
-                                        )
-                                    ] if mount_cvmfs else []) +
-                                    ([
-                                        client.V1VolumeMount(
-                                            mount_path="/dunedaq/pocket",
-                                            name="pocket",
-                                            read_only=False
-                                        )
-                                    ] if self.cluster_config.is_kind else []) +
-                                    ([
-                                        client.V1VolumeMount(
-                                            mount_path="/dev",
-                                            name="devfs",
-                                            read_only=False
-                                        )
-
-                                    ] if use_flx else []) +
-                                    ([
-                                        client.V1VolumeMount(
-                                            mount_path=out_dir,
-                                            name="outdir",
-                                            read_only=False
-                                        )
-
-                                    ] if out_dir else []
-                                     )
-
-                                )
-                            )
+        pod = client.V1Pod(
+            # Run the pod with same user id and group id as the current user
+            # Required in kind environment to create non-root files in shared folders
+            metadata = client.V1ObjectMeta(
+                name=name,
+                labels={"app": app_label}
+            ),
+            spec = client.V1PodSpec(
+                security_context=client.V1PodSecurityContext(
+                    run_as_user=run_as['uid'],
+                    run_as_group=run_as['gid'],
+                ) if run_as else None,
+                # List of processes
+                containers=[
+                    # DAQ application container
+                    client.V1Container(
+                        name="daq-application",
+                        image=daq_image,
+                        image_pull_policy= "IfNotPresent",
+                        # Environment variables
+                        security_context = client.V1SecurityContext(privileged=use_flx),
+                        resources = (
+                            client.V1ResourceRequirements({
+                                "felix.cern/flx": "2", # requesting 2 FLXs
+                                "memory": "32Gi" # yes bro
+                            })
+                        ) if use_flx else None,
+                        env = [
+                            client.V1EnvVar(
+                                name=k,
+                                value=str(v)
+                            ) for k,v in env_vars.items()
+                        ] if env_vars else None,
+                        args=[
+                            "--name", name,
+                            "-c", "rest://localhost:3333",
+                            "-i", "influx://influxdb.monitoring:8086/write?db=influxdb"
                         ],
-                        volumes=(
+                        ports=self.get_container_port_list_from_connections(connections),
+                        volume_mounts=(
                             ([
-                                client.V1Volume(
+                                client.V1VolumeMount(
+                                    mount_path="/cvmfs/dunedaq.opensciencegrid.org",
                                     name="dunedaq",
-                                    host_path=client.V1HostPathVolumeSource(path='/cvmfs/dunedaq.opensciencegrid.org')
-                                )
-                            ] if mount_cvmfs else []) +
+                                    read_only=True
+                            )] if mount_cvmfs else []) +
                             ([
-                                client.V1Volume(
+                                client.V1VolumeMount(
+                                    mount_path="/dunedaq/pocket",
                                     name="pocket",
-                                    host_path=client.V1HostPathVolumeSource(path='/pocket')
-                                )
-                            ] if self.cluster_config.is_kind else [])+
+                                    read_only=False
+                            )] if self.cluster_config.is_kind else []) +
                             ([
-                                client.V1Volume(
+                                client.V1VolumeMount(
+                                    mount_path="/dev",
                                     name="devfs",
-                                    host_path=client.V1HostPathVolumeSource(path='/dev')
-                                )
-                            ] if use_flx else []) +
+                                    read_only=False
+                            )] if use_flx else []) +
                             ([
-                                client.V1Volume(
+                                client.V1VolumeMount(
+                                    mount_path=out_dir,
                                     name="outdir",
-                                    host_path=client.V1HostPathVolumeSource(path=out_dir)
-                                )
-                            ] if out_dir else [])
+                                    read_only=False
+                            )] if out_dir else [])
                         )
                     )
+                ],
+                volumes=(
+                    ([
+                        client.V1Volume(
+                            name="dunedaq",
+                            host_path=client.V1HostPathVolumeSource(path='/cvmfs/dunedaq.opensciencegrid.org')
+                        )
+                    ] if mount_cvmfs else []) +
+                    ([
+                        client.V1Volume(
+                            name="pocket",
+                            host_path=client.V1HostPathVolumeSource(path='/pocket')
+                        )
+                    ] if self.cluster_config.is_kind else [])+
+                    ([
+                        client.V1Volume(
+                            name="devfs",
+                            host_path=client.V1HostPathVolumeSource(path='/dev')
+                        )
+                    ] if use_flx else []) +
+                    ([
+                        client.V1Volume(
+                            name="outdir",
+                            host_path=client.V1HostPathVolumeSource(path=out_dir)
+                        )
+                    ] if out_dir else [])
                 )
             )
         )
 
+        self.log.debug(pod)
 
-        self.log.debug(deployment)
-        # return
-        # Creation of the Deployment in specified namespace
-        # (Can replace "default" with a namespace you may have created)
+        # Creation of the pod in specified namespace
         try:
             #
-            resp = self._apps_v1_api.create_namespaced_deployment(
+            resp = self._core_v1_api.create_namespaced_pod (
                 namespace = namespace,
-                body = deployment
+                body = pod
             )
         except Exception as e:
             self.log.error(e)
-            raise RuntimeError(f"Failed to create daqapp deployment \"{namespace}:{name}\"") from e
+            raise RuntimeError(f"Failed to create daqapp pod \"{namespace}:{name}\"") from e
 
         service = client.V1Service(
             metadata = client.V1ObjectMeta(name=name),
@@ -327,7 +316,7 @@ class K8SProcessManager(object):
             self.log.error(e)
             raise RuntimeError(f"Failed to create nanorc responder service \"{namespace}:{name}\"") from e
 
-        self.log.info("Creating nanorc responder endpoint")
+        self.log.info(f"Creating nanorc responder endpoint {ip}:{port}")
 
         # Create Endpoints Objects
         endpoints = client.V1Endpoints(
@@ -493,37 +482,17 @@ class K8SProcessManager(object):
         # Create the persistent volume claim
         self.create_cvmfs_pvc('dunedaq.opensciencegrid.org', self.partition)
 
-        ers_address = ''
-        opmon_address = ''
-        for env_name, env in boot_info['env'].items():
-            if 'DUNEDAQ_ERS' in env_name:
-                start = env.find('(')
-                end = env.find(')')
-                if start>=0 and end>=0:
-                    ers_address = env[start+1:end]
-
-        for arg in boot_info['exec']['daq_application']['cmd']:
-            if 'INFO_SVC=influx://' in arg:
-                narg = arg.replace('INFO_SVC=influx://', '')
-                opmon_address = narg
-
-        # Let's not do that for now
-        # self.create_opmon_ers_service(ers_address,
-        #                               opmon_address,
-        #                               namespace=self.partition)
-
         run_as = {
             'uid': os.getuid(),
             'gid': os.getgid(),
         }
-        return
+
         for app_name, app_conf in apps.items():
 
             exec_vars = boot_info['exec'][app_conf['exec']]['env']
             daq_image = boot_info['exec'][app_conf['exec']]['image']
             app_vars = {}
             app_vars.update(env_vars)
-            # app_vars.update(exec_vars)
 
             app_desc = AppProcessDescriptor(app_name)
             app_desc.conf = app_conf.copy()
@@ -534,7 +503,7 @@ class K8SProcessManager(object):
             app_desc.proc = K8sProcess(self, app_name, self.partition)
 
 
-            self.create_daqapp_deployment(
+            self.create_daqapp_pod(
                 name = app_name, # better kwargs all this...
                 app_label = app_name,
                 daq_image = daq_image,
@@ -550,7 +519,6 @@ class K8SProcessManager(object):
 
             self.apps[app_name] = app_desc
 
-        # TODO: move (some of) this loop into k8spm?
         timeout = 60
         with Progress(
             SpinnerColumn(),
@@ -582,10 +550,11 @@ class K8SProcessManager(object):
 
                 time.sleep(1)
 
-            self.create_nanorc_responder(name = 'nanorc',
-                                         namespace = self.partition,
-                                         ip = self.gateway,
-                                         port = boot_info["response_listener"]["port"])
+        self.create_nanorc_responder(
+            name = 'nanorc',
+            namespace = self.partition,
+            ip = self.gateway,
+            port = boot_info["response_listener"]["port"])
 
     # ---
     def check_apps(self):
@@ -603,17 +572,16 @@ class K8SProcessManager(object):
         if self.partition:
             self.delete_namespace(self.partition)
 
-            # TODO: add progressbar here
-            # for _ in range(timeout):
             for _ in track(range(timeout), description="Terminating namespace..."):
 
-                try:
-                    s = self._core_v1_api.read_namespace_status(self.partition)
-                except client.exceptions.ApiException as exc:
-                    if exc.reason == 'Not Found':
-                        return
-                    else:
+                s = self._core_v1_api.list_namespace()
+                found = False
+                for namespace in s.items:
+                    if namespace.metadata.name == self.partition:
+                        found = True
                         break
+                if not found:
+                    return
                 time.sleep(1)
 
             logging.warning('Timeout expired!')
@@ -637,7 +605,7 @@ def main():
     # pm.list_endpoints()
     pm.create_namespace(partition)
     pm.create_cvmfs_pvc('dunedaq.opensciencegrid.org', partition)
-    pm.create_daqapp_deployment('trigger', 'trg', partition, True)
+    pm.create_daqapp_pod('trigger', 'trg', partition, True)
     pm.create_nanorc_responder('nanorc', 'nanorc', partition, '128.141.174.0', 56789)
     # pm.list_pods()
 
