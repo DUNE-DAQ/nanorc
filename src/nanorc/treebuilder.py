@@ -3,8 +3,11 @@ from .node import SubsystemNode
 from .cfgmgr import ConfigManager
 import os
 import json
+from pathlib import Path
 from collections import OrderedDict
 from json import JSONDecoder
+from pathlib import Path
+from anytree import PreOrderIter
 
 def dict_raise_on_duplicates(ordered_pairs):
     count=0
@@ -20,31 +23,46 @@ class TreeBuilder:
     def extract_json_to_nodes(self, js, mother, fsm_conf) -> StatefulNode:
         for n,d in js.items():
             if isinstance(d, dict):
-                child = StatefulNode(name=n,
-                                  parent=mother,
-                                  console=self.console,
-                                  fsm_conf = fsm_conf)
+                child = StatefulNode(
+                    name=n,
+                    parent=mother,
+                    console=self.console,
+                    fsm_conf = fsm_conf)
+                
                 self.extract_json_to_nodes(d, child, fsm_conf = fsm_conf)
             elif isinstance(d, str):
-                node = SubsystemNode(name=n,
-                                     ssh_conf=self.ssh_conf,
-                                     cfgmgr=ConfigManager(d, self.resolve_hostname),
-                                     console=self.console,
-                                     fsm_conf = fsm_conf,
-                                     parent = mother)
+                node = SubsystemNode(
+                    name=n,
+                    ssh_conf=self.ssh_conf,
+                    cfgmgr=ConfigManager(
+                        log=self.log,
+                        resolve_hostname = self.resolve_hostname,
+                        cfg_dir=d,
+                        port_offset=self.port_offset),
+                    console=self.console,
+                    fsm_conf = fsm_conf,
+                    parent = mother)
             else:
                 self.log.error(f"ERROR processing the tree {n}: {d} I don't know what that's supposed to mean?")
                 exit(1)
 
-    def __init__(self, log, top_cfg, fsm_conf, console, ssh_conf, resolve_hostname):
-        self.resolve_hostname = resolve_hostname
+    def get_custom_commands(self):
+        ret = {}
+        for node in PreOrderIter(self.topnode):
+            ret.update(node.get_custom_commands())
+        return ret
+
+    def __init__(self, log, top_cfg, resolve_hostname, fsm_conf, console, ssh_conf, port_offset):
         self.log = log
+        self.resolve_hostname = resolve_hostname
         self.ssh_conf = ssh_conf
         self.fsm_conf = fsm_conf
+        self.port_offset = port_offset
         if os.path.isdir(top_cfg):
+            apparatus_id = Path(top_cfg).name
             data = {
-                "apparatus_id": top_cfg,
-                top_cfg:top_cfg
+                "apparatus_id": apparatus_id,
+                apparatus_id: top_cfg
             }
             data = json.dumps(data)
         elif os.path.isfile(top_cfg):

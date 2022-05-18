@@ -32,6 +32,34 @@ class StatefulNode(NodeMixin):
         self.return_code = ErrorCode.Success
         self.status_receiver_queue = Queue()
         self.order = order if order else dict()
+        self.enabled = True
+
+    def disable(self):
+        if not self.enabled:
+            self.log.error(f'Cannot disable {self.name} as it is already disabled!')
+            return 1
+        self.enabled = False
+        return 0
+
+    def enable(self):
+        if self.enabled:
+            self.log.error(f'Cannot enable {self.name} as it is already enabled!')
+            return 1
+        self.enabled = True
+        return 0
+
+    def get_custom_commands(self):
+        ret = {}
+        for c in self.children:
+            ret.update(c.get_custom_commands())
+        return ret
+
+    def send_custom_command(self, cmd, data, timeout) -> dict:
+        ret = {}
+        for c in self.children:
+            if c.enabled:
+                ret[c.name] = c.send_custom_command(cmd, data, timeout)
+        return ret
 
 
     def on_enter_terminate_ing(self, _) -> NoReturn:
@@ -65,82 +93,41 @@ class StatefulNode(NodeMixin):
         command = event.event.name
         self.log.info(f"{self.name} received command '{command}'")
         source_state = event.transition.source
-        still_to_exec = []
-        active_thread = []
         force = event.kwargs.get('force')
+
         if command in self.order:
-            self.log.info(f'Propagating to children nodes in the order {self.order[command]}')
-            for cn in self.order[command]:
-                child = [c for c in self.children if c.name == cn][0]
-                still_to_exec.append(child) # a record of which children still need to finish their task
-                try:
-                    child.trigger(command, **event.kwargs)
-                except Exception as e:
-                    if force:
-                        self.log.error(f'Failed to send \'{command}\' to \'{child.name}\', --force was specified so continuing anyway')
-                        continue
-                    raise Exception from e
+            self.log.info(f'Propagating to the enabled children nodes in the order {self.order[command]}')
         else:
-            self.log.info(f'{self.name} propagating to children nodes ({[c.name for c in self.children]}) simultaneously')
-            for child in self.children:
-                still_to_exec.append(child) # a record of which children still need to finish their task
-                all_kwargs = {
-                    "trigger_name":command,
-                }
-                all_kwargs.update(event.kwargs)
-                thread = threading.Thread(target=child.trigger, kwargs=all_kwargs)
-                thread.start()
-                active_thread.append(thread)
-
-
-        failed_resp = []
-        aborted = False
-        for _ in range(event.kwargs["timeout"]):
-            response = self.status_receiver_queue.get()
-            if response:
-                for child in self.children:
-                    if response["node"] == child.name:
-                        still_to_exec.remove(child)
-
-                        if response["status_code"] != ErrorCode.Success:
-                            failed_resp.append(response)
-
-                        if response['status_code'] == ErrorCode.Aborted:
-                            aborted = True
-                            break
-
-            if aborted or len(still_to_exec) == 0 or len(failed_resp)>0: # if all done, continue
-                break
-
-            time.sleep(1)
-
-        timeout = still_to_exec
-
-        if len(still_to_exec) > 0 and not aborted:
-            self.log.error(f"{self.name} can't {command} because following children timed out: {[n.name for n in timeout]}")
-
-            ## We still need to do that manually, since they are still in their transitions
-            for node in timeout:
-                response = {
-                    "state": self.state,
-                    "command": event.event.name,
-                    "node": node.name,
-                    "failed": [n.name for n in timeout],
-                    "error": "Timed out after waiting for too long, or because a sibling went on error",
-                }
-                node.to_error(event=event, response=response)
-
-        ## For the failed one, we have gone on error state already
-        if failed_resp and not aborted:
-            self.log.error(f"{self.name} can't {command} because following children had error: {[n['node'] for n in failed_resp]}")
+            self.order[command] = [c.name for c in self.children]
+            self.log.info(f'Propagating to children nodes in the figured out order: {self.order[command]}')
 
         status = ErrorCode.Success
-        if len(still_to_exec)>0:
-            status = ErrorCode.Timeout
-        if len(failed_resp)>0:
-            status = ErrorCode.Failed
-        if aborted:
-            status = ErrorCode.Aborted
+
+        for cn in self.order[command]:
+            child = [c for c in self.children if c.name == cn][0]
+            if not child.enabled: continue
+
+            try:
+                child.trigger(command, **event.kwargs)
+                for _ in range(event.kwargs["timeout"]):
+                    response = self.status_receiver_queue.get()
+                    if response:
+                        if response["node"] == child.name:
+                            if response["status_code"] != ErrorCode.Success:
+                                raise RuntimeError(f"Failed to {command} {child.name}, error {str(response)}")
+                            else:
+                                break
+
+                    time.sleep(1)
+
+            except Exception as e:
+                if force:
+                    self.log.error(f'Failed to send \'{command}\' to \'{child.name}\', --force was specified so continuing anyway')
+                    continue
+                status = ErrorCode.Failed
+                break
+
+
 
         response = {
             "status_code" : status,
@@ -148,16 +135,7 @@ class StatefulNode(NodeMixin):
             "command": event.event.name,
             # "comment": [n.get('comment') for n in
             "node": self.name,
-            "timeouts": [n.name for n in timeout],
-            "failed": [n.get('node') for n in failed_resp],
-            "error": [n.get('error') for n in failed_resp]
         }
-
-        if aborted:
-            self.log.info(f'Aborting command {command} on node {self.name}')
-            self.trigger(f"to_{source_state}", response=response)
-            self.return_code = ErrorCode.Aborted
-            return
 
         self.return_code = status
 

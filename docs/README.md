@@ -109,6 +109,8 @@ shonky rc> status
 
 When you've seen enough use `stop`, `scrap` and `terminate` commands. In case you experience timeout problems booting applications or sending commands, consider changing the `hosts` values from `localhost` to the hostname of your machine. This has to do with SSH authentication.
 
+nanorc commands can be autocompleted with TAB, for example, TAB will autocomplete `r` to `resume`. Options like `--disable-data-storage` will be completed with TAB after typing `start --d`.
+
 You can also control nanorc in "batch mode", e.g.:
 ```
 run_number=999
@@ -211,3 +213,8 @@ It should be pointed out that some substitutions are made when nanorc uses a fil
 * `"getenv"` is replaced with the actual value of the environment variable, throwing a Python exception if it is unset
 * `"getenv:<default value>"` is replaced with the actual value of the environment variable if it is set, with `<default value>` used if it is unset
 * If a host is provided as `localhost` or `127.0.0.1`, the result of the Python call `socket.gethostname` is used in its place
+
+## How to run WebUI
+
+WebUI running is handled by `nanocrestrc` command. WebUI needs you to provide only one parameter in addition.
+* `-s` - serveraddress - as your browser is running on your side, it needs the information where to find REST endpoints. Simply provide address of the interface of the computer you are running the server on. Default value is `localhost`

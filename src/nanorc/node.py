@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 from rich.panel import Panel
+import copy as cp
 import logging
 from .sshpm import SSHProcessManager
 from .k8spm import K8SProcessManager
@@ -21,6 +22,11 @@ log = logging.getLogger("transitions.core")
 log.setLevel(logging.ERROR)
 log = logging.getLogger("transitions")
 log.setLevel(logging.ERROR)
+
+appfwk_state_dictionnary = { # !@#%&:(+_&||&!!!! (swears in raaawwww bits)
+    "BOOTED": "NONE",
+    "INITIALISED": "INITIAL",
+}
 
 class ApplicationNode(StatefulNode):
     def __init__(self, name, sup, console, fsm_conf, parent=None):
@@ -53,6 +59,61 @@ class SubsystemNode(StatefulNode):
         self.pm = None
         self.listener = None
 
+    def send_custom_command(self, cmd, data, timeout, app=None) -> dict:
+        ret = {}
+
+        if cmd == 'scripts': # unfortunately I don't see how else to do this
+            scripts = self.cfgmgr.boot.get('scripts')
+            script = cp.deepcopy(scripts.get(data['script_name'])) if scripts else None
+
+            if not script:
+                self.log.error(f"no {data['script_name']} script data in boot.json")
+                return {self.name : f"no {data['script_name']} script data in boot.json"}
+
+            try:
+                del data['script_name']
+                for key, val in data.items():
+                    script[key].update(val)
+                self.pm.execute_script(script)
+
+            except Exception as e:
+                self.log.error(f'Couldn\'t execute the thread pinning scripts: {str(e)}')
+            return ret
+
+        cmd_dict = getattr(self.cfgmgr, cmd, None)
+        if cmd_dict:
+            for app_name, cmd_data in cmd_dict.items():
+                for c in self.children:
+                    if app and c.name!=app_name: continue
+                    cmd_data2 = cp.deepcopy(cmd_data)
+                    for m in cmd_data2['modules']:
+                        m['data'].update(data)
+                    ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=cmd_data2, timeout=timeout)
+        else:
+            for c in self.children:
+                if app and c.name!=app: continue
+                ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=data, timeout=timeout)
+        return ret
+
+    def send_expert_command(self, app, cmd, timeout) -> dict:
+        cmd_name = cmd['id']
+        cmd_payload = cmd['data']
+        cmd_entry_state = cmd['entry_state']
+        cmd_exit_state = cmd_entry_state
+        node_state = app.state.upper()
+        if node_state in appfwk_state_dictionnary: node_state = appfwk_state_dictionnary[node_state]
+        print(node_state, cmd_entry_state)
+        if cmd_entry_state != node_state:
+            self.log.error(f'The node is in \'{node_state}\' so I cannot send \'{cmd_name}\', which requires the app to be \'{cmd_entry_state}\'.')
+            return {'Failed': 'App in wrong state, cmd not sent'}
+        return app.sup.send_command_and_wait(cmd_name,
+                                             cmd_data=cmd_payload,
+                                             entry_state=cmd_entry_state,
+                                             exit_state=cmd_exit_state,
+                                             timeout=timeout)
+
+    def get_custom_commands(self):
+        return self.cfgmgr.get_custom_commands()
 
     def on_enter_boot_ing(self, event) -> NoReturn:
         self.log.info(f'Subsystem {self.name} is booting')
@@ -69,13 +130,11 @@ class SubsystemNode(StatefulNode):
                         response["error"] = "no partition name"
                         self.to_error(event=event, response=response)
 
-                    self.pm = K8SProcessManager(self.console,
-                                                cluster_config=event.kwargs['pm'])
                     # Yes, we need the list of connections here
                     # I hate it dearly too
                     # That and many other things. (I'M SUCH A HATER)
                     connections = { app: data['nwconnections'] for app, data in self.cfgmgr.init.items() }
-                    out_dir = {}
+                    mount_dirs = {}
 
                     ## even more hacks
                     for app, vals in self.cfgmgr.conf.items():
@@ -83,18 +142,35 @@ class SubsystemNode(StatefulNode):
                             if not 'data' in mod: continue
                             mod_data = mod['data']
                             if 'data_store_parameters' in mod_data:
-                                out_dir[app] = mod_data['data_store_parameters']['directory_path']
+                                mount_dirs[app] = mod_data['data_store_parameters']['directory_path']
 
                             # and this is a hack within the hack
                             if 'link_confs' in mod_data:
                                 for link_conf in mod_data['link_confs']:
                                     if 'data_filename' in link_conf:
-                                        out_dir[app] = os.path.dirname(link_conf['data_filename'])
+                                        mount_dirs[app] = os.path.dirname(link_conf['data_filename'])
 
-                    self.pm.boot(self.cfgmgr.boot, event.kwargs['partition'], connections, out_dir=out_dir)
+                    self.pm = K8SProcessManager(
+                        console=self.console,
+                        connections=connections,
+                        mount_dirs=mount_dirs,
+                        cluster_config=event.kwargs['pm']
+                    )
+                    
                 elif event.kwargs['pm'].use_sshpm():
-                    self.pm = SSHProcessManager(self.console, self.ssh_conf)
-                    self.pm.boot(self.cfgmgr.boot, event.kwargs.get('log'))
+                    self.pm = SSHProcessManager(
+                        console = self.console,
+                        log_path = event.kwargs.get('log_path'),
+                        ssh_conf = self.ssh_conf
+                    )
+                    
+            timeout = event.kwargs["timeout"]
+            
+            self.pm.boot(self.cfgmgr.boot,
+                         partition=event.kwargs['partition'],
+                         timeout = timeout)
+
+    
         except Exception as e:
             self.console.print_exception()
             response['status_code'] = 1
@@ -164,6 +240,17 @@ class SubsystemNode(StatefulNode):
             self.end_boot(response=response)
 
 
+    def on_exit_conf_ing(self, event) -> NoReturn:
+        scripts = self.cfgmgr.boot.get('scripts')
+        thread_pinning = scripts.get('thread_pinning') if scripts else None
+        if thread_pinning:
+            try:
+                self.pm.execute_script(thread_pinning)
+            except Exception as e:
+                self.log.error(f'Couldn\'t execute the thread pinning scripts: {str(e)}')
+        super()._on_exit_callback(event)
+
+
     def on_enter_terminate_ing(self, _) -> NoReturn:
         if self.children:
             for child in self.children:
@@ -185,10 +272,6 @@ class SubsystemNode(StatefulNode):
         cfg_method = event.kwargs.get("cfg_method")
         timeout = event.kwargs["timeout"]
         force = event.kwargs.get('force')
-        appfwk_state_dictionnary = { # !@#%&:(+_&||&!!!! (swears in raaawwww bits)
-            "BOOTED": "NONE",
-            "INITIALISED": "INITIAL",
-        }
 
         exit_state = self.get_destination(command).upper()
         if exit_state  in appfwk_state_dictionnary: exit_state  = appfwk_state_dictionnary[exit_state]
@@ -206,6 +289,9 @@ class SubsystemNode(StatefulNode):
             self.listener.flask_manager = self.listener.create_manager()
 
         for n in appset:
+            if not n.enabled:
+                appset.remove(n)
+                continue
             if not n.sup.desc.proc.is_alive() or not n.sup.commander.ping():
                 text = f"'{n.name}' seems to be dead. So I cannot initiate transition '{command}'"
                 if force:
@@ -228,6 +314,8 @@ class SubsystemNode(StatefulNode):
             for child_node in appset:
                 # BERK I don't know how to sort this.
                 # This is essntially calling cfgmgr.runtime_start(runtime_start_data)
+                if not child_node.enabled: continue
+
                 if cfg_method:
                     f=getattr(self.cfgmgr,cfg_method)
                     data = f(event.kwargs['overwrite_data'])
@@ -249,6 +337,7 @@ class SubsystemNode(StatefulNode):
                 if len(appset)==0: break
                 done = []
                 for child_node in appset:
+                    if not child_node.enabled: continue
                     try:
                         r = child_node.sup.check_response()
                     except NoResponse:
@@ -279,6 +368,8 @@ class SubsystemNode(StatefulNode):
                     self.log.error(f'node \'{n}\' is not a child of the subprocess "{self.name}", check the order list for command "{command}"')
                     continue
                 child_node = [cn for cn in appset if cn.name == n][0] # YUK
+                if not child_node.enabled: continue
+
                 entry_state = child_node.state.upper()
                 if entry_state in appfwk_state_dictionnary: entry_state = appfwk_state_dictionnary[entry_state]
 

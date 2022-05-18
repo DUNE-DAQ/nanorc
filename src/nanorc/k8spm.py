@@ -44,7 +44,7 @@ class K8sProcess(object):
 
 class K8SProcessManager(object):
     """docstring for K8SProcessManager"""
-    def __init__(self, console: Console, cluster_config):
+    def __init__(self, console: Console, cluster_config, connections, mount_dirs):
         """A Kubernetes Process Manager
 
         Args:
@@ -52,6 +52,8 @@ class K8SProcessManager(object):
         """
         super(K8SProcessManager, self).__init__()
         self.log = logging.getLogger(__name__)
+        self.connections = connections
+        self.mount_dirs = mount_dirs
         self.console = console
         self.apps = {}
         self.partition = None
@@ -158,9 +160,9 @@ class K8SProcessManager(object):
             run_as: dict = None,
             connections:list = None,
             use_flx:bool = False,
-            out_dir:str = None):
+            mount_dirs:str = None):
 
-        self.log.info(f"Creating \"{namespace}:{name}\" daq application (port: {cmd_port}, image: \"{daq_image}\", use_flx={use_flx}, out_dir={out_dir})")
+        self.log.info(f"Creating \"{namespace}:{name}\" daq application (port: {cmd_port}, image: \"{daq_image}\", use_flx={use_flx}, mount_dirs={mount_dirs})")
 
         pod = client.V1Pod(
             # Run the pod with same user id and group id as the current user
@@ -222,10 +224,10 @@ class K8SProcessManager(object):
                             )] if use_flx else []) +
                             ([
                                 client.V1VolumeMount(
-                                    mount_path=out_dir,
+                                    mount_path=mount_dirs,
                                     name="outdir",
                                     read_only=False
-                            )] if out_dir else [])
+                            )] if mount_dirs else [])
                         )
                     )
                 ],
@@ -251,9 +253,9 @@ class K8SProcessManager(object):
                     ([
                         client.V1Volume(
                             name="outdir",
-                            host_path=client.V1HostPathVolumeSource(path=out_dir)
+                            host_path=client.V1HostPathVolumeSource(path=mount_dirs)
                         )
-                    ] if out_dir else [])
+                    ] if mount_dirs else [])
                 )
             )
         )
@@ -440,7 +442,7 @@ class K8SProcessManager(object):
 
 
     #---
-    def boot(self, boot_info, partition, connections, out_dir):
+    def boot(self, boot_info, partition, timeout):
 
         if self.apps:
             raise RuntimeError(
@@ -512,14 +514,13 @@ class K8SProcessManager(object):
                 mount_cvmfs = True,
                 env_vars = app_vars,
                 run_as = run_as,
-                connections = connections[app_name],
+                connections = self.connections[app_name],
                 use_flx = 'flx' in app_name,
-                out_dir = out_dir.get(app_name)
+                mount_dirs = self.mount_dirs.get(app_name)
             )
 
             self.apps[app_name] = app_desc
 
-        timeout = 60
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),

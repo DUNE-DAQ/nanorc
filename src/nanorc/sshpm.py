@@ -111,7 +111,7 @@ class SSHProcessManager(object):
         for i in instances:
             i.kill()
 
-    def __init__(self, console: Console, ssh_conf):
+    def __init__(self, console: Console, log_path, ssh_conf):
         super(SSHProcessManager, self).__init__()
         self.console = console
         self.log = logging.getLogger(__name__)
@@ -119,6 +119,7 @@ class SSHProcessManager(object):
         self.watchers = []
         self.event_queue = queue.Queue()
         self.ssh_conf = ssh_conf
+        self.log_path = log_path
         # Add self to the list of instances
         self.__instances.add(self)
 
@@ -138,7 +139,7 @@ class SSHProcessManager(object):
         self.log.debug(name+str(exc))
         self.event_queue.put((name, exc))
 
-    def boot(self, boot_info, log=None):
+    def boot(self, boot_info, partition, timeout):
 
         if self.apps:
             raise RuntimeError(
@@ -163,18 +164,19 @@ class SSHProcessManager(object):
             app_vars.update({
                 "APP_NAME": app_name,
                 "APP_PORT": app_conf["port"],
-                "APP_WD": os.getcwd()
+                "APP_WD": os.getcwd(),
+                "DUNEDAQ_PARTITION": partition
                 })
 
             log_file = f'log_{app_name}_{app_conf["port"]}.txt'
 
             cmd=';'.join([ f"export {n}=\"{v}\"" for n,v in app_vars.items()] + boot_info['exec'][app_conf['exec']]['cmd'])
 
-            if log:
+            if self.log_path:
                 now = datetime.now() # current date and time
                 date_time = now.strftime("%Y-%m-%d_%H:%M:%S")
                 log_file_localhost = f'log_{date_time}_{app_name}_{app_conf["port"]}.txt'
-                cmd = "{ "+cmd+"; } &> "+ log+"/"+log_file_localhost
+                cmd = "{ "+cmd+"; } &> "+ self.log_path+"/"+log_file_localhost
 
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"]
             # if not self.can_use_kerb:
@@ -220,7 +222,6 @@ class SSHProcessManager(object):
             self.watch(name, proc)
             desc.proc = proc
 
-        timeout = 30
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),

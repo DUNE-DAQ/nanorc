@@ -1,9 +1,36 @@
 from .statefulnode import StatefulNode
 from .node import *
-from anytree import RenderTree
+from anytree import RenderTree, PreOrderIter
 import logging as log
 from rich.console import Console
 import sh
+
+def status_data(node, get_children=True) -> dict:
+    ret = {}
+    if isinstance(node, ApplicationNode):
+        sup = node.sup
+        if sup.desc.proc.is_alive():
+            ret['process_state'] = 'alive'
+        else:
+            try:
+                exit_code = sup.desc.proc.exit_code
+            except sh.ErrorReturnCode as e:
+                exit_code = e.exit_code
+            ret['process_state'] = f'dead[{exit_code}]'
+        ret['ping'] = sup.commander.ping()
+        ret['last_cmd_failed'] = (sup.last_sent_command != sup.last_ok_command)
+        ret['name'] = node.name
+        ret['state'] = node.state
+        ret['host'] = sup.desc.host,
+        ret['last_sent_command'] = sup.last_sent_command
+        ret['last_ok_command'] = sup.last_ok_command
+    else:
+        ret['name'] = node.name
+        ret['state'] = node.state
+        if get_children:
+            ret['children'] = [status_data(child) for child in node.children]
+    return ret
+
 
 def print_status(topnode, console, apparatus_id='') -> int:
     table = Table(title=f"{apparatus_id} apps")
@@ -33,9 +60,18 @@ def print_status(topnode, console, apparatus_id='') -> int:
                 alive = f'dead[{exit_code}]'
             ping  = sup.commander.ping()
             last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
+
+            state_str = Text()
+            if not node.enabled:
+                state_str = Text(f"{node.state} - {alive} - disabled")
+            elif node.is_error():
+                state_str = Text(f"{node.state} - {alive}", style=('bold red'))
+            else:
+                state_str = Text(f"{node.state} - {alive}")
+
             table.add_row(
                 Text(pre)+Text(node.name),
-                Text(f"{node.state} - {alive}", style=('bold red' if node.is_error() else "")),
+                state_str,
                 sup.desc.host,
                 str(ping),
                 Text(str(sup.last_sent_command), style=('bold red' if last_cmd_failed else '')),

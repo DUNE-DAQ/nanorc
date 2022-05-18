@@ -2,6 +2,7 @@ import os.path
 import json
 import copy
 import socket
+from urllib.parse import urlparse
 
 """Extract nested values from a JSON tree."""
 
@@ -30,16 +31,17 @@ def json_extract(obj, key):
 class ConfigManager:
     """docstring for ConfigManager"""
 
-    def __init__(self, cfg_dir, resolve_hostname=True):
+    def __init__(self,log, cfg_dir, resolve_hostname=True, port_offset=0):
         super().__init__()
         self.resolve_hostname = resolve_hostname
+        self.log = log
         cfg_dir = os.path.expandvars(cfg_dir)
 
         if not (os.path.exists(cfg_dir) and os.path.isdir(cfg_dir)):
             raise RuntimeError(f"'{cfg_dir}' does not exist or is not a directory")
 
         self.cfg_dir = cfg_dir
-
+        self.port_offset = port_offset
         self._load()
 
     def _import_cmd_data(self, cmd: str, cfg: dict) -> None:
@@ -62,6 +64,12 @@ class ConfigManager:
         if "order" in cfg:
             setattr(self, f"{cmd}_order", cfg["order"])
 
+    def get_custom_commands(self):
+        ret = {}
+        for cmd in self.extra_cmds.keys():
+            ret[cmd] = getattr(self, cmd)
+        return ret
+
     def _load(self) -> None:
 
         pm_cfg = ["boot"]
@@ -81,7 +89,24 @@ class ConfigManager:
 
         self.boot = cfgs["boot"]
 
-        for c in rc_cmds:
+        json_files = [f for f in os.listdir(self.cfg_dir) if os.path.isfile(os.path.join(self.cfg_dir, f)) and '.json' in f]
+        self.extra_cmds = {}
+
+        for json_file in json_files:
+            cmd = json_file.split(".")[0]
+
+            if cmd in rc_cmds+pm_cfg:
+                continue
+
+            with open(os.path.join(self.cfg_dir,json_file), 'r') as jf:
+                try:
+                    j = json.load(jf)
+                    cfgs[cmd] = j
+                    self.extra_cmds[cmd] = j
+                except json.decoder.JSONDecodeError as e:
+                    raise RuntimeError(f"ERROR: failed to load {cmd}.json") from e
+
+        for c in rc_cmds+list(self.extra_cmds.keys()):
             self._import_cmd_data(c, cfgs[c])
 
         # Post-process conf
@@ -90,6 +115,17 @@ class ConfigManager:
             n: (h if (not h in ("localhost", "127.0.0.1")) else socket.gethostname())
             for n, h in self.boot["hosts"].items()
         }
+
+        #port offseting
+        for app in self.boot["apps"]:
+            port = self.boot['apps'][app]['port']
+            newport = port + self.port_offset
+            fixed = self.boot['apps'][app].get('fixed')
+            if fixed :
+                newport = port
+            self.boot['apps'][app]['port'] = newport
+
+        self.boot['response_listener']['port'] += self.port_offset
 
         ll = { **self.boot["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration
         for k, v in ll.items():
@@ -105,6 +141,23 @@ class ConfigManager:
                     self.boot["env"][k] = v[v.find(":") + 1:]
                 else:
                     raise ValueError("Key " + k + " is not in environment and no default specified!")
+        if self.boot.get('scripts'):
+            for script_spec in self.boot["scripts"].values():
+                ll = { **script_spec["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration
+                for k, v in ll.items():
+                    if v == "getenv_ifset":
+                        if k in os.environ.keys():
+                            script_spec["env"][k] = os.environ[k]
+                        else:
+                            script_spec["env"].pop(k)
+                    elif str(v).find("getenv") == 0:
+                        if k in os.environ.keys():
+                            script_spec["env"][k] = os.environ[k]
+                        elif str(v).find(":") > 0:
+                            script_spec["env"][k] = v[v.find(":") + 1:]
+                        else:
+                            raise ValueError("Key " + k + " is not in environment and no default specified!")
+
 
         for exec_spec in self.boot["exec"].values():
             ll = { **exec_spec["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration
@@ -122,6 +175,31 @@ class ConfigManager:
                     else:
                         raise ValueError("Key " + k + " is not in environment and no default specified!")
 
+        # Conf:
+        ips = {n: socket.gethostbyname(h) for n, h in self.boot["hosts"].items()}
+        # Set addresses to ips for networkmanager
+        for connections in json_extract(self.init, "nwconnections"):
+            for c in connections:
+                from string import Formatter
+                fieldnames = [fname for _, fname, _, _ in Formatter().parse(c['address']) if fname]
+                if len(fieldnames)>1:
+                    raise RuntimeError(f"Too many fields in connection {c['address']}")
+                for fieldname in fieldnames:
+                    if fieldname in ips:
+                        c["address"] = c["address"].format(**ips)
+                    else:
+                        try:
+                            dico = {"HOST_IP":socket.gethostbyname(fieldname)}
+                            c['address'] = c['address'].replace(fieldname, "HOST_IP").format(**dico)
+                        except Exception as e:
+                            raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
+                # Port offsetting
+                port = urlparse(c['address']).port
+                newport = port + self.port_offset
+                fixed = c.get('fixed')
+                if fixed :
+                    newport = port
+                c['address'] = c['address'].replace(str(port), str(newport))
 
         if self.resolve_hostname:
             hosts = self.boot["hosts"]
