@@ -194,7 +194,7 @@ class ConfigManager:
                             c['uri'] = c['uri'].replace(fieldname, "HOST_IP").format(**dico)
                         except Exception as e:
                             raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
-                if c['uri'] != origuri: # External connections won't have hostname substitution done
+                if "{host_" in origuri: # External connections have fixed hostnames
                     # Port offsetting
                     port = urlparse(c['uri']).port
                     newport = port + self.port_offset
