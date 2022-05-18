@@ -31,7 +31,7 @@ def json_extract(obj, key):
 class ConfigManager:
     """docstring for ConfigManager"""
 
-    def __init__(self, log, cfg_dir, port_offset, partition_number, partition_label):
+    def __init__(self, log, cfg_dir, port_offset):
         super().__init__()
         self.log = log
         cfg_dir = os.path.expandvars(cfg_dir)
@@ -41,8 +41,6 @@ class ConfigManager:
 
         self.cfg_dir = cfg_dir
         self.port_offset = port_offset
-        self.partition_label = partition_label
-        self.partition_number = partition_number
         self._load()
 
     def _import_cmd_data(self, cmd: str, cfg: dict) -> None:
@@ -159,16 +157,6 @@ class ConfigManager:
                         else:
                             raise ValueError("Key " + k + " is not in environment and no default specified!")
 
-        # partition renaming using partition label and number
-        partition_from_config = self.boot["env"]["DUNEDAQ_PARTITION"]
-        if self.partition_label:
-            self.boot["env"]["DUNEDAQ_PARTITION"] = f"{self.partition_label}"
-
-        # if self.partition_number is not None:
-        #     self.boot["env"]["DUNEDAQ_PARTITION"] += f"_{self.partition_number}"
-
-        self.log.info(f'Using partition: \"{self.boot["env"]["DUNEDAQ_PARTITION"]}\"')
-
         for exec_spec in self.boot["exec"].values():
             ll = { **exec_spec["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration
             for k, v in ll.items():
@@ -193,6 +181,7 @@ class ConfigManager:
                 if "queue://" in c['uri']:
                     continue
                 from string import Formatter
+                origuri = c['uri']
                 fieldnames = [fname for _, fname, _, _ in Formatter().parse(c['uri']) if fname]
                 if len(fieldnames)>1:
                     raise RuntimeError(f"Too many fields in connection {c['uri']}")
@@ -205,12 +194,11 @@ class ConfigManager:
                             c['uri'] = c['uri'].replace(fieldname, "HOST_IP").format(**dico)
                         except Exception as e:
                             raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
-                if c['partition'] is partition_from_config:
+                if "{host_" in origuri: # External connections have fixed hostnames
                     # Port offsetting
                     port = urlparse(c['uri']).port
                     newport = port + self.port_offset
                     c['uri'] = c['uri'].replace(str(port), str(newport))
-                    c['partition'] = self.boot["env"]["DUNEDAQ_PARTITION"] # Update partition name in case it changed
 
 
 

@@ -23,22 +23,28 @@ class TreeBuilder:
     def extract_json_to_nodes(self, js, mother, fsm_conf) -> StatefulNode:
         for n,d in js.items():
             if isinstance(d, dict):
-                child = StatefulNode(name=n,
-                                     parent=mother,
-                                     console=self.console,
-                                     fsm_conf = fsm_conf)
+                child = StatefulNode(
+                    name = n,
+                    parent = mother,
+                    console = self.console,
+                    fsm_conf = fsm_conf
+                )
                 self.extract_json_to_nodes(d, child, fsm_conf = fsm_conf)
+
             elif isinstance(d, str):
-                node = SubsystemNode(name=n,
-                                     ssh_conf=self.ssh_conf,
-                                     cfgmgr=ConfigManager(log=self.log,
-                                                          cfg_dir=d,
-                                                          port_offset=self.port_offset,
-                                                          partition_label=self.partition_label,
-                                                          partition_number=self.partition_number),
-                                     console=self.console,
-                                     fsm_conf = fsm_conf,
-                                     parent = mother)
+                node = SubsystemNode(
+                    name = n,
+                    ssh_conf = self.ssh_conf,
+                    cfgmgr = ConfigManager(
+                        log = self.log,
+                        cfg_dir = d,
+                        port_offset = self.port_offset+self.subsystem_port_offset),
+                    console=self.console,
+                    fsm_conf = fsm_conf,
+                    parent = mother
+                )
+                self.subsystem_port_offset += self.subsystem_port_increment
+
             else:
                 self.log.error(f"ERROR processing the tree {n}: {d} I don't know what that's supposed to mean?")
                 exit(1)
@@ -49,13 +55,13 @@ class TreeBuilder:
             ret.update(node.get_custom_commands())
         return ret
 
-    def __init__(self, log, top_cfg, fsm_conf, console, ssh_conf, port_offset, partition_label, partition_number):
+    def __init__(self, log, top_cfg, fsm_conf, console, ssh_conf, port_offset):
         self.log = log
         self.ssh_conf = ssh_conf
         self.fsm_conf = fsm_conf
         self.port_offset = port_offset
-        self.partition_label = partition_label
-        self.partition_number = partition_number
+        self.subsystem_port_offset = 0
+        self.subsystem_port_increment = 20
         if os.path.isdir(top_cfg):
             apparatus_id = Path(top_cfg).name
             data = {

@@ -114,14 +114,31 @@ class SubsystemNode(StatefulNode):
         return self.cfgmgr.get_custom_commands()
 
     def on_enter_boot_ing(self, event) -> NoReturn:
-        self.log.info(f'Subsystem {self.name} is booting')
+        partition = event.kwargs["partition"]
+        self.log.info(f'Subsystem {self.name} is booting partition {partition}')
+        response = {
+            "node": self.name,
+            "command": "boot",
+        }
+
+
         try:
             if self.pm is None:
                 self.pm = SSHProcessManager(self.console, self.ssh_conf)
             timeout = event.kwargs["timeout"]
-            self.pm.boot(self.cfgmgr.boot, event.kwargs.get('log'), timeout)
+            boot_info = cp.deepcopy(self.cfgmgr.boot)
+            boot_info['env']['DUNEDAQ_PARTITION'] = partition
+            self.pm.boot(
+                boot_info=boot_info,
+                log=event.kwargs.get('log'),
+                timeout=timeout
+            )
         except Exception as e:
-            self.console.print_exception()
+            self.log.error(e)
+            response['status_code'] = ErrorCode.Failed
+            response['error'] = str(e)
+            self.to_error(event=event, response=response)
+            return
 
         self.listener = ResponseListener(self.cfgmgr.boot["response_listener"]["port"])
 
