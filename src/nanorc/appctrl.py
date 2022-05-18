@@ -223,9 +223,7 @@ class AppCommander:
         else:
             s = socks.socksocket(socket.AF_INET, socket.SOCK_STREAM)
             s.set_proxy(socks.SOCKS5, self.proxy[0], self.proxy[1])
-            print(self.proxy)
         try:
-            print(self.app_host, self.app_port)
             s.connect((self.app_host, self.app_port))
             s.shutdown(2)
             return True
@@ -251,7 +249,6 @@ class AppCommander:
             "X-Answer-Port": str(self.listener_port),
         }
         if not self.listener_host is None:
-            print("listener", self.listener_host, self.listener_port)
             headers['X-Answer-Host'] = self.listener_host
 
         self.log.debug(headers)
@@ -325,8 +322,7 @@ class AppSupervisor:
             cmd_id: str,
             cmd_data: dict,
             entry_state: str = "ANY",
-            exit_state: str = "ANY",
-            ):
+            exit_state: str = "ANY"):
         self.listener.flask_manager.ready_lock.acquire()
         self.listener.flask_manager.ready_lock.release()
         self.last_sent_command = cmd_id
