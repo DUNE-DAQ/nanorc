@@ -27,7 +27,7 @@ setup(
         "rich",
         "sh",
         "graphviz",
-        "kubernetes==18.20.0",
+        "kubernetes",
         "docker",
         "PySocks",
         "anytree",
