@@ -30,6 +30,7 @@ class TreeBuilder:
                     fsm_conf = fsm_conf)
                 
                 self.extract_json_to_nodes(d, child, fsm_conf = fsm_conf)
+
             elif isinstance(d, str):
                 node = SubsystemNode(
                     name=n,
@@ -38,10 +39,12 @@ class TreeBuilder:
                         log=self.log,
                         resolve_hostname = self.resolve_hostname,
                         cfg_dir=d,
-                        port_offset=self.port_offset),
+                        port_offset = self.port_offset+self.subsystem_port_offset),
                     console=self.console,
                     fsm_conf = fsm_conf,
                     parent = mother)
+                self.subsystem_port_offset += self.subsystem_port_increment
+
             else:
                 self.log.error(f"ERROR processing the tree {n}: {d} I don't know what that's supposed to mean?")
                 exit(1)
@@ -58,6 +61,8 @@ class TreeBuilder:
         self.ssh_conf = ssh_conf
         self.fsm_conf = fsm_conf
         self.port_offset = port_offset
+        self.subsystem_port_offset = 0
+        self.subsystem_port_increment = 20
         if os.path.isdir(top_cfg):
             apparatus_id = Path(top_cfg).name
             data = {

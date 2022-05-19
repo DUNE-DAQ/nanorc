@@ -59,6 +59,7 @@ class NanoRC:
             fsm_conf=fsm_cfg,
             resolve_hostname = pm.use_sshpm(),
             port_offset=self.port_offset)
+        self.partition = None
 
         self.custom_cmd = self.cfg.get_custom_commands()
         self.console.print(f'Extra commands are {list(self.custom_cmd.keys())}')
@@ -174,7 +175,7 @@ class NanoRC:
         if not self.topnode:
             return
 
-        print_status(apparatus_id=self.apparatus_id, topnode=self.topnode, console=self.console)
+        print_status(apparatus_id=self.apparatus_id, topnode=self.topnode, console=self.console, partition=self.partition)
 
     def ls(self, leg:bool=True) -> NoReturn:
         """
@@ -183,11 +184,12 @@ class NanoRC:
         self.return_code = print_node(node=self.topnode, console=self.console, leg=leg)
 
 
-    def boot(self, partition: str, timeout:int=None) -> NoReturn:
+    def boot(self, partition:str, timeout:int=None) -> NoReturn:
         """
-        Boots applications
+        Boot applications
         """
-        self.execute_command("boot", timeout=timeout, log_path=self.log_path, partition=partition)
+        self.partition=partition
+        self.execute_command("boot", partition=partition, timeout=timeout, log_path=self.log_path)
 
 
     def terminate(self, timeout:int=None) -> NoReturn:

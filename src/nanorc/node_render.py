@@ -32,8 +32,8 @@ def status_data(node, get_children=True) -> dict:
     return ret
 
 
-def print_status(topnode, console, apparatus_id='') -> int:
-    table = Table(title=f"{apparatus_id} apps")
+def print_status(topnode, console, apparatus_id='', partition='') -> int:
+    table = Table(title=f"[bold]{apparatus_id}[/bold] applications" + (f" in partition [bold]{partition}[/bold]" if partition else ''))
     table.add_column("name", style="blue")
     table.add_column("state", style="blue")
     table.add_column("host", style="magenta")
@@ -44,8 +44,11 @@ def print_status(topnode, console, apparatus_id='') -> int:
     for pre, _, node in RenderTree(topnode):
         if isinstance(node, ApplicationNode):
             sup = node.sup
+
             if sup.desc.proc.is_alive():
                 alive = 'alive'
+            elif not sup.desc.proc:
+                alive = ''
             else:
                 proc = sup.desc.proc
                 exit_code = None
@@ -58,7 +61,8 @@ def print_status(topnode, console, apparatus_id='') -> int:
                     exit_code = sup.desc.proc.status()
 
                 alive = f'dead[{exit_code}]'
-            ping  = sup.commander.ping()
+
+            ping = sup.commander.ping()
             last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
 
             state_str = Text()

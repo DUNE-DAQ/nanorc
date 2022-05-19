@@ -116,7 +116,8 @@ class SubsystemNode(StatefulNode):
         return self.cfgmgr.get_custom_commands()
 
     def on_enter_boot_ing(self, event) -> NoReturn:
-        self.log.info(f'Subsystem {self.name} is booting')
+        partition = event.kwargs["partition"]
+        self.log.info(f'Subsystem {self.name} is booting partition {partition}')
         response = {
             "node": self.name,
             "command": "boot",
@@ -165,17 +166,18 @@ class SubsystemNode(StatefulNode):
                     )
                     
             timeout = event.kwargs["timeout"]
-            
-            self.pm.boot(self.cfgmgr.boot,
-                         partition=event.kwargs['partition'],
-                         timeout = timeout)
-
-    
+            boot_info = cp.deepcopy(self.cfgmgr.boot)
+            boot_info['env']['DUNEDAQ_PARTITION'] = partition
+            self.pm.boot(
+                boot_info=boot_info,
+                partition=event.kwargs['partition'],
+                timeout=timeout
+            )
         except Exception as e:
-            self.console.print_exception()
-            response['status_code'] = 1
-            response["error"] = str(e)
-            self.to_error(response=response)
+            self.log.error(e)
+            response['status_code'] = ErrorCode.Failed
+            response['error'] = str(e)
+            self.to_error(event=event, response=response)
             return
 
         try:

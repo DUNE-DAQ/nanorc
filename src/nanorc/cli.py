@@ -207,13 +207,12 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
 @click.option('--pm', type=str, default="ssh", help='Process manager, can be: ssh, kind, or k8s://np04-srv-015:31000, for example', callback=validate_pm)
 @click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=validate_partition_number)
-@click.option('--partition-label', type=str, default=None, help='partition label to be use as prefix of partition name')
 @click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn webui')
 @click.argument('top_cfg', type=click.Path(exists=True))
 @accept_timeout(60)
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, timeout, kerberos, partition_number, partition_label, web, top_cfg, pm):
+def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, timeout, kerberos, partition_number, web, top_cfg, pm):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f'{credentials.user}@rc> '
@@ -332,7 +331,7 @@ def pin_threads(obj:NanoContext, pin_thread_file, timeout:int):
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def boot(ctx, obj, partition, timeout):
+def boot(ctx, obj, partition:str, timeout:int):
     obj.rc.boot(partition=partition, timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
