@@ -139,7 +139,7 @@ class SSHProcessManager(object):
         self.log.debug(name+str(exc))
         self.event_queue.put((name, exc))
 
-    def boot(self, boot_info, partition, timeout):
+    def boot(self, boot_info, timeout):
 
         if self.apps:
             raise RuntimeError(
@@ -165,8 +165,7 @@ class SSHProcessManager(object):
                 "APP_NAME": app_name,
                 "APP_PORT": app_conf["port"],
                 "APP_WD": os.getcwd(),
-                "DUNEDAQ_PARTITION": partition
-                })
+            })
 
             log_file = f'log_{app_name}_{app_conf["port"]}.txt'
 
