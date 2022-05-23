@@ -4,7 +4,9 @@ import logging
 import rich
 import socket
 import time
+import json
 import os
+from urllib.parse import urlparse
 from kubernetes import client, config
 from rich.console import Console
 from rich.progress import *
@@ -40,7 +42,7 @@ class K8sProcess(object):
 
     def status(self):
         s = self.pm._core_v1_api.read_namespaced_pod_status(self.name, self.namespace)
-        return c.phase
+        return s.status.phase
 
 class K8SProcessManager(object):
     """docstring for K8SProcessManager"""
@@ -54,6 +56,7 @@ class K8SProcessManager(object):
         self.log = logging.getLogger(__name__)
         self.connections = connections
         self.mount_dirs = mount_dirs
+        self.mount_cvmfs = True
         self.console = console
         self.apps = {}
         self.partition = None
@@ -113,15 +116,17 @@ class K8SProcessManager(object):
                 protocol = "TCP",
                 container_port = 3333,
             )]
-
         for c in connections:
-            if '0.0.0.0' not in c['address']: continue
+            uri = urlparse(c['uri'])
+            print(uri)
+            if uri.hostname != '0.0.0.0': continue
+
             ret += [
                 client.V1ContainerPort(
                     # My sympathy for the nwmgr took yet another hit here
-                    name = c['name'].lower().replace(".", "").replace("_", "").replace("$","").replace("{", "").replace("}", "")[-15:],
-                    protocol = "TCP",
-                    container_port = int(c['address'].split(":")[-1]),
+                    name = c['uid'].lower().replace(".", "").replace("_", "").replace("$","").replace("{", "").replace("}", "")[-15:],
+                    protocol = uri.scheme.upper(),
+                    container_port = uri.port,
                 )]
         return ret
 
@@ -136,14 +141,17 @@ class K8SProcessManager(object):
             )]
 
         for c in connections:
-            if '0.0.0.0' not in c['address']: continue
+            uri = urlparse(c['uri'])
+            print(uri)
+            if uri.hostname != '0.0.0.0': continue
+
             ret += [
                 client.V1ServicePort(
                     # My sympathy for the nwmgr took yet another hit here
-                    name = c['name'].lower().replace(".", "").replace("_", "").replace("$","").replace("{", "").replace("}", "")[-15:],
-                    protocol = "TCP",
-                    target_port = int(c['address'].split(":")[-1]),
-                    port = int(c['address'].split(":")[-1]),
+                    name = c['uid'].lower().replace(".", "").replace("_", "").replace("$","").replace("{", "").replace("}", "")[-15:],
+                    protocol = uri.scheme.upper(),
+                    target_port = uri.port,
+                    port = uri.port,
                 )]
         return ret
 
@@ -152,17 +160,11 @@ class K8SProcessManager(object):
             self,
             name: str,
             app_label: str,
-            daq_image:str,
+            app_boot_info:dict,
             namespace: str,
-            cmd_port: int = 3333,
-            mount_cvmfs: bool = False,
-            env_vars: dict = None,
-            run_as: dict = None,
-            connections:list = None,
-            use_flx:bool = False,
-            mount_dirs:str = None):
+            run_as: dict = None):
 
-        self.log.info(f"Creating \"{namespace}:{name}\" daq application (port: {cmd_port}, image: \"{daq_image}\", use_flx={use_flx}, mount_dirs={mount_dirs})")
+        self.log.info(f"Creating \"{namespace}:{name}\" daq application  (image: \"{app_boot_info['image']}\", use_flx={app_boot_info['use_flx']}, mount_dirs={app_boot_info['mount_dirs']})")
 
         pod = client.V1Pod(
             # Run the pod with same user id and group id as the current user
@@ -181,35 +183,38 @@ class K8SProcessManager(object):
                     # DAQ application container
                     client.V1Container(
                         name="daq-application",
-                        image=daq_image,
+                        image=app_boot_info["image"],
                         image_pull_policy= "IfNotPresent",
                         # Environment variables
-                        security_context = client.V1SecurityContext(privileged=use_flx),
+                        security_context = client.V1SecurityContext(privileged=app_boot_info['use_flx']),
                         resources = (
                             client.V1ResourceRequirements({
                                 "felix.cern/flx": "2", # requesting 2 FLXs
                                 "memory": "32Gi" # yes bro
                             })
-                        ) if use_flx else None,
+                        ) if app_boot_info['use_flx'] else None,
                         env = [
                             client.V1EnvVar(
                                 name=k,
                                 value=str(v)
-                            ) for k,v in env_vars.items()
-                        ] if env_vars else None,
+                            ) for k,v in app_boot_info['env'].items()
+                        ],
+                        # command=['echo $PATH'],#[app_boot_info['cmd']]+app_boot_info['args'],
+                        tcommand=['/dunedaq/run/app-entrypoint.sh'],
                         args=[
                             "--name", name,
                             "-c", "rest://localhost:3333",
                             "-i", "influx://influxdb.monitoring:8086/write?db=influxdb"
-                        ],
-                        ports=self.get_container_port_list_from_connections(connections),
+                        ],                        # args=['$PATH'],#[app_boot_info['cmd']]+app_boot_info['args'],
+                        # args=app_boot_info['args'],
+                        ports=self.get_container_port_list_from_connections(app_boot_info['connections']),
                         volume_mounts=(
                             ([
                                 client.V1VolumeMount(
                                     mount_path="/cvmfs/dunedaq.opensciencegrid.org",
-                                    name="dunedaq",
+                                    name="dunedaq-cvmfs",
                                     read_only=True
-                            )] if mount_cvmfs else []) +
+                            )] if self.mount_cvmfs else []) +
                             ([
                                 client.V1VolumeMount(
                                     mount_path="/dunedaq/pocket",
@@ -221,23 +226,23 @@ class K8SProcessManager(object):
                                     mount_path="/dev",
                                     name="devfs",
                                     read_only=False
-                            )] if use_flx else []) +
+                            )] if app_boot_info['use_flx'] else []) +
                             ([
                                 client.V1VolumeMount(
-                                    mount_path=mount_dirs,
-                                    name="outdir",
+                                    mount_path=mount_dir,
+                                    name=f"mount-dir-{i}",
                                     read_only=False
-                            )] if mount_dirs else [])
+                            ) for i,mount_dir in enumerate(app_boot_info['mount_dirs']) ])
                         )
                     )
                 ],
                 volumes=(
                     ([
                         client.V1Volume(
-                            name="dunedaq",
+                            name="dunedaq-cvmfs",
                             host_path=client.V1HostPathVolumeSource(path='/cvmfs/dunedaq.opensciencegrid.org')
                         )
-                    ] if mount_cvmfs else []) +
+                    ] if self.mount_cvmfs else []) +
                     ([
                         client.V1Volume(
                             name="pocket",
@@ -249,13 +254,13 @@ class K8SProcessManager(object):
                             name="devfs",
                             host_path=client.V1HostPathVolumeSource(path='/dev')
                         )
-                    ] if use_flx else []) +
+                    ] if app_boot_info['use_flx'] else []) +
                     ([
                         client.V1Volume(
-                            name="outdir",
-                            host_path=client.V1HostPathVolumeSource(path=mount_dirs)
+                            name=f"mount-dir-{i}",
+                            host_path=client.V1HostPathVolumeSource(path=mount_dir)
                         )
-                    ] if mount_dirs else [])
+                    for i,mount_dir in enumerate(app_boot_info['mount_dirs']) ])
                 )
             )
         )
@@ -276,7 +281,7 @@ class K8SProcessManager(object):
         service = client.V1Service(
             metadata = client.V1ObjectMeta(name=name),
             spec = client.V1ServiceSpec(
-                ports = self.get_service_port_list_from_connections(connections),
+                ports = self.get_service_port_list_from_connections(app_boot_info['connections']),
                 selector = {"app": app_label}
             )
         )  # V1Service
@@ -299,8 +304,6 @@ class K8SProcessManager(object):
                 name=name,
             ),
             spec=client.V1ServiceSpec(
-                type='NodePort',
-                external_traffic_policy='Cluster',
                 ports=[
                     client.V1ServicePort(
                         protocol = 'TCP',
@@ -322,16 +325,14 @@ class K8SProcessManager(object):
 
         # Create Endpoints Objects
         endpoints = client.V1Endpoints(
-            metadata=client.V1ObjectMeta(
-                name=name,
-            ),
+            metadata = client.V1ObjectMeta(name=name),
             subsets=[
                 client.V1EndpointSubset(
-                    addresses=[
+                    addresses = [
                         client.V1EndpointAddress(ip=ip)
                     ],
                     ports=[
-                        client.V1EndpointPort(port=port)
+                        client.CoreV1EndpointPort(port=port)
                     ]
                 )
             ]
@@ -384,65 +385,8 @@ class K8SProcessManager(object):
             self.log.error(e)
             raise RuntimeError(f"Failed to create persistent volume claim \"{namespace}:{name}\"") from e
 
-    def create_opmon_ers_service(ers_address='',
-                                 opmon_address='',
-                                 namespace=None):
-        if ers_address:
-            # Create Endpoints Objects
-            endpoints = client.V1Endpoints(
-                metadata=client.V1ObjectMeta(
-                    name=ers_address[0],
-                ),
-                subsets=[
-                    client.V1EndpointSubset(
-                        addresses=[
-                            client.V1EndpointAddress(ip=ers_address[0])
-                        ],
-                        ports=[
-                            client.V1EndpointPort(port=ers_address[1])
-                        ]
-                    )
-                ]
-            )
-            self.log.debug(endpoints)
-
-            try:
-                resp = self._core_v1_api.create_namespaced_service(namespace, service)
-            except Exception as e:
-                self.log.error(e)
-                raise RuntimeError(f"Failed to create nanorc responder service \"{namespace}:{name}\"") from e
-
-
-        if opmon_address:
-            service = client.V1Service(
-                metadata=client.V1ObjectMeta(
-                    name=opmon_address[0],
-                ),
-                spec=client.V1ServiceSpec(
-                    type='NodePort',
-                    external_traffic_policy='Cluster',
-                    ports=[
-                        client.V1ServicePort(
-                            protocol = 'TCP',
-                            target_port = port,
-                            port = port,
-                        )
-                    ],
-                )
-            )  # V1Service
-
-            self.log.debug(service)
-
-            try:
-                resp = self._core_v1_api.create_namespaced_service(namespace, service)
-            except Exception as e:
-                self.log.error(e)
-                raise RuntimeError(f"Failed to create nanorc responder service \"{namespace}:{name}\"") from e
-
-
-
     #---
-    def boot(self, boot_info, partition, timeout):
+    def boot(self, boot_info, timeout):
 
         if self.apps:
             raise RuntimeError(
@@ -469,14 +413,13 @@ class K8SProcessManager(object):
             logging.info(f"Kind network gateway: {self.gateway}")
         else:
             self.gateway = socket.gethostbyname(self.cluster_config.address)
-            logging.info(f"Gateway: {self.gateway} ({self.cluster_config.address})")
+            logging.info(f"K8s gateway: {self.gateway} ({self.cluster_config.address})")
 
         apps = boot_info["apps"].copy()
         env_vars = boot_info["env"]
-        # TODO: move into the rc boot method. The PM should not know about DUNEDAQ_PARTITION
-        env_vars['DUNEDAQ_PARTITION'] = partition
+        # del env_vars['PATH']
 
-        self.partition = partition
+        self.partition = boot_info['env']['DUNEDAQ_PARTITION']
         cmd_port = 3333
 
         # Create partition
@@ -491,11 +434,34 @@ class K8SProcessManager(object):
 
         for app_name, app_conf in apps.items():
 
-            exec_vars = boot_info['exec'][app_conf['exec']]['env']
-            daq_image = boot_info['exec'][app_conf['exec']]['image']
-            app_vars = {}
-            app_vars.update(env_vars)
+            # exec_vars = boot_info['exec'][app_conf['exec']]['env']
+            # daq_image = boot_info['exec'][app_conf['exec']]['image']
+            # app_vars = {}
+            exec_data = boot_info['exec'][app_conf['exec']]
 
+            app_env = boot_info["env"]
+            # del env_vars['PATH']
+            app_env.update(exec_data["env"])
+            app_env.update({
+                "APP_NAME": app_name,
+                "APP_PORT": cmd_port,
+            })
+            app_args = exec_data["args"]
+            app_img = exec_data['image']
+            app_cmd = exec_data['cmd']
+            if 'PATH' in app_env: del app_env['PATH']
+
+            app_boot_info ={
+                "env": app_env,
+                "args": app_args,
+                "image": app_img,
+                "cmd": app_cmd,
+                "use_flx": ("ruflx" in app_name),
+                "mount_dirs": self.mount_dirs[app_name],
+                "connections": self.connections[app_name],
+            }
+
+            self.log.info(json.dumps(app_boot_info, indent=2))
             app_desc = AppProcessDescriptor(app_name)
             app_desc.conf = app_conf.copy()
             app_desc.partition = self.partition
@@ -504,19 +470,14 @@ class K8SProcessManager(object):
             app_desc.port = cmd_port
             app_desc.proc = K8sProcess(self, app_name, self.partition)
 
+            k8s_name = app_name.replace("_", "-").replace(".", "")
 
             self.create_daqapp_pod(
-                name = app_name, # better kwargs all this...
-                app_label = app_name,
-                daq_image = daq_image,
+                name = k8s_name, # better kwargs all this...
+                app_label = k8s_name,
+                app_boot_info = app_boot_info,
                 namespace = self.partition,
-                cmd_port = cmd_port,
-                mount_cvmfs = True,
-                env_vars = app_vars,
-                run_as = run_as,
-                connections = self.connections[app_name],
-                use_flx = 'flx' in app_name,
-                mount_dirs = self.mount_dirs.get(app_name)
+                run_as = run_as
             )
 
             self.apps[app_name] = app_desc
