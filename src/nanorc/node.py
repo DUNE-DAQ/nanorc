@@ -2,6 +2,7 @@ from anytree import NodeMixin, RenderTree, PreOrderIter
 from anytree.resolver import Resolver
 import requests
 import time
+import json
 from datetime import datetime
 from rich.console import Console
 from rich.table import Table
@@ -134,22 +135,33 @@ class SubsystemNode(StatefulNode):
                     # Yes, we need the list of connections here
                     # I hate it dearly too
                     # That and many other things. (I'M SUCH A HATER)
-                    connections = { app: data['nwconnections'] for app, data in self.cfgmgr.init.items() }
+                    # connections = { app: data['nwconnections'] for app, data in self.cfgmgr.init.items() }
+                    connections = {}
+                    for app, data in self.cfgmgr.init.items():
+                        connections[app] = []
+                        for connection in data['connections']:
+                            if connection["service_type"] == "kQueue":
+                                continue
+                            connections[app].append(connection)
+
                     mount_dirs = {}
 
                     ## even more hacks
                     for app, vals in self.cfgmgr.conf.items():
+                        mount_dirs[app] = set()
+
                         for mod in vals['modules']:
                             if not 'data' in mod: continue
                             mod_data = mod['data']
                             if 'data_store_parameters' in mod_data:
-                                mount_dirs[app] = mod_data['data_store_parameters']['directory_path']
+                                mount_dirs[app].add(mod_data['data_store_parameters']['directory_path'])
 
                             # and this is a hack within the hack
                             if 'link_confs' in mod_data:
                                 for link_conf in mod_data['link_confs']:
                                     if 'data_filename' in link_conf:
-                                        mount_dirs[app] = os.path.dirname(link_conf['data_filename'])
+                                        mount_dirs[app].add(os.path.dirname(link_conf['data_filename']))
+                        mount_dirs[app] = list(mount_dirs[app])
 
                     self.pm = K8SProcessManager(
                         console=self.console,
@@ -157,23 +169,25 @@ class SubsystemNode(StatefulNode):
                         mount_dirs=mount_dirs,
                         cluster_config=event.kwargs['pm']
                     )
-                    
+
                 elif event.kwargs['pm'].use_sshpm():
                     self.pm = SSHProcessManager(
                         console = self.console,
                         log_path = event.kwargs.get('log_path'),
                         ssh_conf = self.ssh_conf
                     )
-                    
+
             timeout = event.kwargs["timeout"]
             boot_info = cp.deepcopy(self.cfgmgr.boot)
             boot_info['env']['DUNEDAQ_PARTITION'] = partition
+
             self.pm.boot(
                 boot_info=boot_info,
-                partition=event.kwargs['partition'],
                 timeout=timeout
             )
+
         except Exception as e:
+            self.console.print_exception()
             self.log.error(e)
             response['status_code'] = ErrorCode.Failed
             response['error'] = str(e)
