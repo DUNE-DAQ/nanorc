@@ -144,7 +144,7 @@ class K8SProcessManager(object):
             uri = urlparse(c['uri'])
             print(uri)
             if uri.hostname != '0.0.0.0': continue
-
+            
             ret += [
                 client.V1ServicePort(
                     # My sympathy for the nwmgr took yet another hit here
@@ -200,9 +200,9 @@ class K8SProcessManager(object):
                             ) for k,v in app_boot_info['env'].items()
                         ],
                         # command=['echo $PATH'],#[app_boot_info['cmd']]+app_boot_info['args'],
-                        tcommand=['/dunedaq/run/app-entrypoint.sh'],
+                        command=['/dunedaq/run/app-entrypoint.sh'],
                         args=[
-                            "--name", name,
+                            "--name", name, 
                             "-c", "rest://localhost:3333",
                             "-i", "influx://influxdb.monitoring:8086/write?db=influxdb"
                         ],                        # args=['$PATH'],#[app_boot_info['cmd']]+app_boot_info['args'],
@@ -438,7 +438,7 @@ class K8SProcessManager(object):
             # daq_image = boot_info['exec'][app_conf['exec']]['image']
             # app_vars = {}
             exec_data = boot_info['exec'][app_conf['exec']]
-
+            
             app_env = boot_info["env"]
             # del env_vars['PATH']
             app_env.update(exec_data["env"])
@@ -450,7 +450,7 @@ class K8SProcessManager(object):
             app_img = exec_data['image']
             app_cmd = exec_data['cmd']
             if 'PATH' in app_env: del app_env['PATH']
-
+            
             app_boot_info ={
                 "env": app_env,
                 "args": app_args,
@@ -460,7 +460,7 @@ class K8SProcessManager(object):
                 "mount_dirs": self.mount_dirs[app_name],
                 "connections": self.connections[app_name],
             }
-
+            
             self.log.info(json.dumps(app_boot_info, indent=2))
             app_desc = AppProcessDescriptor(app_name)
             app_desc.conf = app_conf.copy()
@@ -469,9 +469,9 @@ class K8SProcessManager(object):
             app_desc.pod = ''
             app_desc.port = cmd_port
             app_desc.proc = K8sProcess(self, app_name, self.partition)
-
+            
             k8s_name = app_name.replace("_", "-").replace(".", "")
-
+            
             self.create_daqapp_pod(
                 name = k8s_name, # better kwargs all this...
                 app_label = k8s_name,
