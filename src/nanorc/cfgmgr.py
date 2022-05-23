@@ -179,6 +179,7 @@ class ConfigManager:
         # Set addresses to ips for networkmanager
         for connections in json_extract(self.init, "connections"):
             for c in connections:
+                if not self.resolve_hostname: continue
                 if "queue://" in c['uri']:
                     continue
                 from string import Formatter
