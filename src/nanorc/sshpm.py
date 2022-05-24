@@ -1,5 +1,6 @@
 import os
 import socket
+import copy as cp
 import sh
 import sys
 import time
@@ -155,21 +156,33 @@ class SSHProcessManager(object):
         for app_name, app_conf in apps.items():
 
             host = hosts[app_conf["host"]]
+            env_formatter = {
+                "APP_HOST": host,
+                "DUNEDAQ_PARTITION": env_vars['DUNEDAQ_PARTITION'],
+                "APP_NAME": app_name,
+                "APP_PORT": app_conf["port"],
+                "APP_WD": os.getcwd(),
+            }
 
-            exec_vars = boot_info['exec'][app_conf['exec']]['env']
+            exec_vars_cp = cp.deepcopy(boot_info['exec'][app_conf['exec']]['env'])
+            exec_vars = {}
+
+            for k,v in exec_vars_cp.items():
+                exec_vars[k]=v.format(**env_formatter)
 
             app_vars = {}
             app_vars.update(env_vars)
             app_vars.update(exec_vars)
-            app_vars.update({
-                "APP_NAME": app_name,
-                "APP_PORT": app_conf["port"],
-                "APP_WD": os.getcwd(),
-            })
+            env_formatter.update(app_vars)
+            args = " ".join([a.format(**env_formatter) for a in boot_info['exec'][app_conf['exec']]['args']])
 
             log_file = f'log_{app_name}_{app_conf["port"]}.txt'
-
-            cmd=';'.join([ f"export {n}=\"{v}\"" for n,v in app_vars.items()] + boot_info['exec'][app_conf['exec']]['cmd'])
+            env_var = [f'export {n}=\"{v}\"' for n, v in app_vars.items()]
+            cmd=';'.join(
+                env_var +
+                [f"cd {env_formatter['APP_WD']}"] +
+                [boot_info['exec'][app_conf['exec']]['cmd']+" "+args]
+            )
 
             if self.log_path:
                 now = datetime.now() # current date and time

@@ -5,6 +5,7 @@ import rich
 import socket
 import time
 import json
+import copy as cp
 import os
 from urllib.parse import urlparse
 from kubernetes import client, config
@@ -42,10 +43,19 @@ class K8sProcess(object):
 
     def status(self):
         s = self.pm._core_v1_api.read_namespaced_pod_status(self.name, self.namespace)
-        return s.status.phase
+        container_status = s.status.container_statuses[0].state
+        if   container_status.running:
+            return "Running"
+        elif container_status.terminated:
+            return f"Terminated {container_status.terminated.exit_code} {container_status.terminated.reason}"
+        elif container_status.waiting:
+            return f"Waiting {container_status.waiting.reason}"
+        else:
+            return 'Unknown'
+
+
 
 class K8SProcessManager(object):
-    """docstring for K8SProcessManager"""
     def __init__(self, console: Console, cluster_config, connections, mount_dirs):
         """A Kubernetes Process Manager
 
@@ -144,7 +154,7 @@ class K8SProcessManager(object):
             uri = urlparse(c['uri'])
             print(uri)
             if uri.hostname != '0.0.0.0': continue
-            
+
             ret += [
                 client.V1ServicePort(
                     # My sympathy for the nwmgr took yet another hit here
@@ -199,20 +209,20 @@ class K8SProcessManager(object):
                                 value=str(v)
                             ) for k,v in app_boot_info['env'].items()
                         ],
-                        # command=['echo $PATH'],#[app_boot_info['cmd']]+app_boot_info['args'],
                         command=['/dunedaq/run/app-entrypoint.sh'],
-                        args=[
-                            "--name", name, 
-                            "-c", "rest://localhost:3333",
-                            "-i", "influx://influxdb.monitoring:8086/write?db=influxdb"
-                        ],                        # args=['$PATH'],#[app_boot_info['cmd']]+app_boot_info['args'],
-                        # args=app_boot_info['args'],
+                        args=app_boot_info['args'],
                         ports=self.get_container_port_list_from_connections(app_boot_info['connections']),
                         volume_mounts=(
                             ([
                                 client.V1VolumeMount(
                                     mount_path="/cvmfs/dunedaq.opensciencegrid.org",
                                     name="dunedaq-cvmfs",
+                                    read_only=True
+                            )] if self.mount_cvmfs else []) +
+                            ([
+                                client.V1VolumeMount(
+                                    mount_path="/cvmfs/dunedaq-development.opensciencegrid.org",
+                                    name="dunedaq-dev-cvmfs",
                                     read_only=True
                             )] if self.mount_cvmfs else []) +
                             ([
@@ -241,6 +251,12 @@ class K8SProcessManager(object):
                         client.V1Volume(
                             name="dunedaq-cvmfs",
                             host_path=client.V1HostPathVolumeSource(path='/cvmfs/dunedaq.opensciencegrid.org')
+                        )
+                    ] if self.mount_cvmfs else []) +
+                    ([
+                        client.V1Volume(
+                            name="dunedaq-dev-cvmfs",
+                            host_path=client.V1HostPathVolumeSource(path='/cvmfs/dunedaq-development.opensciencegrid.org')
                         )
                     ] if self.mount_cvmfs else []) +
                     ([
@@ -417,7 +433,7 @@ class K8SProcessManager(object):
 
         apps = boot_info["apps"].copy()
         env_vars = boot_info["env"]
-        # del env_vars['PATH']
+        hosts = boot_info["hosts"]
 
         self.partition = boot_info['env']['DUNEDAQ_PARTITION']
         cmd_port = 3333
@@ -434,33 +450,46 @@ class K8SProcessManager(object):
 
         for app_name, app_conf in apps.items():
 
-            # exec_vars = boot_info['exec'][app_conf['exec']]['env']
-            # daq_image = boot_info['exec'][app_conf['exec']]['image']
-            # app_vars = {}
-            exec_data = boot_info['exec'][app_conf['exec']]
-            
-            app_env = boot_info["env"]
-            # del env_vars['PATH']
-            app_env.update(exec_data["env"])
-            app_env.update({
+            host = hosts[app_conf["host"]]
+            env_formatter = {
+                "APP_HOST": host,
+                "DUNEDAQ_PARTITION": env_vars['DUNEDAQ_PARTITION'],
                 "APP_NAME": app_name,
                 "APP_PORT": cmd_port,
-            })
-            app_args = exec_data["args"]
+                "APP_WD": os.getcwd(),
+            }
+
+            exec_data = boot_info['exec'][app_conf['exec']]
+            exec_vars_cp = cp.deepcopy(exec_data['env'])
+            exec_vars = {}
+
+            for k,v in exec_vars_cp.items():
+                exec_vars[k]=v.format(**env_formatter)
+
+            app_env = {}
+            app_env.update(env_vars)
+            app_env.update(exec_vars)
+
+            env_formatter.update(app_env)
+            app_args = [a.format(**env_formatter) for a in boot_info['exec'][app_conf['exec']]['args']]
             app_img = exec_data['image']
             app_cmd = exec_data['cmd']
-            if 'PATH' in app_env: del app_env['PATH']
-            
+
+            unwanted_env = ['PATH', 'LD_LIBRARY_PATH', 'CET_PLUGIN_PATH','DUNEDAQ_SHARE_PATH']
+            for var in unwanted_env:
+                if var in app_env:
+                    del app_env[var]
+
             app_boot_info ={
                 "env": app_env,
                 "args": app_args,
                 "image": app_img,
-                "cmd": app_cmd,
+                #"cmd": app_cmd, ##ignred
                 "use_flx": ("ruflx" in app_name),
                 "mount_dirs": self.mount_dirs[app_name],
                 "connections": self.connections[app_name],
             }
-            
+
             self.log.info(json.dumps(app_boot_info, indent=2))
             app_desc = AppProcessDescriptor(app_name)
             app_desc.conf = app_conf.copy()
@@ -469,9 +498,9 @@ class K8SProcessManager(object):
             app_desc.pod = ''
             app_desc.port = cmd_port
             app_desc.proc = K8sProcess(self, app_name, self.partition)
-            
+
             k8s_name = app_name.replace("_", "-").replace(".", "")
-            
+
             self.create_daqapp_pod(
                 name = k8s_name, # better kwargs all this...
                 app_label = k8s_name,
