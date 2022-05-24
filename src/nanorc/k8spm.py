@@ -56,7 +56,7 @@ class K8sProcess(object):
 
 
 class K8SProcessManager(object):
-    def __init__(self, console: Console, cluster_config, connections, mount_dirs):
+    def __init__(self, console: Console, cluster_config, connections):
         """A Kubernetes Process Manager
 
         Args:
@@ -65,7 +65,6 @@ class K8SProcessManager(object):
         super(K8SProcessManager, self).__init__()
         self.log = logging.getLogger(__name__)
         self.connections = connections
-        self.mount_dirs = mount_dirs
         self.mount_cvmfs = True
         self.console = console
         self.apps = {}
@@ -224,7 +223,7 @@ class K8SProcessManager(object):
                                     mount_path="/cvmfs/dunedaq-development.opensciencegrid.org",
                                     name="dunedaq-dev-cvmfs",
                                     read_only=True
-                            )] if self.mount_cvmfs else []) +
+                            )] if self.mount_cvmfs and app_boot_info['mount_cvmfs_dev'] else []) +
                             ([
                                 client.V1VolumeMount(
                                     mount_path="/dunedaq/pocket",
@@ -258,7 +257,7 @@ class K8SProcessManager(object):
                             name="dunedaq-dev-cvmfs",
                             host_path=client.V1HostPathVolumeSource(path='/cvmfs/dunedaq-development.opensciencegrid.org')
                         )
-                    ] if self.mount_cvmfs else []) +
+                    ] if self.mount_cvmfs and app_boot_info['mount_cvmfs_dev'] else []) +
                     ([
                         client.V1Volume(
                             name="pocket",
@@ -475,18 +474,29 @@ class K8SProcessManager(object):
             app_img = exec_data['image']
             app_cmd = exec_data['cmd']
 
+            ## ? Maybe?
             unwanted_env = ['PATH', 'LD_LIBRARY_PATH', 'CET_PLUGIN_PATH','DUNEDAQ_SHARE_PATH']
             for var in unwanted_env:
                 if var in app_env:
                     del app_env[var]
 
+            md = boot_info['mount_dirs'].get(app_name)
+
+            ## This is meant to mean:
+            # if the image is of form pocket_dune_bla (without version postfix)
+            # or if the first letter of the version starts with N
+            # then, we want to mount /cvmfs/dunedaq-development....
+            # Else we are probably in "full release mode" in which case the name of the version will be v3.0.4, and we don't need to mount it
+            mount_cvmfs_dev = (app_img.find(":") == -1) or (app_img.split(":")[1][0] == 'N')
+
             app_boot_info ={
                 "env": app_env,
                 "args": app_args,
                 "image": app_img,
-                #"cmd": app_cmd, ##ignred
-                "use_flx": ("ruflx" in app_name),
-                "mount_dirs": self.mount_dirs[app_name],
+                "mount_cvmfs_dev": mount_cvmfs_dev,
+                #"cmd": app_cmd, ##ignored
+                "use_flx": ("ruflx" in app_name), ## TODO: find a nice way to do that thru config (similar to mount_dirs?)
+                "mount_dirs": md if md else [],
                 "connections": self.connections[app_name],
             }
 

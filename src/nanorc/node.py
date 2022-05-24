@@ -144,29 +144,9 @@ class SubsystemNode(StatefulNode):
                                 continue
                             connections[app].append(connection)
 
-                    mount_dirs = {}
-
-                    ## even more hacks
-                    for app, vals in self.cfgmgr.conf.items():
-                        mount_dirs[app] = set()
-
-                        for mod in vals['modules']:
-                            if not 'data' in mod: continue
-                            mod_data = mod['data']
-                            if 'data_store_parameters' in mod_data:
-                                mount_dirs[app].add(mod_data['data_store_parameters']['directory_path'])
-
-                            # and this is a hack within the hack
-                            if 'link_confs' in mod_data:
-                                for link_conf in mod_data['link_confs']:
-                                    if 'data_filename' in link_conf:
-                                        mount_dirs[app].add(os.path.dirname(link_conf['data_filename']))
-                        mount_dirs[app] = list(mount_dirs[app])
-
                     self.pm = K8SProcessManager(
                         console=self.console,
                         connections=connections,
-                        mount_dirs=mount_dirs,
                         cluster_config=event.kwargs['pm']
                     )
 

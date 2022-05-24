@@ -211,22 +211,6 @@ class ConfigManager:
                     c['uri'] = c['uri'].replace(str(port), str(newport))
                 self.log.debug(c['uid'], c['uri'])
 
-        for app_name, app_conf in self.conf.items():
-            for mod in app_conf['modules']:
-                if not 'data' in mod: continue
-                mod_data = mod['data']
-                if 'data_store_parameters' in mod_data:
-                    od = mod_data['data_store_parameters']['directory_path']
-                    if not os.path.isabs(od):
-                        mod_data['data_store_parameters']['directory_path'] = os.path.abspath(od)
-
-                if 'link_confs' in mod_data:
-                    for link_conf in mod_data['link_confs']:
-                        if 'data_filename' in link_conf:
-                            link_conf['data_filename'] = os.path.abspath(link_conf['data_filename'])
-
-                    # data_filename
-
 
     def runtime_start(self, data: dict) -> dict:
         """
