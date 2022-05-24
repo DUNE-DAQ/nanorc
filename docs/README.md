@@ -21,7 +21,7 @@ curl https://cernbox.cern.ch/index.php/s/VAqNtn7bwuQtff3/download -o frames.bin
 Generate a configuration:
 
 ```bash 
-python -m minidaqapp.nanorc.mdapp_multiru_gen mdapp_fake
+daqconf_multiru_gen fake_daq
 ```
 
 Next (if you want to), you can create a file called `top_level.json` which contains:
@@ -29,7 +29,7 @@ Next (if you want to), you can create a file called `top_level.json` which conta
 ```json
 {
   "apparatus_id": "fake_daq",
-  "minidaq": "mdapp_fake"
+  "minidaq": "fake_daq"
 }
 ```
 
@@ -39,7 +39,7 @@ Now you're ready to run.
 
 To see a list of options you can pass nanorc in order to control things such as the amount of information it prints and the timeouts for transitions, run `nanorc -h`. We'll skip those for now in the following demo:
 ```
-nanorc top_level.json # or "nanorc mdapp_fake" if you didn't create the top_level.json
+nanorc top_level.json # or "nanorc fake_daq" if you didn't create the top_level.json
 
 ╭──────────────────────────────────────────────────────────────────────────╮
 │                              Shonky NanoRC                               │
@@ -108,6 +108,8 @@ shonky rc> status
 ```
 
 When you've seen enough use `stop`, `scrap` and `terminate` commands. In case you experience timeout problems booting applications or sending commands, consider changing the `hosts` values from `localhost` to the hostname of your machine. This has to do with SSH authentication.
+
+nanorc commands can be autocompleted with TAB, for example, TAB will autocomplete `r` to `resume`. Options like `--disable-data-storage` will be completed with TAB after typing `start --d`.
 
 You can also control nanorc in "batch mode", e.g.:
 ```
@@ -211,3 +213,8 @@ It should be pointed out that some substitutions are made when nanorc uses a fil
 * `"getenv"` is replaced with the actual value of the environment variable, throwing a Python exception if it is unset
 * `"getenv:<default value>"` is replaced with the actual value of the environment variable if it is set, with `<default value>` used if it is unset
 * If a host is provided as `localhost` or `127.0.0.1`, the result of the Python call `socket.gethostname` is used in its place
+
+## How to run WebUI
+
+WebUI running is handled by `nanocrestrc` command. WebUI needs you to provide only one parameter in addition.
+* `-s` - serveraddress - as your browser is running on your side, it needs the information where to find REST endpoints. Simply provide address of the interface of the computer you are running the server on. Default value is `localhost`

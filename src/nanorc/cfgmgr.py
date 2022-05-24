@@ -6,8 +6,8 @@ import socket
 import requests
 import importlib.resources as resources
 import tempfile
-from rich.console import Console
 from . import confdata
+from urllib.parse import urlparse
 
 """Extract nested values from a JSON tree."""
 
@@ -46,38 +46,42 @@ def dump_json_recursively(json_data, path):
 class ConfigManager:
     """docstring for ConfigManager"""
 
-    def __init__(self, console, cfg_dir):
+    def __init__(self, log, port_offset, config):
         super().__init__()
-        self.console = console
-        conf_service_flag = 'confservice:'
-
-        if cfg_dir.find(conf_service_flag) == 0:
-            conf_name = cfg_dir.replace(conf_service_flag, '')
-            console.log(f'Using the configuration service to grab \'{conf_name}\'')
+        # conf_service_flag = 'confservice:'
+        self.log = log
+        
+        cfg_dir = ''
+        
+        if config.scheme == 'confservice':
+            self.log.info(f'Using the configuration service to grab \'{config.netloc}\'')
 
             conf_service={}
             with resources.path(confdata, "config_service.json") as p:
                 conf_service = json.load(open(p,'r'))
             url = conf_service['socket']
 
-            version_pos = conf_name.find(':v')
+            version = config.query
+            conf_name = config.netloc
             r = None
-            if version_pos>0:
-                version = conf_name[version_pos+2:]
-                conf_name = conf_name[:version_pos]
-                console.log(f'Using version {version} of \'{conf_name}\'.')
+            if version:
+                self.log.info(f'Using version {version} of \'{conf_name}\'.')
                 r = requests.get('http://'+url+'/retrieveVersion?name='+conf_name+'&version='+version)
             else:
-                console.log(f'Using latest version of \'{conf_name}\'.')
+                self.log.info(f'Using latest version of \'{conf_name}\'.')
                 r = requests.get('http://'+url+'/retrieveLast?name='+conf_name)
 
-            if r.status_code == 200:
-                config = json.loads(r.json())
-                path = Path(tempfile.mkdtemp())
-                dump_json_recursively(config, path)
-                cfg_dir = path
-            else:
-                raise RuntimeError(f'Unexpected HTTP status code: {r.status_code}: {r.json()}\nAre you sure the configuration \'{conf_name}\' exist?')
+            try:
+                if r.status_code == 200:
+                    config = json.loads(r.json())
+                    path = Path(tempfile.mkdtemp())
+                    dump_json_recursively(config, path)
+                    cfg_dir = path
+            except:
+                self.log.error(f'Couldn\'t get/parse the configuration from the conf service.\nHTTP response: {r.status_code}, body: {r.json()}\nAre you sure the configuration \'{conf_name}\' exist?')
+                exit(1)
+        else:
+            cfg_dir = config.path
 
         cfg_dir = os.path.expandvars(cfg_dir)
 
@@ -85,7 +89,7 @@ class ConfigManager:
             raise RuntimeError(f"'{cfg_dir}' does not exist or is not a directory")
 
         self.cfg_dir = cfg_dir
-
+        self.port_offset = port_offset
         self._load()
 
     def _import_cmd_data(self, cmd: str, cfg: dict) -> None:
@@ -108,6 +112,12 @@ class ConfigManager:
         if "order" in cfg:
             setattr(self, f"{cmd}_order", cfg["order"])
 
+    def get_custom_commands(self):
+        ret = {}
+        for cmd in self.extra_cmds.keys():
+            ret[cmd] = getattr(self, cmd)
+        return ret
+
     def _load(self) -> None:
 
         pm_cfg = ["boot"]
@@ -127,7 +137,24 @@ class ConfigManager:
 
         self.boot = cfgs["boot"]
 
-        for c in rc_cmds:
+        json_files = [f for f in os.listdir(self.cfg_dir) if os.path.isfile(os.path.join(self.cfg_dir, f)) and '.json' in f]
+        self.extra_cmds = {}
+
+        for json_file in json_files:
+            cmd = json_file.split(".")[0]
+
+            if cmd in rc_cmds+pm_cfg:
+                continue
+
+            with open(os.path.join(self.cfg_dir,json_file), 'r') as jf:
+                try:
+                    j = json.load(jf)
+                    cfgs[cmd] = j
+                    self.extra_cmds[cmd] = j
+                except json.decoder.JSONDecodeError as e:
+                    raise RuntimeError(f"ERROR: failed to load {cmd}.json") from e
+
+        for c in rc_cmds+list(self.extra_cmds.keys()):
             self._import_cmd_data(c, cfgs[c])
 
         # Post-process conf
@@ -136,6 +163,17 @@ class ConfigManager:
             n: (h if (not h in ("localhost", "127.0.0.1")) else socket.gethostname())
             for n, h in self.boot["hosts"].items()
         }
+
+        #port offseting
+        for app in self.boot["apps"]:
+            port = self.boot['apps'][app]['port']
+            newport = port + self.port_offset
+            fixed = self.boot['apps'][app].get('fixed')
+            if fixed :
+                newport = port
+            self.boot['apps'][app]['port'] = newport
+
+        self.boot['response_listener']['port'] += self.port_offset
 
         ll = { **self.boot["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration
         for k, v in ll.items():
@@ -151,6 +189,22 @@ class ConfigManager:
                     self.boot["env"][k] = v[v.find(":") + 1:]
                 else:
                     raise ValueError("Key " + k + " is not in environment and no default specified!")
+        if self.boot.get('scripts'):
+            for script_spec in self.boot["scripts"].values():
+                ll = { **script_spec["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration
+                for k, v in ll.items():
+                    if v == "getenv_ifset":
+                        if k in os.environ.keys():
+                            script_spec["env"][k] = os.environ[k]
+                        else:
+                            script_spec["env"].pop(k)
+                    elif str(v).find("getenv") == 0:
+                        if k in os.environ.keys():
+                            script_spec["env"][k] = os.environ[k]
+                        elif str(v).find(":") > 0:
+                            script_spec["env"][k] = v[v.find(":") + 1:]
+                        else:
+                            raise ValueError("Key " + k + " is not in environment and no default specified!")
 
         for exec_spec in self.boot["exec"].values():
             ll = { **exec_spec["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration
@@ -171,21 +225,29 @@ class ConfigManager:
         # Conf:
         ips = {n: socket.gethostbyname(h) for n, h in self.boot["hosts"].items()}
         # Set addresses to ips for networkmanager
-        for connections in json_extract(self.init, "nwconnections"):
+        for connections in json_extract(self.init, "connections"):
             for c in connections:
+                if "queue://" in c['uri']:
+                    continue
                 from string import Formatter
-                fieldnames = [fname for _, fname, _, _ in Formatter().parse(c['address']) if fname]
+                origuri = c['uri']
+                fieldnames = [fname for _, fname, _, _ in Formatter().parse(c['uri']) if fname]
                 if len(fieldnames)>1:
-                    raise RuntimeError(f"Too many fields in connection {c['address']}")
+                    raise RuntimeError(f"Too many fields in connection {c['uri']}")
                 for fieldname in fieldnames:
                     if fieldname in ips:
-                        c["address"] = c["address"].format(**ips)
+                        c["uri"] = c["uri"].format(**ips)
                     else:
                         try:
                             dico = {"HOST_IP":socket.gethostbyname(fieldname)}
-                            c['address'] = c['address'].replace(fieldname, "HOST_IP").format(**dico)
+                            c['uri'] = c['uri'].replace(fieldname, "HOST_IP").format(**dico)
                         except Exception as e:
                             raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
+                if "{host_" in origuri: # External connections have fixed hostnames
+                    # Port offsetting
+                    port = urlparse(c['uri']).port
+                    newport = port + self.port_offset
+                    c['uri'] = c['uri'].replace(str(port), str(newport))
 
 
 

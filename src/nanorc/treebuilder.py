@@ -2,9 +2,14 @@ from .statefulnode import StatefulNode
 from .node import SubsystemNode
 from .cfgmgr import ConfigManager
 import os
+import copy as cp
 import json
+from pathlib import Path
+from urllib.parse import ParseResult
 from collections import OrderedDict
 from json import JSONDecoder
+from pathlib import Path
+from anytree import PreOrderIter
 
 def dict_raise_on_duplicates(ordered_pairs):
     count=0
@@ -20,56 +25,81 @@ class TreeBuilder:
     def extract_json_to_nodes(self, js, mother, fsm_conf) -> StatefulNode:
         for n,d in js.items():
             if isinstance(d, dict):
-                child = StatefulNode(name=n,
-                                  parent=mother,
-                                  console=self.console,
-                                  fsm_conf = fsm_conf)
+                child = StatefulNode(
+                    name = n,
+                    parent = mother,
+                    console = self.console,
+                    fsm_conf = fsm_conf
+                )
                 self.extract_json_to_nodes(d, child, fsm_conf = fsm_conf)
-            elif isinstance(d, str):
-                node = SubsystemNode(name=n,
-                                     ssh_conf=self.ssh_conf,
-                                     cfgmgr=ConfigManager(self.console,d),
-                                     console=self.console,
-                                     fsm_conf = fsm_conf,
-                                     parent = mother)
+
+            elif isinstance(d, ParseResult):
+                node = SubsystemNode(
+                    name = n,
+                    ssh_conf = self.ssh_conf,
+                    cfgmgr = ConfigManager(
+                        log = self.log,
+                        config = d,
+                        port_offset = self.port_offset+self.subsystem_port_offset),
+                    console=self.console,
+                    fsm_conf = fsm_conf,
+                    parent = mother
+                )
+                self.subsystem_port_offset += self.subsystem_port_increment
+
             else:
                 self.log.error(f"ERROR processing the tree {n}: {d} I don't know what that's supposed to mean?")
                 exit(1)
 
-    def __init__(self, log, top_cfg, fsm_conf, console, ssh_conf):
+    def get_custom_commands(self):
+        ret = {}
+        for node in PreOrderIter(self.topnode):
+            ret.update(node.get_custom_commands())
+        return ret
+
+    def __init__(self, log, top_cfg, fsm_conf, console, ssh_conf, port_offset):
         self.log = log
         self.ssh_conf = ssh_conf
         self.fsm_conf = fsm_conf
-        if os.path.isdir(top_cfg):
+        self.port_offset = port_offset
+        self.subsystem_port_offset = 0
+        self.subsystem_port_increment = 20
+        
+        if top_cfg.scheme == 'dir':
+            apparatus_id = Path(top_cfg.path).name
             data = {
-                "apparatus_id": top_cfg,
-                top_cfg:top_cfg
+                "apparatus_id": apparatus_id,
+                apparatus_id: top_cfg
             }
-            data = json.dumps(data)
-        elif os.path.isfile(top_cfg):
-            f = open(top_cfg, 'r')
-            data = f.read()
-        elif top_cfg.find('confservice:')==0:
-            pretty_name=top_cfg.replace('confservice:', '')
+            self.top_cfg = data
+        elif top_cfg.scheme == 'file':
+            from .cli import validate_conf
+            f = open(top_cfg.path)
+            data = json.load(f)
+            if not 'apparatus_id' in data:
+                self.log.error(f'{top_cfg} doesn\'t have an \'apparatus_id\' entry')
+                exit(1)
+            data_cp = cp.deepcopy(data)
+            for key, val in data.items():
+                if key=='apparatus_id':continue
+                try:
+                    data_cp[key] = validate_conf(None, None, val)
+                except Exception as e:
+                    self.log.error(f'Error parsing the line {key}:{val} of the configuration: {e}')
+
+            self.top_cfg = data_cp
+        elif top_cfg.scheme == 'confservice':
+            pretty_name = top_cfg.netloc
             data = {
                 "apparatus_id": pretty_name,
-                pretty_name:top_cfg
+                pretty_name: top_cfg
             }
-            data = json.dumps(data)
+            self.top_cfg = data
         else:
             self.log.error(f"{top_cfg} invalid! You must provide either a top level json file, a directory name, or confservice:configuration")
             exit(1)
 
         self.console = console
-
-        try:
-            self.top_cfg = json.loads(data, object_pairs_hook=dict_raise_on_duplicates)
-        except json.JSONDecodeError as e:
-            self.log.error("Failed to parse your top level json:\n"+str(e))
-            exit(1)
-        except RuntimeError as e:
-            self.log.error(str(e)+" in your top level json.")
-            exit(1)
 
         self.apparatus_id = self.top_cfg.get("apparatus_id")
         if self.apparatus_id:
