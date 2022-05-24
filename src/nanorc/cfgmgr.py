@@ -120,9 +120,6 @@ class ConfigManager:
         for app in self.boot["apps"]:
             port = self.boot['apps'][app]['port']
             newport = port + self.port_offset
-            fixed = self.boot['apps'][app].get('fixed')
-            if fixed :
-                newport = port
             self.boot['apps'][app]['port'] = newport
 
         self.boot['response_listener']['port'] += self.port_offset
@@ -176,10 +173,14 @@ class ConfigManager:
 
         # Conf:
         ips = {n: socket.gethostbyname(h) for n, h in self.boot["hosts"].items()}
-        # Set addresses to ips for networkmanager
+        external_connections = self.boot['external_connections']
+        if self.resolve_hostname:
+            hosts = self.boot["hosts"]
+        else:
+            hosts = { "host_"+app:app for app in self.boot["apps"].keys() }
+
         for connections in json_extract(self.init, "connections"):
             for c in connections:
-                if not self.resolve_hostname: continue
                 if "queue://" in c['uri']:
                     continue
                 from string import Formatter
@@ -189,32 +190,26 @@ class ConfigManager:
                     raise RuntimeError(f"Too many fields in connection {c['uri']}")
                 for fieldname in fieldnames:
                     if fieldname in ips:
-                        c["uri"] = c["uri"].format(**ips)
+                        if self.resolve_hostname:
+                            c["uri"] = c["uri"].format(**ips)
+                        else:
+                            c["uri"] = c["uri"].format(**hosts)
                     else:
                         try:
-                            dico = {"HOST_IP":socket.gethostbyname(fieldname)}
+                            if self.resolve_hostname:
+                                dico = {"HOST_IP": socket.gethostbyname(fieldname)}
+                            else:
+                                dico = {"HOST_IP": fieldname.replace('host_', "")}
+
                             c['uri'] = c['uri'].replace(fieldname, "HOST_IP").format(**dico)
                         except Exception as e:
                             raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
-                if "{host_" in origuri: # External connections have fixed hostnames
+                if not c['uid'] in external_connections: # TODO: ignore this altogether with k8s
                     # Port offsetting
                     port = urlparse(c['uri']).port
                     newport = port + self.port_offset
                     c['uri'] = c['uri'].replace(str(port), str(newport))
-
-        if self.resolve_hostname:
-            hosts = self.boot["hosts"]
-        else:
-            hosts = { "host_"+app:app for app in self.boot["apps"].keys() }
-
-
-        for app_name, app_init in self.init.items():
-            hosts_new = {
-                v: (n if v!='host_'+app_name else '0.0.0.0') for v,n in hosts.items()
-            }
-            for connections in json_extract(app_init, "nwconnections"):
-                for c in connections:
-                    c['address'] = c["address"].format(**hosts_new)
+                self.log.debug(c['uid'], c['uri'])
 
         for app_name, app_conf in self.conf.items():
             for mod in app_conf['modules']:
