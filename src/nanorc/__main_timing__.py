@@ -39,9 +39,10 @@ from .cli import *
 @accept_timeout(60)
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
+@click.argument('cfg_dir', type=click.Path(exists=True))
 @click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=argval.validate_partition_number)
 @click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn webui')
-@click.argument('cfg_dir', type=click.Path(exists=True))
+@click.argument('cfg_dir', type=str, callback=validate_conf)
 @click.pass_obj
 @click.pass_context
 def timingcli(ctx, obj, traceback, loglevel, log_path, cfg_dumpdir, kerberos, timeout, partition_number, web, cfg_dir):
@@ -67,17 +68,17 @@ def timingcli(ctx, obj, traceback, loglevel, log_path, cfg_dumpdir, kerberos, ti
     rest_thread  = threading.Thread()
     webui_thread = threading.Thread()
     try:
-        rc = NanoRC(console = obj.console,
-                    fsm_cfg = "timing",
-                    top_cfg = cfg_dir,
-                    run_num_mgr = None,
-                    run_registry = None,
-                    logbook_type = None,
-                    timeout = timeout,
-                    use_kerb = kerberos,
-                    port_offset = port_offset,
-                    partition_label = None,
-                    partition_number = None)
+        rc = NanoRC(
+            console = obj.console,
+            fsm_cfg = "timing",
+            top_cfg = cfg_dir,
+            run_num_mgr = None,
+            run_registry = None,
+            logbook_type = None,
+            timeout = timeout,
+            use_kerb = kerberos,
+            port_offset = port_offset
+        )
 
         rc.log_path = os.path.abspath(log_path)
         add_custom_cmds(ctx.command, rc.execute_custom_command, rc.custom_cmd)

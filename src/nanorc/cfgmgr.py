@@ -1,7 +1,12 @@
 import os.path
 import json
+from pathlib import Path
 import copy
 import socket
+import requests
+import importlib.resources as resources
+import tempfile
+from . import confdata
 from urllib.parse import urlparse
 
 """Extract nested values from a JSON tree."""
@@ -27,13 +32,57 @@ def json_extract(obj, key):
     values = extract(obj, arr, key)
     return values
 
+def dump_json_recursively(json_data, path):
+    for f in json_data['files']:
+        with open(path/(f['name']+'.json'), 'w') as outfile:
+            json.dump(f['configuration'], outfile, indent=4)
+
+    for d in json_data['dirs']:
+        dirname = path/d['name']
+        dirname.mkdir(exist_ok=True)
+        dump_json_recursively(d['dir_content'], dirname)
+
 
 class ConfigManager:
     """docstring for ConfigManager"""
 
-    def __init__(self, log, cfg_dir, port_offset, partition_number, partition_label):
+    def __init__(self, log, port_offset, config):
         super().__init__()
+        # conf_service_flag = 'confservice:'
         self.log = log
+        
+        cfg_dir = ''
+        
+        if config.scheme == 'confservice':
+            self.log.info(f'Using the configuration service to grab \'{config.netloc}\'')
+
+            conf_service={}
+            with resources.path(confdata, "config_service.json") as p:
+                conf_service = json.load(open(p,'r'))
+            url = conf_service['socket']
+
+            version = config.query
+            conf_name = config.netloc
+            r = None
+            if version:
+                self.log.info(f'Using version {version} of \'{conf_name}\'.')
+                r = requests.get('http://'+url+'/retrieveVersion?name='+conf_name+'&version='+version)
+            else:
+                self.log.info(f'Using latest version of \'{conf_name}\'.')
+                r = requests.get('http://'+url+'/retrieveLast?name='+conf_name)
+
+            try:
+                if r.status_code == 200:
+                    config = json.loads(r.json())
+                    path = Path(tempfile.mkdtemp())
+                    dump_json_recursively(config, path)
+                    cfg_dir = path
+            except:
+                self.log.error(f'Couldn\'t get/parse the configuration from the conf service.\nHTTP response: {r.status_code}, body: {r.json()}\nAre you sure the configuration \'{conf_name}\' exist?')
+                exit(1)
+        else:
+            cfg_dir = config.path
+
         cfg_dir = os.path.expandvars(cfg_dir)
 
         if not (os.path.exists(cfg_dir) and os.path.isdir(cfg_dir)):
@@ -41,8 +90,6 @@ class ConfigManager:
 
         self.cfg_dir = cfg_dir
         self.port_offset = port_offset
-        self.partition_label = partition_label
-        self.partition_number = partition_number
         self._load()
 
     def _import_cmd_data(self, cmd: str, cfg: dict) -> None:
@@ -159,16 +206,6 @@ class ConfigManager:
                         else:
                             raise ValueError("Key " + k + " is not in environment and no default specified!")
 
-        # partition renaming using partition label and number
-        partition_from_config = self.boot["env"]["DUNEDAQ_PARTITION"]
-        if self.partition_label:
-            self.boot["env"]["DUNEDAQ_PARTITION"] = f"{self.partition_label}"
-
-        # if self.partition_number is not None:
-        #     self.boot["env"]["DUNEDAQ_PARTITION"] += f"_{self.partition_number}"
-
-        self.log.info(f'Using partition: \"{self.boot["env"]["DUNEDAQ_PARTITION"]}\"')
-
         for exec_spec in self.boot["exec"].values():
             ll = { **exec_spec["env"] }  # copy to avoid RuntimeError: dictionary changed size during iteration
             for k, v in ll.items():
@@ -193,6 +230,7 @@ class ConfigManager:
                 if "queue://" in c['uri']:
                     continue
                 from string import Formatter
+                origuri = c['uri']
                 fieldnames = [fname for _, fname, _, _ in Formatter().parse(c['uri']) if fname]
                 if len(fieldnames)>1:
                     raise RuntimeError(f"Too many fields in connection {c['uri']}")
@@ -205,12 +243,11 @@ class ConfigManager:
                             c['uri'] = c['uri'].replace(fieldname, "HOST_IP").format(**dico)
                         except Exception as e:
                             raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
-                if c['partition'] is partition_from_config:
+                if "{host_" in origuri: # External connections have fixed hostnames
                     # Port offsetting
                     port = urlparse(c['uri']).port
                     newport = port + self.port_offset
                     c['uri'] = c['uri'].replace(str(port), str(newport))
-                    c['partition'] = self.boot["env"]["DUNEDAQ_PARTITION"] # Update partition name in case it changed
 
 
 

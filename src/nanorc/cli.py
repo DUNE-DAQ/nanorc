@@ -16,6 +16,8 @@ import os.path
 import socket
 from pathlib import Path
 import logging
+from urllib.parse import urlparse, ParseResult
+
 import threading
 
 from . import __version__
@@ -131,12 +133,11 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
 @accept_timeout(60)
 @click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=argval.validate_partition_number)
-@click.option('--partition-label', type=str, default=None, help='partition label to be use as prefix of partition name')
 @click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn webui')
-@click.argument('top_cfg', type=click.Path(exists=True))
+@click.argument('top_cfg', type=str, callback=argval.validate_conf)
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, timeout, kerberos, partition_number, partition_label, web, top_cfg):
+def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, timeout, kerberos, partition_number, web, top_cfg):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f'{credentials.user}@rc> '
@@ -169,9 +170,7 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
                     timeout = timeout,
                     use_kerb = kerberos,
                     logbook_prefix = logbook_prefix,
-                    port_offset = port_offset,
-                    partition_label = partition_label,
-                    partition_number = partition_number)
+                    port_offset = port_offset)
 
         if log_path:
             rc.log_path = os.path.abspath(log_path)
@@ -262,10 +261,11 @@ def pin_threads(ctx, obj:NanoContext, pin_thread_file, timeout:int):
 
 @cli.command('boot')
 @accept_timeout(None)
+@click.argument('partition', type=str)
 @click.pass_obj
 @click.pass_context
-def boot(ctx, obj, timeout:int):
-    obj.rc.boot(timeout=timeout)
+def boot(ctx, obj, partition:str, timeout:int):
+    obj.rc.boot(partition=partition, timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
 

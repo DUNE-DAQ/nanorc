@@ -41,13 +41,12 @@ from .cli import *
 @click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
 @click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=argval.validate_partition_number)
-@click.option('--partition-label', type=str, default=None, help='partition label to be use as prefix of partition name')
-@click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn webui')
-@click.argument('cfg_dir', type=click.Path(exists=True))
+@click.argument('cfg_dir', type=str, callback=argval.validate_conf)
 @click.argument('user', type=str)
+@click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn webui')
 @click.pass_obj
 @click.pass_context
-def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, dotnanorc, kerberos, timeout, partition_number, partition_label, web, cfg_dir, user):
+def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, dotnanorc, kerberos, timeout, partition_number, web, cfg_dir, user):
 
     if not elisa_conf:
         with resources.path(confdata, "elisa_conf.json") as p:
@@ -92,16 +91,16 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
         logging.getLogger("cli").info("RunDB socket "+rundb_socket)
         logging.getLogger("cli").info("RunRegistryDB socket "+runreg_socket)
 
-        rc = NanoRC(console = obj.console,
-                    top_cfg = cfg_dir,
-                    run_num_mgr = DBRunNumberManager(rundb_socket),
-                    run_registry = DBConfigSaver(runreg_socket),
-                    logbook_type = elisa_conf,
-                    timeout = timeout,
-                    use_kerb = kerberos,
-                    port_offset = port_offset,
-                    partition_number = partition_number,
-                    partition_label = partition_label)
+        rc = NanoRC(
+            console = obj.console,
+            top_cfg = cfg_dir,
+            run_num_mgr = DBRunNumberManager(rundb_socket),
+            run_registry = DBConfigSaver(runreg_socket),
+            logbook_type = elisa_conf,
+            timeout = timeout,
+            use_kerb = kerberos,
+            port_offset = port_offset
+        )
 
         rc.log_path = os.path.abspath(log_path)
         add_custom_cmds(ctx.command, rc.execute_custom_command, rc.custom_cmd)
