@@ -118,7 +118,7 @@ class K8SProcessManager(object):
             self.log.error(e)
             raise RuntimeError(f"Failed to delete namespace \"{namespace}\"") from e
 
-    def get_container_port_list_from_connections(self, connections:list=None):
+    def get_container_port_list_from_connections(self, app_name:str, connections:list=None):
         ret = [
             client.V1ContainerPort(
                 name = 'restcmd',
@@ -127,8 +127,8 @@ class K8SProcessManager(object):
             )]
         for c in connections:
             uri = urlparse(c['uri'])
+            if uri.hostname != app_name: continue
             print(uri)
-            if uri.hostname != '0.0.0.0': continue
 
             ret += [
                 client.V1ContainerPort(
@@ -140,7 +140,7 @@ class K8SProcessManager(object):
         return ret
 
 
-    def get_service_port_list_from_connections(self, connections:list=None):
+    def get_service_port_list_from_connections(self, app_name:str, connections:list=None):
         ret = [
             client.V1ServicePort(
                 name = 'restcmd',
@@ -151,8 +151,8 @@ class K8SProcessManager(object):
 
         for c in connections:
             uri = urlparse(c['uri'])
+            if uri.hostname !=  app_name: continue
             print(uri)
-            if uri.hostname != '0.0.0.0': continue
 
             ret += [
                 client.V1ServicePort(
@@ -210,7 +210,7 @@ class K8SProcessManager(object):
                         ],
                         command=['/dunedaq/run/app-entrypoint.sh'],
                         args=app_boot_info['args'],
-                        ports=self.get_container_port_list_from_connections(app_boot_info['connections']),
+                        ports=self.get_container_port_list_from_connections(app_name=name, connections=app_boot_info['connections']),
                         volume_mounts=(
                             ([
                                 client.V1VolumeMount(
@@ -296,7 +296,7 @@ class K8SProcessManager(object):
         service = client.V1Service(
             metadata = client.V1ObjectMeta(name=name),
             spec = client.V1ServiceSpec(
-                ports = self.get_service_port_list_from_connections(app_boot_info['connections']),
+                ports = self.get_service_port_list_from_connections(app_name=name, connections=app_boot_info['connections']),
                 selector = {"app": app_label}
             )
         )  # V1Service
