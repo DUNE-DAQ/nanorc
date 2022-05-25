@@ -40,7 +40,7 @@ from .cli import *
 @click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
 @click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=validate_partition_number)
-@click.argument('cfg_dir', type=click.Path(exists=True))
+@click.argument('cfg_dir', type=str, callback=validate_conf)
 @click.argument('user', type=str)
 @click.pass_obj
 @click.pass_context

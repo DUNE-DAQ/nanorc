@@ -134,6 +134,7 @@ class SubsystemNode(StatefulNode):
                 timeout=timeout
             )
         except Exception as e:
+            self.console.print_exception()
             self.log.error(e)
             response['status_code'] = ErrorCode.Failed
             response['error'] = str(e)

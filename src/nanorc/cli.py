@@ -16,6 +16,8 @@ import os.path
 import socket
 from pathlib import Path
 import logging
+from urllib.parse import urlparse, ParseResult
+
 import threading
 
 from . import __version__
@@ -120,6 +122,26 @@ def check_rc(ctx, obj):
     if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
         ctx.exit(obj.rc.return_code)
 
+def validate_conf(ctx, param, top_cfg):
+    confurl = urlparse(top_cfg)
+    print(confurl)
+    if os.path.isdir(confurl.path):
+        confurl=ParseResult(
+            scheme='dir',
+            path=top_cfg,
+            netloc='', params='', query='', fragment='')
+        return confurl
+    if os.path.exists(confurl.path) and confurl.path[-5:]=='.json':
+        confurl=ParseResult(
+            scheme='file',
+            path=top_cfg,
+            netloc='', params='', query='', fragment='')
+        return confurl
+    if confurl.scheme == 'confservice':
+        return confurl
+    
+    raise click.BadParameter(f"TOP_CFG should either be a directory, a json file, or a config service utility with the form confservice://the_conf_name?1 (where the ?1 at the end is optionnal and represents the version). You provided: '{top_cfg}'")
+
 def validate_partition_number(ctx, param, number):
     if number<0 or number>10:
         raise click.BadParameter(f"Partition number should be between 0 and 10 (you fed {number})")
@@ -162,7 +184,7 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
 @accept_timeout(60)
 @click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=validate_partition_number)
 @click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn webui')
-@click.argument('top_cfg', type=click.Path(exists=True), callback=validateCfgDir)
+@click.argument('top_cfg', type=str, callback=validate_conf)
 @click.pass_obj
 @click.pass_context
 def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, timeout, kerberos, partition_number, web, top_cfg):

@@ -21,6 +21,7 @@ setup(
         "click",
         "click-shell",
         "Flask",
+        "requests",
         "Flask-HTTPAuth",
         "Flask-RESTful",
         "Flask-Cors",
