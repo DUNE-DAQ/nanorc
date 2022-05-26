@@ -26,6 +26,7 @@ from nanorc.runmgr import DBRunNumberManager
 from nanorc.cfgsvr import DBConfigSaver
 from nanorc.credmgr import credentials
 from . import confdata
+import nanorc.argval as argval
 
 from .cli import *
 # ------------------------------------------------------------------------------
@@ -39,12 +40,13 @@ from .cli import *
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
 @click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
-@click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=validate_partition_number)
-@click.argument('cfg_dir', type=str, callback=validate_conf)
+@click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=argval.validate_partition_number)
+@click.argument('cfg_dir', type=str, callback=argval.validate_conf)
 @click.argument('user', type=str)
+@click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn webui')
 @click.pass_obj
 @click.pass_context
-def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, dotnanorc, kerberos, timeout, partition_number, cfg_dir, user):
+def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, dotnanorc, kerberos, timeout, partition_number, web, cfg_dir, user):
 
     if not elisa_conf:
         with resources.path(confdata, "elisa_conf.json") as p:
@@ -63,10 +65,14 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
     obj.console.print(Panel.fit(grid))
 
     port_offset = 0 + partition_number * 1_000
+    rest_port = 5005 + partition_number
+    webui_port = 5015 + partition_number
 
     if loglevel:
         updateLogLevel(loglevel)
 
+    rest_thread  = threading.Thread()
+    webui_thread = threading.Thread()
     try:
         dotnanorc = os.path.expanduser(dotnanorc)
         obj.console.print(f"[blue]Loading {dotnanorc}[/blue]")
@@ -98,6 +104,46 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
 
         rc.log_path = os.path.abspath(log_path)
         add_custom_cmds(ctx.command, rc.execute_custom_command, rc.custom_cmd)
+        if web:
+            host = socket.gethostname()
+
+            rc_context.obj = obj
+            rc_context.console = obj.console
+            rc_context.top_json = cfg_dir
+            rc_context.rc = rc
+            rc_context.commands = ctx.command.commands
+            rc_context.ctx = ctx
+
+            obj.console.log(f"Starting up RESTAPI on {host}:{rest_port}")
+            rest = RestApi(rc_context, host, rest_port)
+            rest_thread = threading.Thread(target=rest.run, name="NanoRC_REST_API")
+            rest_thread.start()
+            obj.console.log(f"Started RESTAPI")
+
+            webui_thread = None
+            obj.console.log(f'Starting up Web UI on {host}:{webui_port}')
+            webui = WebServer(host, webui_port, host, rest_port)
+            webui_thread = threading.Thread(target=webui.run, name='NanoRC_WebUI')
+            webui_thread.start()
+            obj.console.log(f"")
+            obj.console.log(f"")
+            obj.console.log(f"")
+            obj.console.log(f"")
+            grid = Table(title='Web NanoRC', show_header=False, show_edge=False)
+            grid.add_column()
+            grid.add_row(f"Started Web UI, you can now connect to: [blue]{host}:{webui_port}[/blue],")
+            if 'np04' in host:
+                grid.add_row(f"You probably need to set up a SOCKS proxy to lxplus:")
+                grid.add_row("[blue]ssh -N -D 8080 your_cern_uname@lxtunnel.cern.ch[/blue] # on a different terminal window on your machine")
+                grid.add_row(f'Make sure you set up browser SOCKS proxy with port 8080 too,')
+                grid.add_row('on Chrome, \'Hotplate localhost SOCKS proxy setup\' works well).')
+            grid.add_row()
+            grid.add_row(f'[red]To stop this, ctrl-c [/red][bold red]twice[/bold red] (that will kill the REST and WebUI threads).')
+            obj.console.print(Panel.fit(grid))
+            obj.console.log(f"")
+            obj.console.log(f"")
+            obj.console.log(f"")
+            obj.console.log(f"")
 
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
@@ -113,6 +159,9 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
     obj.rc = rc
     obj.shell = ctx.command
     rc.ls(False)
+    if web:
+        rest_thread.join()
+        webui_thread.join()
 
 np04cli.add_command(status, 'status')
 np04cli.add_command(boot, 'boot')

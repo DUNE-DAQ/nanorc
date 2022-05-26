@@ -37,6 +37,7 @@ class TreeBuilder:
                 node = SubsystemNode(
                     name = n,
                     ssh_conf = self.ssh_conf,
+                    log = self.log,
                     cfgmgr = ConfigManager(
                         log = self.log,
                         config = d,
@@ -46,7 +47,6 @@ class TreeBuilder:
                     parent = mother
                 )
                 self.subsystem_port_offset += self.subsystem_port_increment
-
             else:
                 self.log.error(f"ERROR processing the tree {n}: {d} I don't know what that's supposed to mean?")
                 exit(1)
@@ -73,7 +73,7 @@ class TreeBuilder:
             }
             self.top_cfg = data
         elif top_cfg.scheme == 'file':
-            from .cli import validate_conf
+            from .argval import validate_conf
             f = open(top_cfg.path)
             data = json.load(f)
             if not 'apparatus_id' in data:
@@ -111,7 +111,7 @@ class TreeBuilder:
         if cmd_order:
             del self.top_cfg['command_order']
 
-        self.topnode = StatefulNode(self.apparatus_id, console=self.console,
+        self.topnode = StatefulNode(self.apparatus_id, console=self.console, log=self.log,
                                     fsm_conf=self.fsm_conf, order=cmd_order, verbose=True)
         self.extract_json_to_nodes(self.top_cfg, self.topnode, fsm_conf=self.fsm_conf)
 

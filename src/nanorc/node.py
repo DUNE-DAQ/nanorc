@@ -16,8 +16,6 @@ from .fsm import FSM
 from .statefulnode import StatefulNode, ErrorCode
 from rich.progress import *
 
-log = logging.getLogger("transitions.core")
-log.setLevel(logging.ERROR)
 log = logging.getLogger("transitions")
 log.setLevel(logging.ERROR)
 
@@ -27,9 +25,9 @@ appfwk_state_dictionnary = { # !@#%&:(+_&||&!!!! (swears in raaawwww bits)
 }
 
 class ApplicationNode(StatefulNode):
-    def __init__(self, name, sup, console, fsm_conf, parent=None):
+    def __init__(self, name, sup, console, log, fsm_conf, parent=None):
         # Absolutely no children for ApplicationNode
-        super().__init__(name=name, console=console, fsm_conf=fsm_conf, parent=parent, children=None)
+        super().__init__(name=name, log=log, console=console, fsm_conf=fsm_conf, parent=parent, children=None)
         self.name = name
         self.sup = sup
 
@@ -48,8 +46,8 @@ class ApplicationNode(StatefulNode):
         self.end_terminate()
 
 class SubsystemNode(StatefulNode):
-    def __init__(self, name:str, ssh_conf, cfgmgr, fsm_conf, console, parent=None, children=None):
-        super().__init__(name=name, console=console, fsm_conf=fsm_conf, parent=parent, children=children)
+    def __init__(self, name:str, ssh_conf, log, cfgmgr, fsm_conf, console, parent=None, children=None):
+        super().__init__(name=name, log=log, console=console, fsm_conf=fsm_conf, parent=parent, children=children)
         self.name = name
         self.ssh_conf = ssh_conf
 
@@ -121,10 +119,10 @@ class SubsystemNode(StatefulNode):
             "command": "boot",
         }
 
-
         try:
             if self.pm is None:
                 self.pm = SSHProcessManager(self.console, self.ssh_conf)
+
             timeout = event.kwargs["timeout"]
             boot_info = cp.deepcopy(self.cfgmgr.boot)
             boot_info['env']['DUNEDAQ_PARTITION'] = partition
@@ -134,6 +132,7 @@ class SubsystemNode(StatefulNode):
                 timeout=timeout
             )
         except Exception as e:
+            self.log.error(f'Couldn\'t boot {self.name}')
             self.console.print_exception()
             self.log.error(e)
             response['status_code'] = ErrorCode.Failed
@@ -141,13 +140,22 @@ class SubsystemNode(StatefulNode):
             self.to_error(event=event, response=response)
             return
 
-        self.listener = ResponseListener(self.cfgmgr.boot["response_listener"]["port"])
+        try:
+            self.listener = ResponseListener(self.cfgmgr.boot["response_listener"]["port"])
+        except Exception as e:
+            self.log.error(f'Couldn\'t create a response listener for {self.name}')
+            self.log.error(str(e))
+            response['error'] = str(e)
+            response['status_code'] = ErrorCode.Failed
+            self.to_error(event=event, response=response)
+            return
 
         children = []
         failed = []
         for n,d in self.pm.apps.items():
             child = ApplicationNode(name=n,
                                     console=self.console,
+                                    log=self.log,
                                     sup=AppSupervisor(self.console, d, self.listener),
                                     parent=self,
                                     fsm_conf=self.fsm_conf)
@@ -173,13 +181,9 @@ class SubsystemNode(StatefulNode):
         if failed:
            status_code = ErrorCode.Failed
 
-        response = {
-            "node": self.name,
-            "status_code": status_code,
-            "command": "boot",
-            "failed": [f['node'] for f in failed],
-            "error": failed,
-        }
+        response["status_code"] = status_code
+        response["failed"] = [f['node'] for f in failed]
+        response["error"] =  failed
 
         if response['status_code'] != ErrorCode.Success:
             self.to_error(event=event, response=response)
