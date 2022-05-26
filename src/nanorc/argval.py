@@ -1,4 +1,5 @@
 from anytree.resolver import Resolver
+from urllib.parse import urlparse, ParseResult
 from os import path
 import click
 
@@ -47,3 +48,23 @@ def validate_partition_number(ctx, param, number):
     if number<0 or number>10:
         raise click.BadParameter(f"Partition number should be between 0 and 10 (you fed {number})")
     return number
+
+
+def validate_conf(ctx, param, top_cfg):
+    confurl = urlparse(top_cfg)
+    if path.isdir(confurl.path):
+        confurl=ParseResult(
+            scheme='dir',
+            path=top_cfg,
+            netloc='', params='', query='', fragment='')
+        return confurl
+    if path.exists(confurl.path) and confurl.path[-5:]=='.json':
+        confurl=ParseResult(
+            scheme='file',
+            path=top_cfg,
+            netloc='', params='', query='', fragment='')
+        return confurl
+    if confurl.scheme == 'confservice':
+        return confurl
+
+    raise click.BadParameter(f"TOP_CFG should either be a directory, a json file, or a config service utility with the form confservice://the_conf_name?1 (where the ?1 at the end is optionnal and represents the version). You provided: '{top_cfg}'")

@@ -37,6 +37,7 @@ class TreeBuilder:
                 node = SubsystemNode(
                     name = n,
                     ssh_conf = self.ssh_conf,
+                    log = self.log,
                     cfgmgr = ConfigManager(
                         log = self.log,
                         config = d,

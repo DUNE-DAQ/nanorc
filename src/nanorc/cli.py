@@ -16,7 +16,6 @@ import os.path
 import socket
 from pathlib import Path
 import logging
-from urllib.parse import urlparse, ParseResult
 
 import threading
 
@@ -133,7 +132,7 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
 @accept_timeout(60)
 @click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=argval.validate_partition_number)
-@click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn webui')
+@click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn WEBUI')
 @click.argument('top_cfg', type=str, callback=argval.validate_conf)
 @click.pass_obj
 @click.pass_context
