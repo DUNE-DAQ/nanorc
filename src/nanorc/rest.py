@@ -10,6 +10,8 @@ from nanorc.node_render import status_data
 from rich.console import Console
 from anytree.resolver import Resolver
 from anytree.exporter import DictExporter
+from os import path
+import nanorc.argval as argval
 
 class NanoWebContext:
     def __init__(self, console: Console):
@@ -21,9 +23,11 @@ class NanoWebContext:
         self.console = console
         self.print_traceback = False
         self.rc = None
+        self.obj = None
         self.last_command = None
         self.last_path = None
         self.worker_thread = None
+        self.commands = []
 
 ## PL:
 ## I don't know how else to do this, if this is None, the variable isn't global
@@ -31,30 +35,6 @@ rc_context = NanoWebContext(Console())
 
 def convert_nanorc_return_code(return_code:int):
     return 200 if return_code == 0 else 500
-
-def get_argument(form, arg_name, default_val=None, required=True):
-    if required:
-        return form[arg_name]
-
-    if not form.get(arg_name):
-        return default_val
-
-    return form.get(arg_name)
-
-def validatePath(rc, prompted_path):
-    hierarchy = []
-    if "/" in prompted_path:
-        hierarchy = prompted_path.split("/")
-
-    topnode = rc.topnode
-
-    r = Resolver('name')
-    try:
-        node = r.get(topnode, prompted_path)
-    except Exception as ex:
-        raise RuntimeError(f"Couldn't find {prompted_path} in the tree") from ex
-
-    return hierarchy
 
 
 class status(Resource):
@@ -73,14 +53,12 @@ class node(Resource):
             return "I'm busy!"
         path = path.replace(".", "/")
         try:
-            path = validatePath(rc_context.rc, path)
+            node = argval.validate_node_path(rc_context, None, path)
         except Exception as ex:
             resp = make_response(f"Couldn't find {path} in the tree")
             return resp
 
         r = Resolver('name')
-        path = "/".join(path)
-        node = r.get(rc_context.rc.topnode, path)
         data = status_data(node, False)
         resp = make_response(data, 200)
         return resp
@@ -112,13 +90,79 @@ class fsm(Resource):
             return resp
         return "No FSM initiated!"
 
+def parse_argument(form, ctx):
+    commands = ctx.commands
+    rc = ctx.rc
+
+    cmd=form['command'].lower()
+    ret = {}
+
+    for param in commands[cmd].params:
+        value = None
+        if param.name in form or param.required:
+            value = form[param.name]
+        else:
+            value = param.default
+
+        if value != None:
+            if str(param.type) == 'INT':
+                value = int(value)
+            elif str(param.type) == 'BOOL':
+                value = bool(value)
+
+        ### <hack>
+        if param.name == 'timeout':
+            value = argval.validate_timeout(None, None, value)
+        elif param.name == 'path':
+            value = argval.validate_node_path(rc_context, None, value)
+        elif param.name == 'stop_wait':
+            value = argval.validate_stop_wait(None, None, value)
+        elif param.name == 'pin_thread_file':
+            value = argval.validate_path_exists(value)
+        ### </hack>
+        ret[param.name] = value
+
+    return ret
+
+
 class command(Resource):
     @auth.login_required
     def get(self):
-        resp_data = {
-            "command": rc_context.last_command,
-            "path"   : rc_context.last_path,
-        }
+        resp_data = {}
+        state = rc_context.rc.topnode.state
+        state_allowed_transitions = []
+
+        for transition in rc_context.rc.topnode.fsm.transitions_cfg:
+            if transition['source'] == state or transition['source'] == '*':
+                state_allowed_transitions += [transition['trigger']]
+
+        if not state in ['none', "booted"]:
+            state_allowed_transitions += list(rc_context.rc.custom_cmd.keys()) + ["enable", "disable"]
+        if state in ['paused', "running"]:
+            state_allowed_transitions += ["start_trigger"+ "stop_trigger", "change_rate"]
+        if state in ['configured', 'running']:
+            state_allowed_transitions += ["pin-threads"]
+
+        if 'shell'          in state_allowed_transitions: state_allowed_transitions.remove('shell'         )
+        if 'wait'           in state_allowed_transitions: state_allowed_transitions.remove('wait'          )
+        if 'expert_command' in state_allowed_transitions: state_allowed_transitions.remove('expert_command')
+        if 'ls'             in state_allowed_transitions: state_allowed_transitions.remove('ls'            )
+        if 'status'         in state_allowed_transitions: state_allowed_transitions.remove('status'        )
+
+        for cmd_name, cmd_data in rc_context.commands.items():
+            if not cmd_name in state_allowed_transitions: continue
+            resp_data[cmd_name] = [
+                {
+                    param.name:
+                    {
+                        'type': 'PATH' if 'Path' in str(param.type) else str(param.type),
+                        'default': param.default,
+                        'required': param.required
+                    }
+                } for param in cmd_data.params ]
+
+
+
         return make_response(jsonify(resp_data))
 
     @auth.login_required
@@ -127,10 +171,20 @@ class command(Resource):
             return "busy!"
         try:
             form = request.form
-            cmd  = form['command'].lower()
-            path = get_argument(form, 'path', default_val=None, required=False)
+            cmd = form['command'].lower()
 
-            target=getattr(rc_context.rc, cmd) # anyway to makethis clean??
+            # <hack>
+            def get_underlying_func(func):
+                if hasattr(func, '__wrapped__'):
+                    # pass_obj, and pass_context create new object that aren't the function
+                    # anyway to make this clean??
+                    return get_underlying_func(func.__wrapped__)
+                else:
+                    return func
+            # </hack>
+
+            target = get_underlying_func(rc_context.commands[cmd].callback)
+
             if not target:
                 raise RuntimeError(f'I don\'t know of command {cmd}')
 
@@ -140,80 +194,13 @@ class command(Resource):
             log_handle = logging.FileHandler("rest_command.log")
             logger.addHandler(log_handle)
 
-            if cmd == 'boot' or cmd == 'terminate':
-                rc_context.worker_thread = threading.Thread(target=target,
-                                                            name="command-worker")
-            elif cmd == 'scrap':
-                force     = get_argument(form, 'force',     default_val=True, required=False)
-
-                args=[force]
-
-                rc_context.worker_thread = threading.Thread(target=target,
-                                                            name="command-worker",
-                                                            args=args)
-
-            elif cmd == 'stop':
-                stop_wait = get_argument(form, 'stop_wait', default_val=0   , required=False)
-                force     = get_argument(form, 'force',     default_val=True, required=False)
-                message   = get_argument(form, 'message',   default_val=""  , required=False)
-
-                def pause_sleep_stop(force, stop_wait, message):
-                    rc_context.rc.pause(force)
-                    time.sleep(stop_wait)
-                    if rc_context.rc.return_code == 0:
-                        rc_context.rc.stop(force, message=message)
-
-                args=[stop_wait, force, message]
-
-                rc_context.worker_thread = threading.Thread(target=pause_sleep_stop,
-                                                            name="command-worker",
-                                                            args=args)
-
-
-            elif cmd == 'start':
-                run_type               =     get_argument(form, 'run_type'              , default_val='TEST', required=False)
-                run_num                = int(get_argument(form, 'run_num'               , default_val=None  , required=True ))
-                disable_data_storage   =     get_argument(form, 'disable_data_storage'  , default_val=False , required=False)
-                trigger_interval_ticks =     get_argument(form, 'trigger_interval_ticks', default_val=None  , required=False)
-                message                =     get_argument(form, 'message'               , default_val=''    , required=False)
-                resume_wait            =     get_argument(form, 'resume_wait'           , default_val=0     , required=False)
-
-                if not (run_type=="TEST" or run_type=="PROD"):
-                    raise RuntimeError(f"Wrong run_type (can be either TEST or PROD), yours was: \"{run_type}\"")
-
-                def start_sleep_resume(disable_data_storage, run_type, trigger_interval_ticks, resume_wait, message):
-                    rc = rc_context.rc
-                    rc.start(disable_data_storage, run_type, message)
-                    time.sleep(resume_wait)
-                    if rc.return_code==0:
-                        rc.resume(trigger_interval_ticks)
-
-                rc_context.rc.run_num_mgr.set_run_number(run_num)
-
-                args = [disable_data_storage, run_type, trigger_interval_ticks, resume_wait, message]
-
-                rc_context.worker_thread = threading.Thread(target=start_sleep_resume,
-                                                            name="command-worker",
-                                                            args=args)
-
-
-            elif cmd == 'resume':
-                trigger_interval_ticks = get_argument(form, 'trigger_interval_ticks', default_val=None  , required=False)
-
-                args=[trigger_interval_ticks]
-
-                rc_context.worker_thread = threading.Thread(target=target,
-                                                            name="command-worker",
-                                                            args=args)
-
-            else:
-                if not path:
-                    path = rc_context.rc.topnode.name
-                path = validatePath(rc_context.rc, path)
-
-                rc_context.worker_thread = threading.Thread(target=target, name="command-worker", args=[path])
+            rc_context.worker_thread = threading.Thread(
+                target=target,
+                name="command-worker",
+                args=[rc_context.ctx,rc_context],
+                kwargs=parse_argument(form, rc_context)
+            )
             rc_context.worker_thread.start()
-
             rc_context.worker_thread.join()
             rc_context.last_command = cmd
             rc_context.last_path = path
@@ -222,8 +209,7 @@ class command(Resource):
             logs = open('rest_command.log').read()
 
             resp_data = {
-                "command"    : cmd,
-                "path"       : path,
+                "command"    : form,
                 "return_code": rc_context.rc.return_code,
                 "logs"       : logs
             }
@@ -249,7 +235,7 @@ class RestApi:
         self.app = Flask("nanorc_rest_api")
         self.api = Api(self.app)
         CORS(self.app)
-        
+
         self.api.add_resource(status,  '/nanorcrest/status')
         self.api.add_resource(node,    '/nanorcrest/node/<path>')
         self.api.add_resource(tree,    '/nanorcrest/tree')
@@ -260,7 +246,7 @@ class RestApi:
     def run(self):
         if not self.host or not self.port:
             raise RuntimeError('RestAPI: no host or port specified!')
-        
+
         self.app.run(host=self.host, port=self.port,
                      debug=True, use_reloader=False,
                      threaded=True)

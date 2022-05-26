@@ -201,8 +201,7 @@ class SSHProcessManager(object):
             except Exception as e:
                 self.log.error(f'I cannot ssh to {host}:')
                 self.log.error(f'ssh {" ".join(ssh_test_args)}')
-                self.log.error(str(e))
-                return
+                raise e
 
             ssh_args += [cmd]
 

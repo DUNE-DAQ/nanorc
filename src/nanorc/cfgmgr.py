@@ -1,7 +1,12 @@
 import os.path
 import json
+from pathlib import Path
 import copy
 import socket
+import requests
+import importlib.resources as resources
+import tempfile
+from . import confdata
 from urllib.parse import urlparse
 
 """Extract nested values from a JSON tree."""
@@ -27,14 +32,57 @@ def json_extract(obj, key):
     values = extract(obj, arr, key)
     return values
 
+def dump_json_recursively(json_data, path):
+    for f in json_data['files']:
+        with open(path/(f['name']+'.json'), 'w') as outfile:
+            json.dump(f['configuration'], outfile, indent=4)
+
+    for d in json_data['dirs']:
+        dirname = path/d['name']
+        dirname.mkdir(exist_ok=True)
+        dump_json_recursively(d['dir_content'], dirname)
+
 
 class ConfigManager:
     """docstring for ConfigManager"""
 
-    def __init__(self,log, cfg_dir, resolve_hostname=True, port_offset=0):
+    def __init__(self, log, config, resolve_hostname=True, port_offset=0):
         super().__init__()
         self.resolve_hostname = resolve_hostname
         self.log = log
+        
+        cfg_dir = ''
+        
+        if config.scheme == 'confservice':
+            self.log.info(f'Using the configuration service to grab \'{config.netloc}\'')
+
+            conf_service={}
+            with resources.path(confdata, "config_service.json") as p:
+                conf_service = json.load(open(p,'r'))
+            url = conf_service['socket']
+
+            version = config.query
+            conf_name = config.netloc
+            r = None
+            if version:
+                self.log.info(f'Using version {version} of \'{conf_name}\'.')
+                r = requests.get('http://'+url+'/retrieveVersion?name='+conf_name+'&version='+version)
+            else:
+                self.log.info(f'Using latest version of \'{conf_name}\'.')
+                r = requests.get('http://'+url+'/retrieveLast?name='+conf_name)
+
+            try:
+                if r.status_code == 200:
+                    config = json.loads(r.json())
+                    path = Path(tempfile.mkdtemp())
+                    dump_json_recursively(config, path)
+                    cfg_dir = path
+            except:
+                self.log.error(f'Couldn\'t get/parse the configuration from the conf service.\nHTTP response: {r.status_code}, body: {r.json()}\nAre you sure the configuration \'{conf_name}\' exist?')
+                exit(1)
+        else:
+            cfg_dir = config.path
+
         cfg_dir = os.path.expandvars(cfg_dir)
 
         if not (os.path.exists(cfg_dir) and os.path.isdir(cfg_dir)):

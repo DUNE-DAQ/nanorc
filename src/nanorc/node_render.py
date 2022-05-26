@@ -20,7 +20,7 @@ def status_data(node, get_children=True) -> dict:
         ret['ping'] = sup.commander.ping()
         ret['last_cmd_failed'] = (sup.last_sent_command != sup.last_ok_command)
         ret['name'] = node.name
-        ret['state'] = node.state
+        ret['state'] = node.state + ("" if node.enabled else " - disabled")
         ret['host'] = sup.desc.host,
         ret['last_sent_command'] = sup.last_sent_command
         ret['last_ok_command'] = sup.last_ok_command

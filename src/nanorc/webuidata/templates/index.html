@@ -3,7 +3,7 @@
 <div id="statemachine" style="text-align:center;"></div>
     <div id="data" class="container-fluid">
         <div id="" class="row ">
-            <div class="col-4">
+            <div class="col-2">
                 <nav class="sb-sidenav accordion sb-sidenav-light" id="sidenavAccordion">
 
                     <div id="tree">
@@ -63,7 +63,7 @@
                     </div>
                 </nav>
             </div>
-            <div class="col-8">
+            <div class="col-10">
                 <main class="mainBlock">
                     <div id="name" class="mt-1 mb-1 treetop">Controls: </div>
                     <div id="detailPage" class="content default">
@@ -80,13 +80,9 @@
                                 <div class="col-sm-4 float-left">
                                         <h4> Present state: </h4>
                                         <input type="text" id="state" class="form-control" value="" readonly>
-                                        <h4> Runnumber: </h4>
-                                        <input type="number" id="runnumber" class="form-control">
-                                        <h4> Run type: </h4>
-                                        <select id="runtype" class="form-control">
-                                            <option value="TEST">Test</option>
-                                            <option value="PROD">Prod</option>
-                                        </select>
+                                        <div id="commargs">
+                                            
+                                        </div>
                                 </div>
                             </div>
                             <hr class="mt-2 mb-3"/>
@@ -116,4 +112,23 @@
         </div>
     </div>
 </div>
+<div class="modal fade" id="argumentsModal" tabindex="-1" role="dialog" aria-labelledby="argumentsModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="ModalLabel">Modal title</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div id="modalBody" class="modal-body">
+          ...
+        </div>
+        <div id="modalFooter" class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          <button id="executeBtn" type="button" class="btn btn-primary">Execute command</button>
+        </div>
+      </div>
+    </div>
+  </div>
 {% endblock %}

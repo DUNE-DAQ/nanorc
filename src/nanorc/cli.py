@@ -16,6 +16,7 @@ import os.path
 import socket
 from pathlib import Path
 import logging
+
 import threading
 
 from . import __version__
@@ -35,6 +36,7 @@ from nanorc.logbook import FileLogbook
 from nanorc.credmgr import credentials
 from nanorc.rest import RestApi, NanoWebContext, rc_context
 from nanorc.webui import WebServer
+import nanorc.argval as argval
 
 class NanoContext:
     """docstring for NanoContext"""
@@ -81,95 +83,17 @@ def updateLogLevel(loglevel):
         for handler in sh_command_logger.handlers:
             handler.setLevel(sh_command_level)
 
-def validate_timeout(ctx, param, timeout):
-    if timeout is None:
-        return timeout
-    if timeout<=0:
-        raise click.BadParameter('Timeout should be >0')
-    return timeout
 
 def accept_timeout(default_timeout):
     def add_decorator(function):
-        return click.option('--timeout', type=int, default=default_timeout, help="Timeout, in seconds", callback=validate_timeout)(function)
+        return click.option('--timeout', type=int, default=default_timeout, help="Timeout, in seconds", callback=argval.validate_timeout)(function)
     return add_decorator
 
-def validatePath(ctx, param, prompted_path):
-
-    if prompted_path is None:
-        return None
-
-    if prompted_path[0] != '/':
-        prompted_path = '/'+prompted_path
-
-    hierarchy = prompted_path.split("/")
-    topnode = ctx.obj.rc.topnode
-
-    r = Resolver('name')
-    try:
-        node = r.get(topnode, prompted_path)
-        return node
-    except Exception as ex:
-        raise click.BadParameter(f"Couldn't find {prompted_path} in the tree") from ex
-
-    return node
-
-def validateCfgDir(ctx, param, path):
-    return str(Path(path))
 
 def check_rc(ctx, obj):
+    if not ctx.parent: return
     if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
         ctx.exit(obj.rc.return_code)
-
-class pm_desc:
-    def __init__(self, pm_arg):
-        self.arg = pm_arg
-        self.is_ssh = (self.arg=='ssh')
-        self.is_kind = (self.arg.find('kind')==0)
-        self.is_k8s_cluster = (self.arg.find('k8s')==0)
-        if not self.is_ssh and not self.is_kind and not self.is_k8s_cluster:
-            raise click.BadParameter(f'--pm should be either ssh, kind, or k8s')
-
-        if self.is_kind or self.is_k8s_cluster:
-            self.address = self.arg
-            self.address = self.address.replace('kind', '')
-            self.address = self.address.replace('k8s', '')
-            self.address = self.address.replace('://', '')
-            if not self.address:
-                self.address = 'localhost'
-                self.port = '31000'
-            else:
-                address_and_port = self.address.split(':')
-                if len(address_and_port) == 2:
-                    self.address = address_and_port[0]
-                    self.port = int(address_and_port[1])
-                else:
-                    raise click.BadParameter(f'Badly formed k8s address: {self.address}, should be of the form: server_name:port_number')
-
-        if self.is_kind and self.address != "localhost":
-            raise click.BadParameter(f'Kind address can only be localhost for now!')
-
-    def use_k8spm(self):
-        return self.is_kind or self.is_k8s_cluster
-
-    def use_sshpm(self):
-        return self.is_ssh
-
-
-def validate_pm(ctx, param, pm):
-    return pm_desc(pm)
-
-
-def validate_partition(ctx, param, partition):
-    if ctx.obj.rc.pm.use_k8spm() and not partition:
-        raise click.BadParameter(f'You need to feed a partition to run with k8s')
-    if not partition.replace('-', '').isalnum():
-        raise click.BadParameter(f'Partition {partition} should be alpha-numeric only (hyphens are allowed)!')
-    return partition
-
-def validate_partition_number(ctx, param, number):
-    if number<0 or number>10:
-        raise click.BadParameter(f"Partition number should be between 0 and 10 (you fed {number})")
-    return number
 
 def add_custom_cmds(cli, rc_cmd_exec, cmds):
     for c,d in cmds.items():
@@ -179,7 +103,8 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
             for modules_data in app_data.values():
                 for module_data in modules_data:
                     module = module_data['match']
-                    cmd_data = module_data['data']
+                    cmd_data = module_data.get('data')
+                    if not cmd_data: continue
                     for arg in cmd_data:
                         arg_list[arg] = type(cmd_data[arg])
                         arg_default[arg] = cmd_data[arg]
@@ -205,14 +130,15 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
 @click.option('--log-path', type=click.Path(exists=True), default=None, help='Where the logs should go (on localhost of applications)')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
-@click.option('--pm', type=str, default="ssh", help='Process manager, can be: ssh, kind, or k8s://np04-srv-015:31000, for example', callback=validate_pm)
-@click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=validate_partition_number)
+@click.option('--pm', type=str, default="ssh", help='Process manager, can be: ssh, kind, or k8s://np04-srv-015:31000, for example', callback=argval.validate_pm)
 @click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn webui')
-@click.argument('top_cfg', type=click.Path(exists=True))
 @accept_timeout(60)
+@click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=argval.validate_partition_number)
+@click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn WEBUI')
+@click.argument('top_cfg', type=str, callback=argval.validate_conf)
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, timeout, kerberos, partition_number, web, top_cfg, pm):
+def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, timeout, kerberos, partition_number, web, pm, top_cfg, pm):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f'{credentials.user}@rc> '
@@ -229,13 +155,13 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
     port_offset = 0 + partition_number * 1_000
     rest_port = 5005 + partition_number
     webui_port = 5015 + partition_number
-    
+
     if loglevel:
         updateLogLevel(loglevel)
 
     rest_thread  = threading.Thread()
     webui_thread = threading.Thread()
-        
+
     try:
         rc = NanoRC(console = obj.console,
                     top_cfg = top_cfg,
@@ -256,17 +182,19 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
         if web:
             host = socket.gethostname()
 
-            # rc_context = obj
+            rc_context.obj = obj
             rc_context.console = obj.console
             rc_context.top_json = top_cfg
             rc_context.rc = rc
-            
+            rc_context.commands = ctx.command.commands
+            rc_context.ctx = ctx
+
             obj.console.log(f"Starting up RESTAPI on {host}:{rest_port}")
             rest = RestApi(rc_context, host, rest_port)
             rest_thread = threading.Thread(target=rest.run, name="NanoRC_REST_API")
             rest_thread.start()
             obj.console.log(f"Started RESTAPI")
-            
+
             webui_thread = None
             obj.console.log(f'Starting up Web UI on {host}:{webui_port}')
             webui = WebServer(host, webui_port, host, rest_port)
@@ -282,6 +210,11 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
             if 'np04' in host:
                 grid.add_row(f"You probably need to set up a SOCKS proxy to lxplus:")
                 grid.add_row("[blue]ssh -N -D 8080 your_cern_uname@lxtunnel.cern.ch[/blue] # on a different terminal window on your machine")
+                grid.add_row(f'Make sure you set up browser SOCKS proxy with port 8080 too,')
+                grid.add_row('on Chrome, \'Hotplate localhost SOCKS proxy setup\' works well).')
+            elif 'lxplus' in host:
+                grid.add_row(f"You probably need to set up a SOCKS proxy to lxplus:")
+                grid.add_row(f"[blue]ssh -N -D 8080 your_cern_uname@{host}[/blue] # on a different terminal window on your machine")
                 grid.add_row(f'Make sure you set up browser SOCKS proxy with port 8080 too,')
                 grid.add_row('on Chrome, \'Hotplate localhost SOCKS proxy setup\' works well).')
             grid.add_row()
@@ -307,6 +240,7 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
     obj.rc = rc
     obj.shell = ctx.command
     rc.ls(False)
+
     if web:
         rest_thread.join()
         webui_thread.join()
@@ -320,7 +254,8 @@ def status(obj: NanoContext):
 @click.option('--pin-thread-file', type=click.Path(exists=True), default=None)
 @accept_timeout(None)
 @click.pass_obj
-def pin_threads(obj:NanoContext, pin_thread_file, timeout:int):
+@click.pass_context
+def pin_threads(ctx, obj:NanoContext, pin_thread_file, timeout:int):
     data = { "script_name": 'thread_pinning' }
     if pin_thread_file:
         data["env"]: { "DUNEDAQ_THREAD_PIN_FILE": pin_thread_file }
@@ -337,7 +272,7 @@ def boot(ctx, obj, partition:str, timeout:int):
     obj.rc.status()
 
 @cli.command('init')
-@click.option('--path', type=str, default=None, callback=validatePath)
+@click.option('--path', type=str, default=None, callback=argval.validate_node_path)
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
@@ -353,7 +288,7 @@ def ls(obj):
 
 
 @cli.command('conf')
-@click.option('--path', type=str, default=None, callback=validatePath)
+@click.option('--path', type=str, default=None, callback=argval.validate_node_path)
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
@@ -369,7 +304,7 @@ def message(obj, message):
     obj.rc.message(message)
 
 @cli.command('start')
-@click.argument('run', type=int)
+@click.argument('run_num', type=int)
 @click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')
 @click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @click.option('--resume-wait', type=int, default=0, help='Seconds to wait between Start and Resume commands')
@@ -377,18 +312,18 @@ def message(obj, message):
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def start(ctx, obj:NanoContext, run:int, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str, timeout:int):
+def start(ctx, obj:NanoContext, run_num:int, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str, timeout:int):
     """
     Start Command
 
     Args:
         obj (NanoContext): Context object
-        run (int): Run number
+        run_num (int): Run number
         disable_data_storage (bool): Flag to disable data writing to storage
 
     """
 
-    obj.rc.run_num_mgr.set_run_number(run)
+    obj.rc.run_num_mgr.set_run_number(run_num)
     obj.rc.start(disable_data_storage, "TEST", message=message, timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
@@ -441,7 +376,7 @@ def resume(ctx, obj:NanoContext, trigger_interval_ticks:int, timeout:int):
 
 
 @cli.command('scrap')
-@click.option('--path', type=str, default=None, callback=validatePath)
+@click.option('--path', type=str, default=None, callback=argval.validate_node_path)
 @click.option('--force', default=False, is_flag=True)
 @accept_timeout(None)
 @click.pass_obj
@@ -481,7 +416,7 @@ def change_rate(ctx, obj, trigger_interval_ticks, timeout):
     obj.rc.status()
 
 @cli.command('enable')
-@click.argument('path', type=str, default=None, callback=validatePath)
+@click.argument('path', type=str, default=None, callback=argval.validate_node_path)
 @click.option('--resource-name', type=str, required=True)
 @accept_timeout(None)
 @click.pass_obj
@@ -492,7 +427,7 @@ def enable(ctx, obj, path, resource_name, timeout):
     obj.rc.status()
 
 @cli.command('disable')
-@click.argument('path', type=str, default=None, callback=validatePath)
+@click.argument('path', type=str, default=None, callback=argval.validate_node_path)
 @click.option('--resource-name', type=str, required=True)
 @accept_timeout(None)
 @click.pass_obj
@@ -505,13 +440,14 @@ def disable(ctx, obj, path, resource_name, timeout):
 @cli.command('terminate')
 @accept_timeout(None)
 @click.pass_obj
-def terminate(obj, timeout):
+@click.pass_context
+def terminate(ctx, obj, timeout):
     obj.rc.terminate(timeout=timeout)
     time.sleep(1)
     obj.rc.status()
 
 @cli.command('expert_command')
-@click.argument('app', type=str, default=None, callback=validatePath)
+@click.argument('app', type=str, default=None, callback=argval.validate_node_path)
 @click.argument('json_file', type=click.Path(exists=True))
 @accept_timeout(None)
 @click.pass_obj
