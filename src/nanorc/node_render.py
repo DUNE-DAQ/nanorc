@@ -46,8 +46,6 @@ def print_status(topnode, console, apparatus_id='', partition='') -> int:
 
             if sup.desc.proc.is_alive():
                 alive = 'alive'
-            elif not sup.desc.proc:
-                alive = ''
             else:
                 try:
                     exit_code = sup.desc.proc.exit_code
