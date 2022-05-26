@@ -73,7 +73,7 @@ class TreeBuilder:
             }
             self.top_cfg = data
         elif top_cfg.scheme == 'file':
-            from .cli import validate_conf
+            from .argval import validate_conf
             f = open(top_cfg.path)
             data = json.load(f)
             if not 'apparatus_id' in data:
