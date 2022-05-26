@@ -137,7 +137,7 @@ class command(Resource):
                 state_allowed_transitions += [transition['trigger']]
 
         if not state in ['none', "booted"]:
-            state_allowed_transitions += list(rc_context.rc.custom_cmd.keys()) + ["enable"+"disable"]
+            state_allowed_transitions += list(rc_context.rc.custom_cmd.keys()) + ["enable", "disable"]
         if state in ['paused', "running"]:
             state_allowed_transitions += ["start_trigger"+ "stop_trigger", "change_rate"]
         if state in ['configured', 'running']:
@@ -194,10 +194,12 @@ class command(Resource):
             log_handle = logging.FileHandler("rest_command.log")
             logger.addHandler(log_handle)
 
-            rc_context.worker_thread = threading.Thread(target=target,
-                                                        name="command-worker",
-                                                        args=[rc_context.ctx,rc_context],
-                                                        kwargs=parse_argument(form, rc_context))
+            rc_context.worker_thread = threading.Thread(
+                target=target,
+                name="command-worker",
+                args=[rc_context.ctx,rc_context],
+                kwargs=parse_argument(form, rc_context)
+            )
             rc_context.worker_thread.start()
             rc_context.worker_thread.join()
             rc_context.last_command = cmd
