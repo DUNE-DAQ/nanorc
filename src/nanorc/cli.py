@@ -104,7 +104,8 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
             for modules_data in app_data.values():
                 for module_data in modules_data:
                     module = module_data['match']
-                    cmd_data = module_data['data']
+                    cmd_data = module_data.get('data')
+                    if not cmd_data: continue
                     for arg in cmd_data:
                         arg_list[arg] = type(cmd_data[arg])
                         arg_default[arg] = cmd_data[arg]
@@ -320,7 +321,6 @@ def start(ctx, obj:NanoContext, run_num:int, disable_data_storage:bool, trigger_
 
     """
 
-    obj.rc.console.print(f'Run {run_num} (TEST) is starting!!')
     obj.rc.run_num_mgr.set_run_number(run_num)
     obj.rc.start(disable_data_storage, "TEST", message=message, timeout=timeout)
     check_rc(ctx,obj)
