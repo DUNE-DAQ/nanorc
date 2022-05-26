@@ -83,7 +83,8 @@ class SubsystemNode(StatefulNode):
                     if app and c.name!=app_name: continue
                     cmd_data2 = cp.deepcopy(cmd_data)
                     for m in cmd_data2['modules']:
-                        m['data'].update(data)
+                        if m.get("data"):
+                            m['data'].update(data)
                     ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=cmd_data2, timeout=timeout)
         else:
             for c in self.children:
