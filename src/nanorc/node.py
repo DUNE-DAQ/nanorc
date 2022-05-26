@@ -57,6 +57,35 @@ class SubsystemNode(StatefulNode):
         self.pm = None
         self.listener = None
 
+    def can_execute_custom_or_expert(self, command, check_dead=True):
+        if not super().can_execute_custom_or_expert(command, check_dead):
+            return False
+
+        for c in self.children:
+            if not c.enabled: continue
+
+            if check_dead and not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
+                self.return_code = ErrorCode.Failed
+                self.log.error(f'{c.name} is dead, cannot send {command}')
+                return False
+
+        self.return_code = ErrorCode.Success
+        return True
+
+    def can_execute(self, command):
+        if not super().can_execute(command):
+            return False
+
+        for c in self.children:
+            if not c.enabled: continue
+            if not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
+                self.return_code = ErrorCode.Failed
+                self.log.error(f'{c.name} is dead, cannot send {command} unless you disable it or --force')
+                return False
+
+        self.return_code = ErrorCode.Success
+        return True
+
     def send_custom_command(self, cmd, data, timeout, app=None) -> dict:
         ret = {}
 
@@ -78,18 +107,43 @@ class SubsystemNode(StatefulNode):
                 self.log.error(f'Couldn\'t execute the thread pinning scripts: {str(e)}')
             return ret
 
+        is_enable_disable = cmd=='enable' or cmd=='disable'
+
         cmd_dict = getattr(self.cfgmgr, cmd, None)
+
         if cmd_dict:
             for app_name, cmd_data in cmd_dict.items():
                 for c in self.children:
-                    if app and c.name!=app_name: continue
+                    # selects the app matching the data
+                    if c.name!=app_name: continue
+
+                    if app:
+                        # selects the app matching the argument
+                        if c.name!=app: continue
+                    else:
+                        if not is_enable_disable and not c.enabled: continue
+
+                    if not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
+                        if not is_enable_disable:
+                            self.log.error(f'{c.name} is dead, cannot send {cmd} to the app')
+                        return False
+
                     cmd_data2 = cp.deepcopy(cmd_data)
                     for m in cmd_data2['modules']:
                         m['data'].update(data)
                     ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=cmd_data2, timeout=timeout)
         else:
             for c in self.children:
-                if app and c.name!=app: continue
+                if app:
+                    if c.name!=app: continue
+                else:
+                    if not is_enable_disable and not c.enabled: continue
+
+                if not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
+                    if not is_enable_disable:
+                        self.log.error(f'{c.name} is dead, cannot send {cmd} to the app')
+                    return False
+
                 ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=data, timeout=timeout)
         return ret
 
@@ -100,7 +154,6 @@ class SubsystemNode(StatefulNode):
         cmd_exit_state = cmd_entry_state
         node_state = app.state.upper()
         if node_state in appfwk_state_dictionnary: node_state = appfwk_state_dictionnary[node_state]
-        print(node_state, cmd_entry_state)
         if cmd_entry_state != node_state:
             self.log.error(f'The node is in \'{node_state}\' so I cannot send \'{cmd_name}\', which requires the app to be \'{cmd_entry_state}\'.')
             return {'Failed': 'App in wrong state, cmd not sent'}
