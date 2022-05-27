@@ -2,7 +2,7 @@ from anytree.resolver import Resolver
 from urllib.parse import urlparse, ParseResult
 from os import path
 import click
-from pmdesc import pm_desc
+from .pmdesc import pm_desc
 
 def validate_path_exists(prompted_path):
     if not prompted_path: return prompted_path
@@ -50,6 +50,12 @@ def validate_partition_number(ctx, param, number):
         raise click.BadParameter(f"Partition number should be between 0 and 10 (you fed {number})")
     return number
 
+def validate_partition(ctx, param, partition):
+    if ctx.obj.rc.pm.use_k8spm() and not partition:
+        raise click.BadParameter(f'You need to feed a partition to run with k8s')
+    if not partition.replace('-', '').isalnum():
+        raise click.BadParameter(f'Partition {partition} should be alpha-numeric only (hyphens are allowed)!')
+    return partition
 
 def validate_conf(ctx, param, top_cfg):
     confurl = urlparse(top_cfg)

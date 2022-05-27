@@ -138,7 +138,7 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
 @click.argument('top_cfg', type=str, callback=argval.validate_conf)
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, timeout, kerberos, partition_number, web, pm, top_cfg, pm):
+def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, timeout, kerberos, partition_number, web, top_cfg, pm):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f'{credentials.user}@rc> '
@@ -262,7 +262,7 @@ def pin_threads(ctx, obj:NanoContext, pin_thread_file, timeout:int):
     obj.rc.execute_script(data=data, timeout=timeout)
 
 @cli.command('boot')
-@click.argument('partition', type=str, callback=validate_partition)
+@click.argument('partition', type=str, callback=argval.validate_partition)
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
