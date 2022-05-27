@@ -94,26 +94,38 @@ class NanoRC:
         self.topnode = self.cfg.get_tree_structure()
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
 
-
-    def execute_custom_command(self, command, data, timeout, node=None):
+    def execute_custom_command(self, command, data, timeout, node=None, check_dead=True):
         if not timeout:
             timeout = self.timeout
 
-        if not node:
-            self.log.debug(f'Sending {command} to all the nodes')
-            ret = self.topnode.send_custom_command(command, data, timeout=timeout)
-        elif isinstance(node, ApplicationNode):
-            self.log.debug(f'Telling {node.parent.name} to send {command} to {node.name}')
-            ret = node.parent.send_custom_command(command, data, timeout=timeout, app=node.name)
-        else:
-            self.log.debug(f'Sending {command} to {node.name}')
-            ret = node.send_custom_command(command, data, timeout=timeout)
+        node_to_send = None
+        extra_arg={}
 
+        if not node:
+            self.log.info(f'Sending {command} to all the nodes')
+            node_to_send = self.topnode
+        elif isinstance(node, ApplicationNode):
+            self.log.info(f'Telling {node.parent.name} to send {command} to {node.name}')
+            node_to_send = node.parent
+            extra_arg['app'] = node.name
+        else:
+            self.log.info(f'Sending {command} to {node.name}')
+            node_to_send = node
+
+        if not node_to_send.can_execute_custom_or_expert(command, check_dead):
+            self.return_code = node_to_send.return_code
+            return
+
+        ret = node_to_send.send_custom_command(command, data, timeout=timeout, **extra_arg)
         self.log.debug(ret)
 
     def send_expert_command(self, app, json_file, timeout):
         if not timeout:
             timeout = self.timeout
+
+        if not app.can_execute_custom_or_expert("expert", check_dead=True):
+            self.return_code = app.return_code
+            return
 
         data = json.load(open(json_file,'r'))
         try:
@@ -145,18 +157,11 @@ class NanoRC:
         ret = app.parent.send_expert_command(app, data, timeout=timeout)
         self.log.info(f'Reply: {ret}')
 
-    def can_transition(self, command):
-        can_execute = getattr(self.topnode, "can_"+command)
-        if not can_execute():
-            self.log.error(f'Cannot {command}, as you are in {self.topnode.state} state.')
-            self.topnode.return_code = ErrorCode.InvalidTransition
-            self.return_code = self.topnode.return_code.value
-            return False
-        return True
-
-
     def execute_command(self, command, *args, **kwargs):
-        if not self.can_transition(command):
+        force = kwargs.get('force')
+
+        if not force and not self.topnode.can_execute(command):
+            self.return_code = self.topnode.return_code.value
             return
 
         kwargs['timeout'] = kwargs['timeout'] if kwargs.get('timeout') else self.timeout
@@ -196,7 +201,7 @@ class NanoRC:
         """
         Terminates applications (but keep all the subsystems structure)
         """
-        self.execute_command("terminate", timeout=timeout)
+        self.execute_command("terminate", timeout=timeout, force=True)
 
 
     def init(self, path, timeout:int=None) -> NoReturn:
@@ -236,7 +241,8 @@ class NanoRC:
             run_type (str): Description
         """
         # self.return_code = self.topnode.allowed("start", None)
-        if not self.can_transition("start"):
+        if not self.topnode.can_execute("start"):
+            self.return_code = self.topnode.return_code
             return
 
         if self.run_num_mgr:
@@ -307,7 +313,8 @@ class NanoRC:
         Sends stop command
         """
 
-        if not self.can_transition("stop"):
+        if not force and not self.topnode.can_execute("stop"):
+            self.return_code = self.topnode.return_code
             return
 
         if message != "":
@@ -339,7 +346,8 @@ class NanoRC:
         :param      trigger_interval_ticks:  The trigger interval ticks
         :type       trigger_interval_ticks:  int
         """
-        if not self.can_transition("resume"):
+        if not self.topnode.can_execute("resume"):
+            self.return_code = self.topnode.return_code
             return
 
         runtime_resume_data = {}
@@ -393,19 +401,27 @@ class NanoRC:
         """
         Start the triggers
         """
+
+        if not node.can_execute_custom_or_expert("disable", False):
+            self.return_code = node.return_code
+            return
         ret = node.disable()
         if ret != 0:
             return
         self.execute_custom_command("disable",
                                     data={'resource_name': resource_name if resource_name else node.name},
                                     timeout=timeout,
-                                    node=node)
+                                    node=node,
+                                    check_dead=False)
 
 
     def enable(self, node, timeout, resource_name) -> NoReturn:
         """
         Start the triggers
         """
+        if not node.can_execute_custom_or_expert("enable", True):
+            self.return_code = node.return_code
+            return
         ret = node.enable()
         if ret != 0:
             return
