@@ -127,7 +127,7 @@ class K8SProcessManager(object):
             )]
         for c in connections:
             uri = urlparse(c['uri'])
-            if uri.hostname != app_name: continue
+            if uri.hostname != "0.0.0.0": continue
             print(uri)
 
             ret += [
@@ -151,7 +151,7 @@ class K8SProcessManager(object):
 
         for c in connections:
             uri = urlparse(c['uri'])
-            if uri.hostname !=  app_name: continue
+            if uri.hostname != "0.0.0.0": continue
             print(uri)
 
             ret += [
@@ -173,7 +173,7 @@ class K8SProcessManager(object):
             namespace: str,
             run_as: dict = None):
 
-        self.log.info(f"Creating \"{namespace}:{name}\" daq application  (image: \"{app_boot_info['image']}\", use_flx={app_boot_info['use_flx']}, mount_dirs={app_boot_info['mount_dirs']})")
+        self.log.info(f"Creating \"{namespace}:{name}\" daq application  (image: \"{app_boot_info['image']}\", use_flx={app_boot_info['use_flx']})")
 
         pod = client.V1Pod(
             # Run the pod with same user id and group id as the current user
@@ -183,6 +183,7 @@ class K8SProcessManager(object):
                 labels={"app": app_label}
             ),
             spec = client.V1PodSpec(
+                restart_policy="Never",
                 security_context=client.V1PodSecurityContext(
                     run_as_user=run_as['uid'],
                     run_as_group=run_as['gid'],
@@ -235,13 +236,13 @@ class K8SProcessManager(object):
                                     mount_path="/dev",
                                     name="devfs",
                                     read_only=False
-                            )] if app_boot_info['use_flx'] else []) +
-                            ([
-                                client.V1VolumeMount(
-                                    mount_path=mount_dir,
-                                    name=f"mount-dir-{i}",
-                                    read_only=False
-                            ) for i,mount_dir in enumerate(app_boot_info['mount_dirs']) ])
+                            )] if app_boot_info['use_flx'] else [])
+                            # ([
+                            #     client.V1VolumeMount(
+                            #         mount_path=mount_dir,
+                            #         name=f"mount-dir-{i}",
+                            #         read_only=False
+                            # ) for i,mount_dir in enumerate(app_boot_info['mount_dirs']) ])
                         )
                     )
                 ],
@@ -269,13 +270,14 @@ class K8SProcessManager(object):
                             name="devfs",
                             host_path=client.V1HostPathVolumeSource(path='/dev')
                         )
-                    ] if app_boot_info['use_flx'] else []) +
-                    ([
-                        client.V1Volume(
-                            name=f"mount-dir-{i}",
-                            host_path=client.V1HostPathVolumeSource(path=mount_dir)
-                        )
-                    for i,mount_dir in enumerate(app_boot_info['mount_dirs']) ])
+                    ] if app_boot_info['use_flx'] else [])
+                    # +
+                    # ([
+                    #     client.V1Volume(
+                    #         name=f"mount-dir-{i}",
+                    #         host_path=client.V1HostPathVolumeSource(path=mount_dir)
+                    #     )
+                    # for i,mount_dir in enumerate(app_boot_info['mount_dirs']) ])
                 )
             )
         )
@@ -480,7 +482,7 @@ class K8SProcessManager(object):
                 if var in app_env:
                     del app_env[var]
 
-            md = boot_info['mount_dirs'].get(app_name)
+            # md = boot_info['mount_dirs'].get(app_name)
 
             ## This is meant to mean:
             # if the image is of form pocket_dune_bla (without version postfix)
@@ -496,7 +498,7 @@ class K8SProcessManager(object):
                 "mount_cvmfs_dev": mount_cvmfs_dev,
                 #"cmd": app_cmd, ##ignored
                 "use_flx": ("ruflx" in app_name), ## TODO: find a nice way to do that thru config (similar to mount_dirs?)
-                "mount_dirs": md if md else [],
+                # "mount_dirs": md if md else [],
                 "connections": self.connections[app_name],
             }
 
