@@ -34,6 +34,45 @@ class StatefulNode(NodeMixin):
         self.order = order if order else dict()
         self.enabled = True
 
+
+    def can_execute_custom_or_expert(self, command, check_dead=True):
+        disallowed_state = ['booted', 'none']
+        if self.state in disallowed_state:
+            self.log.error(f"Cannot send {command} to {self.name} as it should at least be initialised")
+            return False
+
+        for c in self.children:
+            if not c.enabled: continue
+
+            if not c.can_execute_custom_or_expert(command, check_dead):
+                self.return_code = ErrorCode.Failed
+                return False
+
+        self.return_code = ErrorCode.Success
+        return True
+
+
+    def can_execute(self, command):
+        can_transition = getattr(self, "can_"+command)
+        if not can_transition:
+            self.log.info(f"{self.name} cannot check if command {command} is possible")
+        else:
+            if not can_transition():
+                self.log.error(f"{self.name} cannot {command} as it is {self.state}")
+                self.return_code = ErrorCode.InvalidTransition
+                return False
+
+        for c in self.children:
+            if not c.enabled: continue
+
+            if not c.can_execute(command):
+                self.return_code = ErrorCode.Failed
+                return False
+
+        self.return_code = ErrorCode.Success
+        return True
+
+
     def disable(self):
         if not self.enabled:
             self.log.error(f'Cannot disable {self.name} as it is already disabled!')
