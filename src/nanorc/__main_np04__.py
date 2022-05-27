@@ -162,10 +162,11 @@ def stop(ctx, obj, stop_wait:int, force:bool, message:str, timeout:int):
     obj.rc.pause(force, timeout=timeout)
     check_rc(ctx,obj)
     obj.rc.status()
-    time.sleep(stop_wait)
-    obj.rc.stop(force, message=message, timeout=timeout)
+    if obj.rc.return_code == 0:
+        time.sleep(stop_wait)
+        obj.rc.stop(force, message=message, timeout=timeout)
+        obj.rc.status()
     check_rc(ctx,obj)
-    obj.rc.status()
 
 
 @np04cli.command('message')
@@ -201,11 +202,12 @@ def start(ctx, obj:NanoContext, run_type:str, disable_data_storage:bool, trigger
 
     obj.rc.start(disable_data_storage, run_type, message=message, timeout=timeout)
     check_rc(ctx,obj)
-    obj.rc.status()
     time.sleep(resume_wait)
-    obj.rc.resume(trigger_interval_ticks, timeout=timeout)
+    if obj.rc.return_code == 0:
+        obj.rc.status()
+        obj.rc.resume(trigger_interval_ticks, timeout=timeout)
+        obj.rc.status()
     check_rc(ctx,obj)
-    obj.rc.status()
 
 
 def main():
