@@ -112,8 +112,8 @@ class SubsystemNode(StatefulNode):
         if cmd_dict:
             for app_name, cmd_data in cmd_dict.items():
                 for c in self.children:
-                    # selects the app matching the data
-                    if c.name!=app_name: continue
+                    # selects the app matching the data (if app is specified)
+                    if app_name and c.name!=app_name: continue
 
                     if app:
                         # selects the app matching the argument
