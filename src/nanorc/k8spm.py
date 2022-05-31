@@ -43,14 +43,17 @@ class K8sProcess(object):
 
     def status(self):
         s = self.pm._core_v1_api.read_namespaced_pod_status(self.name, self.namespace)
-        container_status = s.status.container_statuses[0].state
-        if   container_status.running:
-            return "Running"
-        elif container_status.terminated:
-            return f"Terminated {container_status.terminated.exit_code} {container_status.terminated.reason}"
-        elif container_status.waiting:
-            return f"Waiting {container_status.waiting.reason}"
-        else:
+        try:
+            container_status = s.status.container_statuses[0].state
+            if   container_status.running:
+                return "Running"
+            elif container_status.terminated:
+                return f"Terminated {container_status.terminated.exit_code} {container_status.terminated.reason}"
+            elif container_status.waiting:
+                return f"Waiting {container_status.waiting.reason}"
+            else:
+                return 'Unknown'
+        except:
             return 'Unknown'
 
 
@@ -128,7 +131,6 @@ class K8SProcessManager(object):
         for c in connections:
             uri = urlparse(c['uri'])
             if uri.hostname != "0.0.0.0": continue
-            print(uri)
 
             ret += [
                 client.V1ContainerPort(
@@ -152,7 +154,6 @@ class K8SProcessManager(object):
         for c in connections:
             uri = urlparse(c['uri'])
             if uri.hostname != "0.0.0.0": continue
-            print(uri)
 
             ret += [
                 client.V1ServicePort(
@@ -188,6 +189,42 @@ class K8SProcessManager(object):
                     run_as_user=run_as['uid'],
                     run_as_group=run_as['gid'],
                 ) if run_as else None,
+                affinity=client.V1Affinity(
+                    node_affinity = client.V1NodeAffinity(
+                        required_during_scheduling_ignored_during_execution=client.V1NodeSelector(
+                            node_selector_terms = [
+                                client.V1NodeSelectorTerm(
+                                    match_expressions=[
+                                        # client.V1NodeSelectorRequirement(
+                                        {
+                                            'key':'kubernetes.io/hostname',
+                                            'operator':'In',
+                                            # 'values':[app_boot_info['node']]
+                                            'values':['np04-srv-026']
+                                        }
+                                    ]
+                                )
+                            ]
+                        )
+                    ),# if app_boot_info.get("node") else None,
+                    pod_anti_affinity = client.V1PodAntiAffinity(
+                        required_during_scheduling_ignored_during_execution=[
+                            client.V1PodAffinityTerm(
+                                topology_key="kubernetes.io/hostname",#??? not sure what this does
+                                label_selector=client.V1LabelSelector(
+                                    match_expressions=[
+                                        client.V1LabelSelectorRequirement(
+                                            key='app',
+                                            operator="In",
+                                            values=app_boot_info['anti_affinity_pods'],
+                                        )
+                                    ]
+                                )
+                            )
+                            # for pod in
+                        ]
+                    ) if app_boot_info.get('anti_affinity_pods') else None,
+                ),
                 # List of processes
                 containers=[
                     # DAQ application container
@@ -215,6 +252,12 @@ class K8SProcessManager(object):
                         volume_mounts=(
                             ([
                                 client.V1VolumeMount(
+                                    mount_path="/"+app_boot_info['pvc'],
+                                    name=app_boot_info['pvc'],
+                                    read_only=True
+                            )] if app_boot_info['pvc'] else []) +
+                            ([
+                                client.V1VolumeMount(
                                     mount_path="/cvmfs/dunedaq.opensciencegrid.org",
                                     name="dunedaq-cvmfs",
                                     read_only=True
@@ -237,16 +280,19 @@ class K8SProcessManager(object):
                                     name="devfs",
                                     read_only=False
                             )] if app_boot_info['use_flx'] else [])
-                            # ([
-                            #     client.V1VolumeMount(
-                            #         mount_path=mount_dir,
-                            #         name=f"mount-dir-{i}",
-                            #         read_only=False
-                            # ) for i,mount_dir in enumerate(app_boot_info['mount_dirs']) ])
                         )
                     )
                 ],
                 volumes=(
+                    ([
+                        client.V1Volume(
+                            name=app_boot_info['pvc'],
+                            persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
+                                claim_name=app_boot_info['pvc'],
+                                read_only=True
+                            )
+                        )
+                    ] if app_boot_info['pvc'] else []) +
                     ([
                         client.V1Volume(
                             name="dunedaq-cvmfs",
@@ -271,13 +317,6 @@ class K8SProcessManager(object):
                             host_path=client.V1HostPathVolumeSource(path='/dev')
                         )
                     ] if app_boot_info['use_flx'] else [])
-                    # +
-                    # ([
-                    #     client.V1Volume(
-                    #         name=f"mount-dir-{i}",
-                    #         host_path=client.V1HostPathVolumeSource(path=mount_dir)
-                    #     )
-                    # for i,mount_dir in enumerate(app_boot_info['mount_dirs']) ])
                 )
             )
         )
@@ -402,6 +441,76 @@ class K8SProcessManager(object):
             self.log.error(e)
             raise RuntimeError(f"Failed to create persistent volume claim \"{namespace}:{name}\"") from e
 
+
+    def create_data_pvc(self, name:str, namespace:str):
+        # # Create persistent volume
+        # This shouldn't be in nanorc (as it should only be executed once)
+        # claim = client.V1PersistentVolume(
+        #     # Meta-data
+        #     metadata=client.V1ObjectMeta(
+        #         name=name,
+        #     ),
+        #     # Claim
+        #     spec=client.V1PersistentVolumeSpec(
+        #         access_modes=['ReadOnlyMany'],
+        #         # persistent_volume_reclaim_policy="Retain",
+        #         storage_class_name=name,
+        #         capacity={
+        #             "storage": "5Gi"
+        #         },
+        #         node_affinity = client.V1VolumeNodeAffinity(
+        #             client.V1NodeSelector(
+        #                 node_selector_terms = [
+        #                     client.V1NodeSelectorTerm(
+        #                         match_expressions=[
+        #                             {
+        #                                 'key':'kubernetes.io/hostname',
+        #                                 'operator':'In',
+        #                                 'values':['np04-srv-004']
+        #                             }
+        #                         ]
+        #                     )
+        #                 ]
+        #             )
+        #         ),
+        #         local=client.V1LocalVolumeSource(
+        #             path="/"+name,
+        #             # type='Directory'
+        #         )
+        #     )
+        # )
+
+        # try:
+        #     self._core_v1_api.create_persistent_volume(claim)
+        # except Exception as e:
+        #     self.log.error(e)
+        #     raise RuntimeError(f"Failed to create persistent volume claim \"{namespace}:{name}\"") from e
+
+        # Create claim
+        claim = client.V1PersistentVolumeClaim(
+            # Meta-data
+            metadata=client.V1ObjectMeta(
+                name=name,
+                namespace=namespace
+            ),
+            # Claim
+            spec=client.V1PersistentVolumeClaimSpec(
+                access_modes=['ReadOnlyMany'],
+                storage_class_name=name,
+                resources=client.V1ResourceRequirements(
+                    requests={'storage': '2Gi'}
+                ),
+            )
+        )
+
+        try:
+            self._core_v1_api.create_namespaced_persistent_volume_claim(namespace, claim)
+        except Exception as e:
+            self.log.error(e)
+            raise RuntimeError(f"Failed to create persistent volume claim \"{namespace}:{name}\"") from e
+
+
+
     #---
     def boot(self, boot_info, timeout):
 
@@ -442,14 +551,22 @@ class K8SProcessManager(object):
         # Create partition
         self.create_namespace(self.partition)
         # Create the persistent volume claim
-        self.create_cvmfs_pvc('dunedaq.opensciencegrid.org', self.partition)
+        # self.create_cvmfs_pvc('dunedaq.opensciencegrid.org', self.partition)
+        # self.create_data_pvc('data1', self.partition)
 
         run_as = {
             'uid': os.getuid(),
             'gid': os.getgid(),
         }
 
-        for app_name, app_conf in apps.items():
+        readout_apps = [aname for aname in apps.keys() if "ruflx" in aname or "ruemu" in aname]
+        dataflow_apps = [aname for aname in apps.keys() if "dataflow" in aname]
+        rest_apps = [aname for aname in apps.keys() if aname not in readout_apps+dataflow_apps]
+
+        app_boot_order = readout_apps + dataflow_apps + rest_apps
+
+        for app_name in app_boot_order:
+            app_conf = apps[app_name]
 
             host = hosts[app_conf["host"]]
             env_formatter = {
@@ -482,7 +599,6 @@ class K8SProcessManager(object):
                 if var in app_env:
                     del app_env[var]
 
-            # md = boot_info['mount_dirs'].get(app_name)
 
             ## This is meant to mean:
             # if the image is of form pocket_dune_bla (without version postfix)
@@ -496,13 +612,17 @@ class K8SProcessManager(object):
                 "args": app_args,
                 "image": app_img,
                 "mount_cvmfs_dev": mount_cvmfs_dev,
-                #"cmd": app_cmd, ##ignored
-                "use_flx": ("ruflx" in app_name), ## TODO: find a nice way to do that thru config (similar to mount_dirs?)
-                # "mount_dirs": md if md else [],
+                "pvc": None,#('data1' if "dataflow" in app_name else None), ## TODO: find a nice way to do that thru config
+                "use_flx": ("ruflx" in app_name), ## TODO: find a nice way to do that thru config
                 "connections": self.connections[app_name],
             }
 
-            self.log.info(json.dumps(app_boot_info, indent=2))
+            if self.pm.is_k8s_cluster:
+                if app_name in readout_apps:
+                    app_boot_info["node"] = host
+                else:
+                    app_boot_info["anti_affinity_pods"] = readout_apps
+            self.log.debug(json.dumps(app_boot_info, indent=2))
             app_desc = AppProcessDescriptor(app_name)
             app_desc.conf = app_conf.copy()
             app_desc.partition = self.partition
@@ -547,7 +667,11 @@ class K8SProcessManager(object):
                         progress.update(t, completed=1)
                         self.apps[a].pod = ready[a]
                 progress.update(total, completed=len(ready))
-                if list(ready.keys()) == list(self.apps.keys()):
+                r = list(ready.keys())
+                a = list(self.apps.keys())
+                r.sort()
+                a.sort()
+                if r==a:
                     progress.update(waiting, visible=False)
                     break
 
