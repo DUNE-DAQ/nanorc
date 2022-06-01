@@ -47,15 +47,14 @@ class NanoRC:
         self.console = console
         self.pm = pm
 
-        ssh_conf = []
+        self.ssh_conf = []
         if not use_kerb:
-            ssh_conf = ["-o GSSAPIAuthentication=no"]
+            self.ssh_conf = ["-o GSSAPIAuthentication=no"]
         self.port_offset = port_offset
         self.cfg = TreeBuilder(
             log=self.log,
             top_cfg=top_cfg,
             console=self.console,
-            ssh_conf=ssh_conf,
             fsm_conf=fsm_cfg,
             resolve_hostname = pm.use_sshpm(),
             port_offset=self.port_offset)
@@ -194,7 +193,13 @@ class NanoRC:
         Boot applications
         """
         self.partition=partition
-        self.execute_command("boot", partition=partition, timeout=timeout, log_path=self.log_path)
+        self.execute_command(
+            "boot",
+            partition=partition,
+            timeout=timeout,
+            ssh_conf=self.ssh_conf,
+            log_path=self.log_path,
+        )
 
 
     def terminate(self, timeout:int=None) -> NoReturn:

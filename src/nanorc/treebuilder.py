@@ -36,7 +36,6 @@ class TreeBuilder:
             elif isinstance(d, ParseResult):
                 node = SubsystemNode(
                     name = n,
-                    ssh_conf = self.ssh_conf,
                     log = self.log,
                     cfgmgr = ConfigManager(
                         log = self.log,
@@ -57,10 +56,9 @@ class TreeBuilder:
             ret.update(node.get_custom_commands())
         return ret
 
-    def __init__(self, log, top_cfg, resolve_hostname, fsm_conf, console, ssh_conf, port_offset):
+    def __init__(self, log, top_cfg, resolve_hostname, fsm_conf, console, port_offset):
         self.log = log
         self.resolve_hostname = resolve_hostname
-        self.ssh_conf = ssh_conf
         self.fsm_conf = fsm_conf
         self.port_offset = port_offset
         self.subsystem_port_offset = 0

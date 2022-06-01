@@ -10,8 +10,7 @@ from rich.text import Text
 from rich.panel import Panel
 import copy as cp
 import logging
-from .sshpm import SSHProcessManager
-from .k8spm import K8SProcessManager
+from .pmdesc import PMFactory
 from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
 from typing import Union, NoReturn
 from .fsm import FSM
@@ -49,10 +48,9 @@ class ApplicationNode(StatefulNode):
         self.end_terminate()
 
 class SubsystemNode(StatefulNode):
-    def __init__(self, name:str, ssh_conf, log, cfgmgr, fsm_conf, console, parent=None, children=None):
+    def __init__(self, name:str, log, cfgmgr, fsm_conf, console, parent=None, children=None):
         super().__init__(name=name, log=log, console=console, fsm_conf=fsm_conf, parent=parent, children=children)
         self.name = name
-        self.ssh_conf = ssh_conf
 
         self.cfgmgr = cfgmgr
         self.pm = None
@@ -177,32 +175,8 @@ class SubsystemNode(StatefulNode):
         }
         try:
             if self.pm is None:
-                if event.kwargs['pm'].use_k8spm():
-
-                    # Yes, we need the list of connections here
-                    # I hate it dearly too
-                    # That and many other things. (I'M SUCH A HATER)
-                    # connections = { app: data['nwconnections'] for app, data in self.cfgmgr.init.items() }
-                    connections = {}
-                    for app, data in self.cfgmgr.init.items():
-                        connections[app] = []
-                        for connection in data['connections']:
-                            if connection["service_type"] == "kQueue":
-                                continue
-                            connections[app].append(connection)
-
-                    self.pm = K8SProcessManager(
-                        console=self.console,
-                        connections=connections,
-                        cluster_config=event.kwargs['pm']
-                    )
-
-                elif event.kwargs['pm'].use_sshpm():
-                    self.pm = SSHProcessManager(
-                        console = self.console,
-                        log_path = event.kwargs.get('log_path'),
-                        ssh_conf = self.ssh_conf
-                    )
+                fact = PMFactory(self.cfgmgr, self.console)
+                self.pm = fact.get_pm(event)
 
             timeout = event.kwargs["timeout"]
             boot_info = cp.deepcopy(self.cfgmgr.boot)
