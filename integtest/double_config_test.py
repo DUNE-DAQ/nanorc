@@ -13,6 +13,6 @@ confgen_arguments=[ "-o", ".", "-s", "10", "-n", "2"] #Need to figure out how to
 nanorc_command_list="boot init conf start 1 resume wait 10 stop scrap terminate".split()
 
 # The tests themselves
-def test_nanorc_success(run_nanorc_custom):
+def test_nanorc_success(run_nanorc):
     # Basic test to check that nanorc ran successfully
     assert run_nanorc.completed_process.returncode==0
