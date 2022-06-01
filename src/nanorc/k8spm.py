@@ -199,14 +199,13 @@ class K8SProcessManager(object):
                                         {
                                             'key':'kubernetes.io/hostname',
                                             'operator':'In',
-                                            # 'values':[app_boot_info['node']]
-                                            'values':['np04-srv-026']
+                                            'values':[app_boot_info['node']]
                                         }
                                     ]
                                 )
                             ]
                         )
-                    ),# if app_boot_info.get("node") else None,
+                   ) if app_boot_info.get("node") else None,
                     pod_anti_affinity = client.V1PodAntiAffinity(
                         required_during_scheduling_ignored_during_execution=[
                             client.V1PodAffinityTerm(
@@ -538,8 +537,8 @@ class K8SProcessManager(object):
                 raise RuntimeError("Identify the kind gateway address'") from exc
             logging.info(f"Kind network gateway: {self.gateway}")
         else:
-            self.gateway = socket.gethostbyname(self.cluster_config.address)
-            logging.info(f"K8s gateway: {self.gateway} ({self.cluster_config.address})")
+            self.gateway = socket.gethostbyname(socket.gethostname())
+            logging.info(f"K8s gateway: {self.gateway} ({socket.gethostname()})")
 
         apps = boot_info["apps"].copy()
         env_vars = boot_info["env"]
@@ -592,6 +591,8 @@ class K8SProcessManager(object):
             app_args = [a.format(**env_formatter) for a in boot_info['exec'][app_conf['exec']]['args']]
             app_img = exec_data['image']
             app_cmd = exec_data['cmd']
+            if not app_img:
+                raise RuntimeError("You need to specify an image in the configuration!")
 
             ## ? Maybe?
             unwanted_env = ['PATH', 'LD_LIBRARY_PATH', 'CET_PLUGIN_PATH','DUNEDAQ_SHARE_PATH']
@@ -605,7 +606,17 @@ class K8SProcessManager(object):
             # or if the first letter of the version starts with N
             # then, we want to mount /cvmfs/dunedaq-development....
             # Else we are probably in "full release mode" in which case the name of the version will be v3.0.4, and we don't need to mount it
-            mount_cvmfs_dev = (app_img.find(":") == -1) or (app_img.split(":")[1][0] == 'N')
+            image_and_ver = app_img.split(":")
+            mount_cvmfs_dev = False
+            if len(image_and_ver)==1:
+                mount_cvmfs_dev = True
+            elif len(image_and_ver)==2:
+                if image_and_ver[1] or image_and_ver[1] == "latest":
+                    mount_cvmfs_dev = (image_and_ver[1][0] == 'N')
+                else:
+                    raise RuntimeError("Malformed image name in boot.json")
+            else:
+                raise RuntimeError("Malformed image name in boot.json")
 
             app_boot_info ={
                 "env": app_env,
@@ -617,7 +628,7 @@ class K8SProcessManager(object):
                 "connections": self.connections[app_name],
             }
 
-            if self.pm.is_k8s_cluster:
+            if self.cluster_config.is_k8s_cluster:
                 if app_name in readout_apps:
                     app_boot_info["node"] = host
                 else:
