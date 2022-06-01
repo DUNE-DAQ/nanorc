@@ -50,9 +50,9 @@ class ConfigManager:
         super().__init__()
         self.resolve_hostname = resolve_hostname
         self.log = log
-        
+
         cfg_dir = ''
-        
+
         if config.scheme == 'confservice':
             self.log.info(f'Using the configuration service to grab \'{config.netloc}\'')
 
@@ -220,12 +220,8 @@ class ConfigManager:
                         raise ValueError("Key " + k + " is not in environment and no default specified!")
 
         # Conf:
-        ips = {n: socket.gethostbyname(h) for n, h in self.boot["hosts"].items()}
         external_connections = self.boot['external_connections']
-        if self.resolve_hostname:
-            hosts = self.boot["hosts"]
-        else:
-            hosts = { "host_"+app:app for app in self.boot["apps"].keys() }
+        hosts = self.boot["hosts"]
 
         for connections in json_extract(self.init, "connections"):
             for c in connections:
@@ -234,30 +230,27 @@ class ConfigManager:
                 from string import Formatter
                 origuri = c['uri']
                 fieldnames = [fname for _, fname, _, _ in Formatter().parse(c['uri']) if fname]
+
                 if len(fieldnames)>1:
                     raise RuntimeError(f"Too many fields in connection {c['uri']}")
-                for fieldname in fieldnames:
-                    if fieldname in ips:
-                        if self.resolve_hostname:
-                            c["uri"] = c["uri"].format(**ips)
-                        else:
-                            c["uri"] = c["uri"].format(**hosts)
-                    else:
-                        try:
-                            if self.resolve_hostname:
-                                dico = {"HOST_IP": socket.gethostbyname(fieldname)}
-                            else:
-                                dico = {"HOST_IP": fieldname.replace('host_', "")}
 
-                            c['uri'] = c['uri'].replace(fieldname, "HOST_IP").format(**dico)
-                        except Exception as e:
-                            raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
+                for fieldname in fieldnames:
+                    try:
+                        if self.resolve_hostname: # replace host_ruemu0 by np04-srv-XXX (ssh)
+                            dico = {"HOST_IP": hosts[fieldname]}
+                        else: # relace by host_ruemu0 by ruemu0 (K8s)
+                            dico = {"HOST_IP": fieldname.replace('host_', '')}
+
+                        c['uri'] = c['uri'].replace(fieldname, "HOST_IP").format(**dico)
+                    except Exception as e:
+                        raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
+
                 if not c['uid'] in external_connections: # TODO: ignore this altogether with k8s
                     # Port offsetting
                     port = urlparse(c['uri']).port
                     newport = port + self.port_offset
                     c['uri'] = c['uri'].replace(str(port), str(newport))
-                self.log.debug(c['uid'], c['uri'])
+                self.log.debug(f"{c['uid']}: {c['uri']}")
 
 
     def runtime_start(self, data: dict) -> dict:
