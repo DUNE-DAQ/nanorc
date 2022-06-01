@@ -40,7 +40,7 @@ from .cli import *
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--dotnanorc', type=click.Path(), default="~/.nanorc.json", help='A JSON file which has auth/socket for the DB services')
 @click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
-@click.option('--pm', type=str, default="ssh", help='Process manager, can be: ssh, kind, or k8s://np04-srv-015:31000, for example', callback=argval.validate_pm)
+@click.option('--pm', type=str, default="ssh://", help='Process manager, can be: ssh://, kind://, or k8s://np04-srv-015:31000, for example', callback=argval.validate_pm)
 @click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn webui')
 @click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=argval.validate_partition_number)
 @click.argument('cfg_dir', type=str, callback=argval.validate_conf)

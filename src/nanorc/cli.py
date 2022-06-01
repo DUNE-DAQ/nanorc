@@ -130,7 +130,7 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
 @click.option('--log-path', type=click.Path(exists=True), default=None, help='Where the logs should go (on localhost of applications)')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
-@click.option('--pm', type=str, default="ssh", help='Process manager, can be: ssh, kind, or k8s://np04-srv-015:31000, for example', callback=argval.validate_pm)
+@click.option('--pm', type=str, default="ssh://", help='Process manager, can be: ssh://, kind://, or k8s://np04-srv-015:31000, for example', callback=argval.validate_pm)
 @click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn webui')
 @accept_timeout(60)
 @click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=argval.validate_partition_number)
