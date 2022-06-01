@@ -62,7 +62,7 @@ class TreeBuilder:
         self.fsm_conf = fsm_conf
         self.port_offset = port_offset
         self.subsystem_port_offset = 0
-        self.subsystem_port_increment = 20
+        self.subsystem_port_increment = 50
         
         if top_cfg.scheme == 'dir':
             apparatus_id = Path(top_cfg.path).name

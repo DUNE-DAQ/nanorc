@@ -65,7 +65,7 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
 
     obj.console.print(Panel.fit(grid))
 
-    port_offset = 0 + partition_number * 1_000
+    port_offset = 0 + partition_number * 500
     rest_port = 5005 + partition_number
     webui_port = 5015 + partition_number
 

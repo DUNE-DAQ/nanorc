@@ -8,7 +8,6 @@ class pm_desc:
         self.arg = pm_arg
         try:
             pm_uri = parse.urlparse(pm_arg)
-            print(pm_uri)
         except:
             raise click.BadParameter(f'Badly formatted --pm')
 
