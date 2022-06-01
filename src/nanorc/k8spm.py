@@ -189,6 +189,7 @@ class K8SProcessManager(object):
                     run_as_user=run_as['uid'],
                     run_as_group=run_as['gid'],
                 ) if run_as else None,
+                host_pid=True,
                 affinity=client.V1Affinity(
                     node_affinity = client.V1NodeAffinity(
                         required_during_scheduling_ignored_during_execution=client.V1NodeSelector(
