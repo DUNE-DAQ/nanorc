@@ -209,22 +209,20 @@ class SubsystemNode(StatefulNode):
         children = []
         failed = []
         for n,d in self.pm.apps.items():
+
+            response_host = None
+            proxy = None
             if event.kwargs['pm'].use_k8spm():
                 response_host = 'nanorc'
                 proxy = (event.kwargs['pm'].address, event.kwargs['pm'].port)
-                child = ApplicationNode(name=n,
-                                        console=self.console,
-                                        log=self.log,
-                                        sup=AppSupervisor(self.console, d, self.listener, response_host, proxy),
-                                        parent=self,
-                                        fsm_conf=self.fsm_conf)
-            else:
-                child = ApplicationNode(name=n,
-                                        console=self.console,
-                                        log=self.log,
-                                        sup=AppSupervisor(self.console, d, self.listener),
-                                        parent=self,
-                                        fsm_conf=self.fsm_conf)
+
+            child = ApplicationNode(
+                name=n,
+                console=self.console,
+                log=self.log,
+                sup=AppSupervisor(self.console, d, self.listener, response_host, proxy),
+                parent=self,
+                fsm_conf=self.fsm_conf)
 
 
             if child.sup.desc.proc.is_alive() and child.sup.commander.ping():
