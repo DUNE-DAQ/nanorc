@@ -2,6 +2,7 @@ from anytree import NodeMixin, RenderTree, PreOrderIter
 from anytree.resolver import Resolver
 import requests
 import time
+import json
 from datetime import datetime
 from rich.console import Console
 from rich.table import Table
@@ -9,10 +10,11 @@ from rich.text import Text
 from rich.panel import Panel
 import copy as cp
 import logging
-from .sshpm import SSHProcessManager
+from .pmdesc import PMFactory
 from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
 from typing import Union, NoReturn
 from .fsm import FSM
+import os.path
 from .statefulnode import StatefulNode, ErrorCode
 from rich.progress import *
 
@@ -46,10 +48,9 @@ class ApplicationNode(StatefulNode):
         self.end_terminate()
 
 class SubsystemNode(StatefulNode):
-    def __init__(self, name:str, ssh_conf, log, cfgmgr, fsm_conf, console, parent=None, children=None):
+    def __init__(self, name:str, log, cfgmgr, fsm_conf, console, parent=None, children=None):
         super().__init__(name=name, log=log, console=console, fsm_conf=fsm_conf, parent=parent, children=children)
         self.name = name
-        self.ssh_conf = ssh_conf
 
         self.cfgmgr = cfgmgr
         self.pm = None
@@ -172,19 +173,20 @@ class SubsystemNode(StatefulNode):
             "node": self.name,
             "command": "boot",
         }
-
         try:
             if self.pm is None:
-                self.pm = SSHProcessManager(self.console, self.ssh_conf)
+                fact = PMFactory(self.cfgmgr, self.console)
+                self.pm = fact.get_pm(event)
 
             timeout = event.kwargs["timeout"]
             boot_info = cp.deepcopy(self.cfgmgr.boot)
             boot_info['env']['DUNEDAQ_PARTITION'] = partition
+
             self.pm.boot(
                 boot_info=boot_info,
-                log=event.kwargs.get('log'),
                 timeout=timeout
             )
+
         except Exception as e:
             self.log.error(f'Couldn\'t boot {self.name}')
             self.console.print_exception()
@@ -207,12 +209,21 @@ class SubsystemNode(StatefulNode):
         children = []
         failed = []
         for n,d in self.pm.apps.items():
-            child = ApplicationNode(name=n,
-                                    console=self.console,
-                                    log=self.log,
-                                    sup=AppSupervisor(self.console, d, self.listener),
-                                    parent=self,
-                                    fsm_conf=self.fsm_conf)
+
+            response_host = None
+            proxy = None
+            if event.kwargs['pm'].use_k8spm():
+                response_host = 'nanorc'
+                proxy = (event.kwargs['pm'].address, event.kwargs['pm'].port)
+
+            child = ApplicationNode(
+                name=n,
+                console=self.console,
+                log=self.log,
+                sup=AppSupervisor(self.console, d, self.listener, response_host, proxy),
+                parent=self,
+                fsm_conf=self.fsm_conf)
+
 
             if child.sup.desc.proc.is_alive() and child.sup.commander.ping():
                 # nothing really happens in these 2:
@@ -268,8 +279,8 @@ class SubsystemNode(StatefulNode):
             self.listener.terminate()
         if self.pm:
             self.pm.terminate()
+            self.pm = None
         self.end_terminate()
-
 
     def _on_enter_callback(self, event):
         command = event.event.name
@@ -326,6 +337,7 @@ class SubsystemNode(StatefulNode):
                     data = f(event.kwargs['overwrite_data'])
                 else:
                     data = getattr(self.cfgmgr, command)
+
                 entry_state = child_node.state.upper()
                 if entry_state in appfwk_state_dictionnary: entry_state = appfwk_state_dictionnary[entry_state]
 

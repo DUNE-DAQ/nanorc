@@ -2,6 +2,8 @@ from anytree.resolver import Resolver
 from urllib.parse import urlparse, ParseResult
 from os import path
 import click
+from .pmdesc import pm_desc
+import re
 
 def validate_path_exists(prompted_path):
     if not prompted_path: return prompted_path
@@ -49,6 +51,14 @@ def validate_partition_number(ctx, param, number):
         raise click.BadParameter(f"Partition number should be between 0 and 10 (you fed {number})")
     return number
 
+def validate_partition(ctx, param, partition):
+    if ctx.obj.rc.pm.use_k8spm() and not partition:
+        raise click.BadParameter(f'You need to feed a partition to run with k8s')
+
+    pat = re.compile(r'[a-z0-9]([-a-z0-9]*[a-z0-9])?') ## Nanorc-12334 allowed (with hyphen) This is straight from k8s error message when the partition name isn't right
+    if not re.fullmatch(pat, partition):
+        raise click.BadParameter(f'Partition {partition} should be alpha-numeric-hyphen! Make sure you name has the form [a-z0-9]([-a-z0-9]*[a-z0-9])?')
+    return partition
 
 def validate_conf(ctx, param, top_cfg):
     confurl = urlparse(top_cfg)
@@ -68,3 +78,8 @@ def validate_conf(ctx, param, top_cfg):
         return confurl
 
     raise click.BadParameter(f"TOP_CFG should either be a directory, a json file, or a config service utility with the form confservice://the_conf_name?1 (where the ?1 at the end is optionnal and represents the version). You provided: '{top_cfg}'")
+
+
+
+def validate_pm(ctx, param, pm):
+    return pm_desc(pm)

@@ -41,10 +41,11 @@ from .cli import *
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=argval.validate_partition_number)
 @click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn webui')
+@click.option('--pm', type=str, default="ssh://", help='Process manager, can be: ssh://, kind://, or k8s://np04-srv-015:31000, for example', callback=argval.validate_pm)
 @click.argument('cfg_dir', type=str, callback=argval.validate_conf)
 @click.pass_obj
 @click.pass_context
-def timingcli(ctx, obj, traceback, loglevel, log_path, cfg_dumpdir, kerberos, timeout, partition_number, web, cfg_dir):
+def timingcli(ctx, obj, traceback, pm, loglevel, log_path, cfg_dumpdir, kerberos, timeout, partition_number, web, cfg_dir):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f"{credentials.user}@timingrc> "
@@ -57,7 +58,7 @@ def timingcli(ctx, obj, traceback, loglevel, log_path, cfg_dumpdir, kerberos, ti
 
     obj.console.print(Panel.fit(grid))
 
-    port_offset = 500 + partition_number * 1_000
+    port_offset = 300 + partition_number * 500
     rest_port = 5005 + partition_number
     webui_port = 5015 + partition_number
 
@@ -75,6 +76,7 @@ def timingcli(ctx, obj, traceback, loglevel, log_path, cfg_dumpdir, kerberos, ti
             run_registry = None,
             logbook_type = None,
             timeout = timeout,
+            pm = pm,
             use_kerb = kerberos,
             port_offset = port_offset
         )

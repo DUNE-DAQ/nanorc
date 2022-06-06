@@ -4,6 +4,7 @@ import queue
 import json
 import time
 import socket
+import socks
 import threading
 
 from flask import Flask, request, cli
@@ -76,7 +77,7 @@ class FlaskManager(threading.Thread):
                 self.log.error('This can happen if the web proxy is on at NP04.'+
                                '\nExit NanoRC and try again after executing:'+
                                '\nsource ~np04daq/bin/web_proxy.sh -u')
-                break
+                raise RuntimeError("Cannot create a response listener")
             tries += 1
             try:
                 resp = requests.get(f"http://0.0.0.0:{self.port}/")
@@ -100,6 +101,7 @@ class FlaskManager(threading.Thread):
     def _create_and_join_flask(self):
         if not self.ready_lock.locked:
             self.ready_lock.acquire()
+
         self.flask = self._create_flask()
         self.flask.join()
         self.log.info(f'ResponseListener: Flask joined')
@@ -133,7 +135,8 @@ class ResponseListener:
     def create_manager(self):
         fm = FlaskManager(self.log, self.response_queue, self.port) # locked
         fm.start() # should unlock
-        fm.ready_lock.acquire() # make sure that everything is ready
+        if not fm.ready_lock.acquire(timeout=12): # make sure that everything is ready
+            raise RuntimeError("Cannot create a response listener!!")
         fm.ready_lock.release()
         return fm
 
@@ -205,7 +208,7 @@ class AppCommander:
     """docstring for DAQAppController"""
 
     def __init__(
-        self, console: Console, app: str, host: str, port: int, response_port: int
+        self, console: Console, app: str, host: str, port: int, response_port: int, response_host: str = None, proxy : tuple = None
     ):
         self.log = logging.getLogger(app)
         self.console = console
@@ -214,6 +217,8 @@ class AppCommander:
         self.app_port = port
         self.app_url = f"http://{self.app_host}:{str(self.app_port)}/command"
         self.listener_port = response_port
+        self.listener_host = response_host
+        self.proxy = proxy
         self.response_queue = Queue()
         self.sent_cmd = None
 
@@ -224,7 +229,12 @@ class AppCommander:
         self.response_queue.put(response)
 
     def ping(self):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        if not self.proxy:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        else:
+            s = socks.socksocket(socket.AF_INET, socket.SOCK_STREAM)
+            s.set_proxy(socks.SOCKS5, self.proxy[0], self.proxy[1])
         try:
             s.connect((self.app_host, self.app_port))
             s.shutdown(2)
@@ -244,14 +254,28 @@ class AppCommander:
             "entry_state": entry_state,
             "exit_state": exit_state,
         }
-        self.log.info(f"Sending {cmd_id} to {self.app} (http://{self.app_host}:{str(self.app_port)})")
         self.log.debug(json.dumps(cmd, sort_keys=True, indent=2))
 
         headers = {
             "content-type": "application/json",
             "X-Answer-Port": str(self.listener_port),
         }
-        ack = requests.post(self.app_url, data=json.dumps(cmd), headers=headers)
+        if not self.listener_host is None:
+            headers['X-Answer-Host'] = self.listener_host
+
+        self.log.debug(headers)
+
+        ack = requests.post(
+            self.app_url,
+            data=json.dumps(cmd),
+            headers=headers,
+            proxies={
+                'http': f'socks5h://{self.proxy[0]}:{self.proxy[1]}',
+                'https': f'socks5h://{self.proxy[0]}:{self.proxy[1]}'
+            } if self.proxy else None
+        )
+
+
         self.log.info(f"Ack: {ack}")
         self.sent_cmd = cmd_id
 
@@ -270,6 +294,7 @@ class AppCommander:
             ResponseTimeout: Description
         """
         try:
+            # self.log.info(f"Checking for answers from {self.app} {self.sent_cmd}")
             r = self.response_queue.get(block=(timeout>0), timeout=timeout)
             self.log.info(f"Received reply from {self.app} to {self.sent_cmd}")
             self.sent_cmd = None
@@ -293,11 +318,11 @@ class AppSupervisor:
     Tracks the last executed and successful commands
     """
 
-    def __init__(self, console: Console, desc: AppProcessDescriptor, listener: ResponseListener):
+    def __init__(self, console: Console, desc: AppProcessDescriptor, listener: ResponseListener, response_host: str = None, proxy: tuple = None):
         self.console = console
         self.desc = desc
         self.commander = AppCommander(
-            console, desc.name, desc.host, desc.port, listener.port
+            console, desc.name, desc.host, desc.port, listener.port, response_host, proxy
         )
         self.last_sent_command = None
         self.last_ok_command = None
@@ -309,8 +334,7 @@ class AppSupervisor:
             cmd_id: str,
             cmd_data: dict,
             entry_state: str = "ANY",
-            exit_state: str = "ANY",
-            ):
+            exit_state: str = "ANY"):
         self.listener.flask_manager.ready_lock.acquire()
         self.listener.flask_manager.ready_lock.release()
         self.last_sent_command = cmd_id

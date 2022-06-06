@@ -4,6 +4,7 @@ from anytree import RenderTree, PreOrderIter
 import logging as log
 from rich.console import Console
 import sh
+
 def status_data(node, get_children=True) -> dict:
     ret = {}
     if isinstance(node, ApplicationNode):
@@ -47,10 +48,16 @@ def print_status(topnode, console, apparatus_id='', partition='') -> int:
             if sup.desc.proc.is_alive():
                 alive = 'alive'
             else:
-                try:
-                    exit_code = sup.desc.proc.exit_code
-                except sh.ErrorReturnCode as e:
-                    exit_code = e.exit_code
+                proc = sup.desc.proc
+                exit_code = None
+                if isinstance(proc, sh.Command): # hacky way to check the pm
+                    try:
+                        exit_code = sup.desc.proc.exit_code
+                    except sh.ErrorReturnCode as e:
+                        exit_code = e.exit_code
+                else:
+                    exit_code = sup.desc.proc.status()
+
                 alive = f'dead[{exit_code}]'
 
             ping = sup.commander.ping()

@@ -1,5 +1,7 @@
 import logging
 import time
+from .cfgmgr import ConfigManager
+from .appctrl import AppSupervisor, ResponseListener
 import json
 import os
 import copy as cp
@@ -15,6 +17,8 @@ from .logbook import ElisaLogbook, FileLogbook
 import importlib
 from . import confdata
 from rich.traceback import Traceback
+from rich.progress import *
+from rich.table import Table
 
 from datetime import datetime
 
@@ -36,21 +40,25 @@ class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
     def __init__(self, console: Console, top_cfg: str, run_num_mgr, run_registry, logbook_type:str, timeout: int,
-                 use_kerb=True, logbook_prefix="", port_offset=0, fsm_cfg="partition"):
+                 use_kerb=True, logbook_prefix="", fsm_cfg="partition", port_offset=0,
+                 pm=None):
         super(NanoRC, self).__init__()
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
-        ssh_conf = []
+        self.pm = pm
+
+        self.ssh_conf = []
         if not use_kerb:
-            ssh_conf = ["-o GSSAPIAuthentication=no"]
-        self.partition = None
+            self.ssh_conf = ["-o GSSAPIAuthentication=no"]
         self.port_offset = port_offset
-        self.cfg = TreeBuilder(log=self.log,
-                               top_cfg=top_cfg,
-                               console=self.console,
-                               ssh_conf=ssh_conf,
-                               fsm_conf=fsm_cfg,
-                               port_offset=self.port_offset)
+        self.cfg = TreeBuilder(
+            log=self.log,
+            top_cfg=top_cfg,
+            console=self.console,
+            fsm_conf=fsm_cfg,
+            resolve_hostname = pm.use_sshpm(),
+            port_offset=self.port_offset)
+        self.partition = None
 
         self.custom_cmd = self.cfg.get_custom_commands()
         self.console.print(f'Extra commands are {list(self.custom_cmd.keys())}')
@@ -158,13 +166,13 @@ class NanoRC:
         kwargs['timeout'] = kwargs['timeout'] if kwargs.get('timeout') else self.timeout
         self.log.debug(f'Using timeout = {kwargs["timeout"]}')
         transition = getattr(self.topnode, command)
+        kwargs['pm'] = self.pm
         transition(*args, **kwargs)
         self.return_code = self.topnode.return_code.value
 
     def status(self) -> NoReturn:
         """
         Displays the status of the applications
-
         :returns:   Nothing
         :rtype:     None
         """
@@ -185,7 +193,13 @@ class NanoRC:
         Boot applications
         """
         self.partition=partition
-        self.execute_command("boot", partition=partition, timeout=timeout, log=self.log_path)
+        self.execute_command(
+            "boot",
+            partition=partition,
+            timeout=timeout,
+            ssh_conf=self.ssh_conf,
+            log_path=self.log_path,
+        )
 
 
     def terminate(self, timeout:int=None) -> NoReturn:

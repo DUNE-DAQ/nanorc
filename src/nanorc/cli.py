@@ -95,7 +95,6 @@ def check_rc(ctx, obj):
     if ctx.parent.invoked_subcommand == '*' and obj.rc.return_code:
         ctx.exit(obj.rc.return_code)
 
-
 def add_custom_cmds(cli, rc_cmd_exec, cmds):
     for c,d in cmds.items():
         arg_list = {}
@@ -131,13 +130,15 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
 @click.option('--log-path', type=click.Path(exists=True), default=None, help='Where the logs should go (on localhost of applications)')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
+@click.option('--pm', type=str, default="ssh://", help='Process manager, can be: ssh://, kind://, or k8s://np04-srv-015:31000, for example', callback=argval.validate_pm)
+@click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn webui')
 @accept_timeout(60)
 @click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=argval.validate_partition_number)
 @click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn WEBUI')
 @click.argument('top_cfg', type=str, callback=argval.validate_conf)
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, timeout, kerberos, partition_number, web, top_cfg):
+def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, timeout, kerberos, partition_number, web, top_cfg, pm):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f'{credentials.user}@rc> '
@@ -151,7 +152,7 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
 
     obj.console.print(Panel.fit(grid))
 
-    port_offset = 0 + partition_number * 1_000
+    port_offset = 0 + partition_number * 500
     rest_port = 5005 + partition_number
     webui_port = 5015 + partition_number
 
@@ -170,6 +171,7 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
                     timeout = timeout,
                     use_kerb = kerberos,
                     logbook_prefix = logbook_prefix,
+                    pm = pm,
                     port_offset = port_offset)
 
         if log_path:
@@ -260,8 +262,8 @@ def pin_threads(ctx, obj:NanoContext, pin_thread_file, timeout:int):
     obj.rc.execute_script(data=data, timeout=timeout)
 
 @cli.command('boot')
+@click.argument('partition', type=str, callback=argval.validate_partition)
 @accept_timeout(None)
-@click.argument('partition', type=str)
 @click.pass_obj
 @click.pass_context
 def boot(ctx, obj, partition:str, timeout:int):
