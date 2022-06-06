@@ -58,7 +58,7 @@ def timingcli(ctx, obj, traceback, pm, loglevel, log_path, cfg_dumpdir, kerberos
 
     obj.console.print(Panel.fit(grid))
 
-    port_offset = -1100 + partition_number * 500
+    port_offset = 300 + partition_number * 500
     rest_port = 5005 + partition_number
     webui_port = 5015 + partition_number
 
