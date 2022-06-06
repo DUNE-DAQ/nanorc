@@ -121,12 +121,12 @@ class K8SProcessManager(object):
             self.log.error(e)
             raise RuntimeError(f"Failed to delete namespace \"{namespace}\"") from e
 
-    def get_container_port_list_from_connections(self, app_name:str, connections:list=None):
+    def get_container_port_list_from_connections(self, app_name:str, connections:list=None, cmd_port:int=3333):
         ret = [
             client.V1ContainerPort(
                 name = 'restcmd',
                 protocol = "TCP",
-                container_port = 3333,
+                container_port = cmd_port,
             )]
         for c in connections:
             uri = urlparse(c['uri'])
@@ -142,13 +142,13 @@ class K8SProcessManager(object):
         return ret
 
 
-    def get_service_port_list_from_connections(self, app_name:str, connections:list=None):
+    def get_service_port_list_from_connections(self, app_name:str, connections:list=None, cmd_port:int=3333):
         ret = [
             client.V1ServicePort(
                 name = 'restcmd',
                 protocol = "TCP",
-                target_port = 3333,
-                port = 3333,
+                target_port = cmd_port,
+                port = cmd_port,
             )]
 
         for c in connections:
@@ -174,7 +174,7 @@ class K8SProcessManager(object):
             namespace: str,
             run_as: dict = None):
 
-        self.log.info(f"Creating \"{namespace}:{name}\" daq application  (image: \"{app_boot_info['image']}\", use_flx={app_boot_info['use_flx']})")
+        self.log.info(f"Creating \"{namespace}:{name}\" daq application (image: \"{app_boot_info['image']}\", use_flx={app_boot_info['use_flx']})")
 
         pod = client.V1Pod(
             # Run the pod with same user id and group id as the current user
@@ -248,7 +248,7 @@ class K8SProcessManager(object):
                         ],
                         command=['/dunedaq/run/app-entrypoint.sh'],
                         args=app_boot_info['args'],
-                        ports=self.get_container_port_list_from_connections(app_name=name, connections=app_boot_info['connections']),
+                        ports=self.get_container_port_list_from_connections(app_name=name, connections=app_boot_info['connections'], cmd_port=app_boot_info['cmd_port']),
                         volume_mounts=(
                             ([
                                 client.V1VolumeMount(
@@ -337,7 +337,7 @@ class K8SProcessManager(object):
         service = client.V1Service(
             metadata = client.V1ObjectMeta(name=name),
             spec = client.V1ServiceSpec(
-                ports = self.get_service_port_list_from_connections(app_name=name, connections=app_boot_info['connections']),
+                ports = self.get_service_port_list_from_connections(app_name=name, connections=app_boot_info['connections'], cmd_port=app_boot_info['cmd_port']),
                 selector = {"app": app_label}
             )
         )  # V1Service
@@ -546,7 +546,6 @@ class K8SProcessManager(object):
         hosts = boot_info["hosts"]
 
         self.partition = boot_info['env']['DUNEDAQ_PARTITION']
-        cmd_port = 3333
 
         # Create partition
         self.create_namespace(self.partition)
@@ -569,6 +568,7 @@ class K8SProcessManager(object):
             app_conf = apps[app_name]
 
             host = hosts[app_conf["host"]]
+            cmd_port = app_conf['port']
             env_formatter = {
                 "APP_HOST": host,
                 "DUNEDAQ_PARTITION": env_vars['DUNEDAQ_PARTITION'],
@@ -623,6 +623,7 @@ class K8SProcessManager(object):
                 "env": app_env,
                 "args": app_args,
                 "image": app_img,
+                "cmd_port": cmd_port,
                 "mount_cvmfs_dev": mount_cvmfs_dev,
                 "pvc": None,#('data1' if "dataflow" in app_name else None), ## TODO: find a nice way to do that thru config
                 "use_flx": ("ruflx" in app_name), ## TODO: find a nice way to do that thru config
@@ -634,6 +635,7 @@ class K8SProcessManager(object):
                     app_boot_info["node"] = host
                 else:
                     app_boot_info["anti_affinity_pods"] = readout_apps
+
             self.log.debug(json.dumps(app_boot_info, indent=2))
             app_desc = AppProcessDescriptor(app_name)
             app_desc.conf = app_conf.copy()
