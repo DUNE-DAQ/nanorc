@@ -55,7 +55,7 @@ def print_status(topnode, console, apparatus_id='', partition='') -> int:
                         exit_code = sup.desc.proc.exit_code
                     except sh.ErrorReturnCode as e:
                         exit_code = e.exit_code
-                else:
+                elif sup.desc.proc:
                     exit_code = sup.desc.proc.status()
 
                 alive = f'dead[{exit_code}]'
