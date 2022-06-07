@@ -293,7 +293,14 @@ class NanoRC:
 
         self.return_code = self.topnode.return_code.value
         if self.return_code == 0:
-            self.runs.append(start_run(run, run_type))
+            self.runs.append(
+                start_run(
+                    run_number=run,
+                    run_type=run_type,
+                    enable_data_storage=not disable_data_storage,
+                    message=message
+                )
+            )
             text = ""
             if self.run_num_mgr:
                 text += f"Started run #{run}"
@@ -316,6 +323,9 @@ class NanoRC:
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
             try:
                 self.logbook.add_message(message)
+                if self.runs:
+                    if self.runs[-1].is_running():
+                        self.runs[-1].messages.append(message)
             except Exception as e:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
@@ -333,6 +343,7 @@ class NanoRC:
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
             try:
                 self.logbook.message_on_stop(message)
+                self.runs[-1].messages.append(message)
             except Exception as e:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
@@ -378,6 +389,9 @@ class NanoRC:
                              overwrite_data=runtime_resume_data,
                              timeout=timeout)
         self.return_code = self.topnode.return_code.value
+
+        if self.return_code == 0:
+            self.runs[-1].trigger_interval_ticks = trigger_interval_ticks
 
 
     def execute_script(self, timeout, data=None) -> NoReturn:
