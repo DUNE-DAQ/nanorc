@@ -8,13 +8,13 @@ class RunInfo:
                  run_number:int,
                  run_type:str,
                  run_start_time:datetime,
-                 message:str,
+                 # message:str,
                  enable_data_storage:bool):
         self.run_number = run_number
         self.run_type = run_type
         self.run_start_time = run_start_time
         self.run_stop_time = None
-        self.messages = [message]
+        # self.messages = [message]
         self.enable_data_storage = enable_data_storage
         self.trigger_interval_ticks = None
 
@@ -24,12 +24,13 @@ class RunInfo:
     def is_running(self):
         return not self.run_stop_time
 
-def start_run(run_number:int, run_type:int, message:str, enable_data_storage:bool):
+def start_run(run_number:int, run_type:int,# message:str,
+              enable_data_storage:bool):
     ri = RunInfo(
         run_number=run_number,
         run_type=run_type,
         run_start_time=datetime.now(),
-        message=message,
+        # message=message,
         enable_data_storage=enable_data_storage
     )
     return ri

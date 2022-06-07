@@ -299,7 +299,7 @@ class NanoRC:
                     run_number=run,
                     run_type=run_type,
                     enable_data_storage=not disable_data_storage,
-                    message=message
+                    # message=message
                 )
             )
             text = ""
@@ -324,9 +324,9 @@ class NanoRC:
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
             try:
                 self.logbook.add_message(message)
-                if self.runs:
-                    if self.runs[-1].is_running():
-                        self.runs[-1].messages.append(message)
+                # if self.runs:
+                #     if self.runs[-1].is_running():
+                #         self.runs[-1].messages.append(message)
             except Exception as e:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
@@ -344,7 +344,7 @@ class NanoRC:
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
             try:
                 self.logbook.message_on_stop(message)
-                if self.runs: self.runs[-1].messages.append(message)
+                # if self.runs: self.runs[-1].messages.append(message)
             except Exception as e:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
