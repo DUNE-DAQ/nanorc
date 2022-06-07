@@ -173,6 +173,7 @@ class NanoRC:
         transition(*args, **kwargs)
         self.return_code = self.topnode.return_code.value
 
+
     def status(self) -> NoReturn:
         """
         Displays the status of the applications
@@ -343,7 +344,7 @@ class NanoRC:
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
             try:
                 self.logbook.message_on_stop(message)
-                self.runs[-1].messages.append(message)
+                if self.runs: self.runs[-1].messages.append(message)
             except Exception as e:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
@@ -354,9 +355,12 @@ class NanoRC:
         self.return_code = self.topnode.return_code.value
 
         if self.return_code == 0:
-            self.runs[-1].finish_run()
+            run = None
+            if self.runs:
+                self.runs[-1].finish_run()
+                run = self.runs[-1].run_number
             if self.run_num_mgr:
-                self.console.rule(f"[bold magenta]Stopped run #{self.runs[-1].run_number}[/bold magenta]")
+                self.console.rule(f"[bold magenta]Stopped run #{run}[/bold magenta]")
             else:
                 self.console.rule(f"[bold magenta]Stopped running[/bold magenta]")
 
@@ -391,7 +395,7 @@ class NanoRC:
         self.return_code = self.topnode.return_code.value
 
         if self.return_code == 0:
-            self.runs[-1].trigger_interval_ticks = trigger_interval_ticks
+            if self.runs: self.runs[-1].trigger_interval_ticks = trigger_interval_ticks
 
 
     def execute_script(self, timeout, data=None) -> NoReturn:
