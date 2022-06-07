@@ -55,11 +55,11 @@ def print_run_info(run_info:RunInfo, console:Console):
         table.add_row("Trigger interval ticks", str(run_info.trigger_interval_ticks))
     else:
         table.add_row("Trigger interval ticks", "default (1Hz?)")
-    i=0
-    for message in run_info.messages:
-        if message:
-            table.add_row(f"Message #{i}", message)
-            i+=1
+    # i=0
+    # for message in run_info.messages:
+    #     if message:
+    #         table.add_row(f"Message #{i}", message)
+    #         i+=1
 
 
     console.print(table)
