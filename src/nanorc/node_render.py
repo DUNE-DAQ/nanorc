@@ -1,5 +1,6 @@
 from .statefulnode import StatefulNode
 from .node import *
+from .k8spm import K8sProcess
 from anytree import RenderTree, PreOrderIter
 import logging as log
 from rich.console import Console
@@ -50,13 +51,13 @@ def print_status(topnode, console, apparatus_id='', partition='') -> int:
             else:
                 proc = sup.desc.proc
                 exit_code = None
-                if isinstance(proc, sh.Command): # hacky way to check the pm
+                if isinstance(proc, K8sProcess): # hacky way to check the pm
+                    exit_code = sup.desc.proc.status()
+                else:
                     try:
                         exit_code = sup.desc.proc.exit_code
                     except sh.ErrorReturnCode as e:
                         exit_code = e.exit_code
-                else:
-                    exit_code = sup.desc.proc.status()
 
                 alive = f'dead[{exit_code}]'
 

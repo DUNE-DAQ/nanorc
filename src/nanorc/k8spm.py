@@ -35,15 +35,18 @@ class K8sProcess(object):
         self.namespace = namespace
 
     def is_alive(self):
-        s = self.pm._core_v1_api.read_namespaced_pod_status(self.name, self.namespace)
-        for cond in s.status.conditions:
-            if cond.type == "Ready" and cond.status == "True":
-                return True
-        return False
+        try:
+            s = self.pm._core_v1_api.read_namespaced_pod_status(self.name, self.namespace)
+            for cond in s.status.conditions:
+                if cond.type == "Ready" and cond.status == "True":
+                    return True
+            return False
+        except:
+            return False
 
     def status(self):
-        s = self.pm._core_v1_api.read_namespaced_pod_status(self.name, self.namespace)
         try:
+            s = self.pm._core_v1_api.read_namespaced_pod_status(self.name, self.namespace)
             container_status = s.status.container_statuses[0].state
             if   container_status.running:
                 return "Running"
