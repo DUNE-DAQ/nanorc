@@ -140,6 +140,16 @@ class SSHProcessManager(object):
         self.log.debug(name+str(exc))
         self.event_queue.put((name, exc))
 
+    def execute_script(self, script_data):
+        env_vars = script_data["env"]
+        cmd =';'.join([ f"export {n}=\"{v}\"" for n,v in env_vars.items()])
+        cmd += ";"+"; ".join(script_data['cmd'])
+        hosts = set(self.boot_info["hosts"].values())
+        for host in hosts:
+            ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"] + [cmd]
+            proc = sh.ssh(ssh_args)
+            self.log.info(proc)
+            
     def boot(self, boot_info, timeout):
 
         if self.apps:
