@@ -158,7 +158,7 @@ class SSHProcessManager(object):
             )
 
         # Add a check for env and apps in boot_info keys
-
+        self.boot_info = boot_info
         apps = boot_info["apps"]
         hosts = boot_info["hosts"]
         env_vars = boot_info["env"]
