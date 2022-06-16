@@ -189,8 +189,7 @@ class SubsystemNode(StatefulNode):
 
         except Exception as e:
             self.log.error(f'Couldn\'t boot {self.name}')
-            self.console.print_exception()
-            self.log.error(e)
+            self.log.exception(e)
             response['status_code'] = ErrorCode.Failed
             response['error'] = str(e)
             self.to_error(event=event, response=response)
