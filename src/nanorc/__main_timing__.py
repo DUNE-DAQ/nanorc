@@ -43,9 +43,10 @@ from .cli import *
 @click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn webui')
 @click.option('--pm', type=str, default="ssh://", help='Process manager, can be: ssh://, kind://, or k8s://np04-srv-015:31000, for example', callback=argval.validate_pm)
 @click.argument('cfg_dir', type=str, callback=argval.validate_conf)
+@click.argument('partition-label', type=str, callback=argval.validate_partition)
 @click.pass_obj
 @click.pass_context
-def timingcli(ctx, obj, traceback, pm, loglevel, log_path, cfg_dumpdir, kerberos, timeout, partition_number, web, cfg_dir):
+def timingcli(ctx, obj, traceback, pm, loglevel, log_path, cfg_dumpdir, kerberos, timeout, partition_number, partition_label, web, cfg_dir):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f"{credentials.user}@timingrc> "
@@ -70,6 +71,7 @@ def timingcli(ctx, obj, traceback, pm, loglevel, log_path, cfg_dumpdir, kerberos
     try:
         rc = NanoRC(
             console = obj.console,
+            partition_label = partition_label,
             fsm_cfg = "timing",
             top_cfg = cfg_dir,
             run_num_mgr = None,
