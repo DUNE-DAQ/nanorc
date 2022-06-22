@@ -15,13 +15,13 @@ First, set up a working area according to [the daq-buildtools instructions](http
 Get the example data file:
 
 ```bash
-curl https://cernbox.cern.ch/index.php/s/VAqNtn7bwuQtff3/download -o frames.bin
+curl -o frames.bin -O https://cernbox.cern.ch/index.php/s/0XzhExSIMQJUsp0/download
 ```
 
 Generate a configuration:
 
 ```bash 
-daqconf_multiru_gen fake_daq
+daqconf_multiru_gen fake_daq partition-name
 ```
 
 Next (if you want to), you can create a file called `top_level.json` which contains:
