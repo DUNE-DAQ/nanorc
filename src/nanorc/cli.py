@@ -140,7 +140,6 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
 @click.pass_obj
 @click.pass_context
 def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, timeout, kerberos, partition_number, web, top_cfg, partition_label, pm):
-    print(f"pm, {pm}")
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f'{credentials.user}@rc> '
