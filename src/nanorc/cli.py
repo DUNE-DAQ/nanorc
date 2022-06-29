@@ -341,12 +341,33 @@ def start(ctx, obj:NanoContext, run_num:int, disable_data_storage:bool, trigger_
 @click.pass_obj
 @click.pass_context
 def stop(ctx, obj, stop_wait:int, force:bool, message:str, timeout:int):
-    obj.rc.pause(force, timeout=timeout)
-    check_rc(ctx,obj)
-    obj.rc.status()
-    time.sleep(stop_wait)
-    if obj.rc.return_code == 0:
-        obj.rc.stop(force, message=message, timeout=timeout)
+    prestop_sequence = [
+        "stop_trigger",
+        "prestop1",
+        "prestop2",
+    ]
+
+    for prestop in prestop_sequence:
+        prestop_func = getattr(obj.rc, prestop, None)
+        if not prestop_func:
+            obj.rc.console.error(f"Prestop function {prestop} doesn't exist in nanorc.core, omitting!")
+            continue
+        prestop_func(
+            force = force,
+            message = message,
+            timeout = timeout,
+            stop_sequence = True
+        )
+
+        check_rc(ctx,obj)
+        obj.rc.status()
+        time.sleep(stop_wait)
+
+        if obj.rc.return_code != 0 and not force:
+            break
+
+    if obj.rc.return_code == 0 or force:
+        obj.rc.stop(force, timeout=timeout)
         obj.rc.status()
 
 @cli.command('pause')
@@ -397,11 +418,16 @@ def start_trigger(ctx, obj, trigger_interval_ticks, timeout):
     obj.rc.status()
 
 @cli.command('stop_trigger')
+@click.option('--force', default=False, is_flag=True)
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def stop_trigger(ctx, obj, timeout):
-    obj.rc.stop_trigger(timeout=timeout)
+def stop_trigger(ctx, obj, timeout, force):
+    obj.rc.stop_trigger(
+        timeout=timeout,
+        force=force,
+        stop_sequence=False
+    )
     check_rc(ctx,obj)
     obj.rc.status()
 

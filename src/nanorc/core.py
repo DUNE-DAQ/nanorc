@@ -330,41 +330,16 @@ class NanoRC:
             except Exception as e:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
+    def disable_trigger(
+            self,
+            force:bool=False,
+            message:str="",
+            timeout:int=None) -> NoReturn:
 
     def stop(self, force:bool=False, message:str="", timeout:int=None) -> NoReturn:
         """
         Sends stop command
         """
-
-        if not force and not self.topnode.can_execute("stop"):
-            self.return_code = self.topnode.return_code
-            return
-
-        if message != "":
-            self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
-            try:
-                self.logbook.message_on_stop(message)
-                # if self.runs: self.runs[-1].messages.append(message)
-            except Exception as e:
-                self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
-
-        if self.cfgsvr:
-            self.cfgsvr.save_on_stop(self.runs[-1].run_number)
-
-        self.execute_command("stop", path=None, raise_on_fail=True, timeout=timeout, force=force)
-        self.return_code = self.topnode.return_code.value
-
-        if self.return_code == 0:
-            run = None
-            if self.runs:
-                self.runs[-1].finish_run()
-                run = self.runs[-1].run_number
-            if self.run_num_mgr:
-                self.console.rule(f"[bold magenta]Stopped run #{run}[/bold magenta]")
-            else:
-                self.console.rule(f"[bold magenta]Stopped running[/bold magenta]")
-
-
 
 
     def resume(self, trigger_interval_ticks: Union[int, None], timeout:int=None) -> NoReturn:
@@ -410,14 +385,43 @@ class NanoRC:
                                     timeout=timeout)
 
 
-    def stop_trigger(self, timeout) -> NoReturn:
+    def stop_trigger(self, timeout:int, force:bool=False, message:str="", stop_sequence:bool=False) -> NoReturn:
         """
         Stop the triggers
         """
-        self.execute_custom_command("stop_trigger",
-                                    data={},
-                                    timeout=timeout)
+        
+        if not force and not self.topnode.can_execute("stop_trigger"):
+            self.return_code = self.topnode.return_code
+            return
+        
+        if stop_sequence:
+            if message != "":
+                self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
+                try:
+                    self.logbook.message_on_stop(message)
+                    # if self.runs: self.runs[-1].messages.append(message)
+                except Exception as e:
+                    self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
+    
+            if self.cfgsvr:
+                self.cfgsvr.save_on_stop(self.runs[-1].run_number)
 
+        self.execute_command("stop_trigger", path=None, raise_on_fail=True, timeout=timeout, force=force)
+        self.return_code = self.topnode.return_code.value
+
+        if self.return_code == 0:
+            if stop_sequence:
+                run = None
+                if self.runs:
+                    self.runs[-1].finish_run()
+                    run = self.runs[-1].run_number
+                if self.run_num_mgr:
+                    self.console.rule(f"[bold magenta]Stopped run #{run}[/bold magenta]")
+                else:
+                    self.console.rule(f"[bold magenta]Stopped running[/bold magenta]")
+            else:
+                self.console.rule(f"[bold magenta]Trigger stopped[/bold magenta]")
+                
 
     def change_rate(self, trigger_interval_ticks, timeout) -> NoReturn:
         """
