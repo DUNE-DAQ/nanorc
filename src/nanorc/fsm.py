@@ -15,24 +15,34 @@ class FSM(Machine):
                 { "trigger": "terminate", "source": "*",           "dest": "none"       },
                 { "trigger": "to_error",  "source": "*",           "dest": "error"      }
             ]
+            self.precommand_sequence = { }
 
         else:
-            self.states_cfg = [ "none", "booted", "initialised", "configured", "running", "paused", "error"]
-            self.transitions_cfg = [
-                { "trigger": "boot",      "source": "none",        "dest": "booted"     },
-                { "trigger": "init",      "source": "booted",      "dest": "initialised"},
-                { "trigger": "conf",      "source": "initialised", "dest": "configured" },
-                { "trigger": "start",     "source": "configured",  "dest": "running"    },
-                { "trigger": "stop",      "source": "running" ,    "dest": "configured" },
-                { "trigger": "stop",      "source": "paused" ,     "dest": "configured" },
-                { "trigger": "resume",    "source": "running",     "dest": "running"    },
-                { "trigger": "resume",    "source": "paused",      "dest": "running"    },
-                { "trigger": "pause",     "source": "running",     "dest": "paused"     },
-                { "trigger": "pause",     "source": "paused",      "dest": "paused"     },
-                { "trigger": "scrap",     "source": "configured",  "dest": "initialised"},
-                { "trigger": "terminate", "source": "*",           "dest": "none"       },
-                { "trigger": "to_error",  "source": "*",           "dest": "error"      }
+            self.states_cfg = [
+                "none", "booted", "initialised", "configured", "running",
+                "paused", "trigger_stopped","prestopped1", "prestopped2", "error"
             ]
+            self.transitions_cfg = [
+                { "trigger": "boot",         "source": "none",            "dest": "booted"         },
+                { "trigger": "init",         "source": "booted",          "dest": "initialised"    },
+                { "trigger": "conf",         "source": "initialised",     "dest": "configured"     },
+                { "trigger": "start",        "source": "configured",      "dest": "running"        },
+                { "trigger": "stop_trigger", "source": "running",         "dest": "trigger_stopped"},
+                { "trigger": "prestop1",     "source": "trigger_stopped", "dest": "prestopped1"    },
+                { "trigger": "prestop2",     "source": "prestopped1",     "dest": "prestopped2"    },
+                { "trigger": "stop",         "source": "prestopped2",     "dest": "configured"     },
+                { "trigger": "resume",       "source": "running",         "dest": "running"        },
+                { "trigger": "resume",       "source": "paused",          "dest": "running"        },
+                { "trigger": "pause",        "source": "running",         "dest": "paused"         },
+                { "trigger": "pause",        "source": "paused",          "dest": "paused"         },
+                { "trigger": "scrap",        "source": "configured",      "dest": "initialised"    },
+                { "trigger": "terminate",    "source": "*",               "dest": "none"           },
+                { "trigger": "to_error",     "source": "*",               "dest": "error"          }
+            ]
+            self.precommand_sequence = {
+                "stop": ["stop_trigger", "prestop1", "prestop2"],
+            }
+
         if verbose:
             print_friendly_transitions = set()
             for tr in self.transitions_cfg:

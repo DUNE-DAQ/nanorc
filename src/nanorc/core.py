@@ -96,6 +96,10 @@ class NanoRC:
         self.topnode = self.cfg.get_tree_structure()
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
 
+    def get_precommand_sequence(self, command:str):
+        precommand = self.topnode.fsm.precommand_sequence.get(command)
+        return precommand if precommand else []
+
     def execute_custom_command(self, command, data, timeout, node=None, check_dead=True):
         if not timeout:
             timeout = self.timeout
@@ -330,16 +334,23 @@ class NanoRC:
             except Exception as e:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
-    def disable_trigger(
-            self,
-            force:bool=False,
-            message:str="",
-            timeout:int=None) -> NoReturn:
-
     def stop(self, force:bool=False, message:str="", timeout:int=None) -> NoReturn:
         """
         Sends stop command
         """
+        self.execute_command("stop", path=None, raise_on_fail=True, timeout=timeout, force=force)
+
+    def prestop1(self, force:bool=False, message:str="", timeout:int=None, stop_sequence:bool=True) -> NoReturn:
+        """
+        Sends stop command
+        """
+        self.execute_command("prestop1", path=None, raise_on_fail=True, timeout=timeout, force=force)
+
+    def prestop2(self, force:bool=False, message:str="", timeout:int=None, stop_sequence:bool=True) -> NoReturn:
+        """
+        Sends stop command
+        """
+        self.execute_command("prestop2", path=None, raise_on_fail=True, timeout=timeout, force=force)
 
 
     def resume(self, trigger_interval_ticks: Union[int, None], timeout:int=None) -> NoReturn:
@@ -389,11 +400,11 @@ class NanoRC:
         """
         Stop the triggers
         """
-        
+
         if not force and not self.topnode.can_execute("stop_trigger"):
             self.return_code = self.topnode.return_code
             return
-        
+
         if stop_sequence:
             if message != "":
                 self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
@@ -402,7 +413,7 @@ class NanoRC:
                     # if self.runs: self.runs[-1].messages.append(message)
                 except Exception as e:
                     self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
-    
+
             if self.cfgsvr:
                 self.cfgsvr.save_on_stop(self.runs[-1].run_number)
 
@@ -421,7 +432,7 @@ class NanoRC:
                     self.console.rule(f"[bold magenta]Stopped running[/bold magenta]")
             else:
                 self.console.rule(f"[bold magenta]Trigger stopped[/bold magenta]")
-                
+
 
     def change_rate(self, trigger_interval_ticks, timeout) -> NoReturn:
         """

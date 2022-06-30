@@ -121,7 +121,7 @@ class ConfigManager:
     def _load(self) -> None:
 
         pm_cfg = ["boot"]
-        rc_cmds = ["init", "conf", "start", "stop", "pause", "resume", "scrap"]
+        rc_cmds = ["init", "conf", "start", "stop_trigger", "prestop1", "prestop2", "stop", "pause", "resume", "scrap"]
         cfgs = {}
         for f in pm_cfg + rc_cmds:
             fpath = os.path.join(self.cfg_dir, f + ".json")

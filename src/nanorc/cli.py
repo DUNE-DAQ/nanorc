@@ -341,13 +341,10 @@ def start(ctx, obj:NanoContext, run_num:int, disable_data_storage:bool, trigger_
 @click.pass_obj
 @click.pass_context
 def stop(ctx, obj, stop_wait:int, force:bool, message:str, timeout:int):
-    prestop_sequence = [
-        "stop_trigger",
-        "prestop1",
-        "prestop2",
-    ]
 
-    for prestop in prestop_sequence:
+    for prestop in obj.rc.get_precommand_sequence('stop'):
+
+        obj.rc.console.print(f'Executing {prestop}')
         prestop_func = getattr(obj.rc, prestop, None)
         if not prestop_func:
             obj.rc.console.error(f"Prestop function {prestop} doesn't exist in nanorc.core, omitting!")
