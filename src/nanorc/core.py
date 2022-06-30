@@ -317,7 +317,7 @@ class NanoRC:
 
             self.console.rule(f"[bold magenta]{text}[/bold magenta]")
         else:
-            self.log.error(f"[bold red]There was an error when starting the run #{run}[/bold red]:")
+            self.log.error(f"There was an error when starting the run #{run}:")
             self.log.error(f'Response: {self.topnode.response}')
 
     def message(self, message:str="") -> NoReturn:
