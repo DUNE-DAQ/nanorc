@@ -38,7 +38,7 @@ class StatefulNode(NodeMixin):
     def can_execute_custom_or_expert(self, command, check_dead=True):
         disallowed_state = ['booted', 'none']
         if self.state in disallowed_state:
-            self.log.error(f"Cannot send {command} to {self.name} as it should at least be initialised")
+            self.log.error(f"Cannot send '{command}' to '{self.name}' as it should at least be initialised")
             return False
 
         for c in self.children:
@@ -52,14 +52,15 @@ class StatefulNode(NodeMixin):
         return True
 
 
-    def can_execute(self, command):
+    def can_execute(self, command, quiet=False):
         can_transition = getattr(self, "can_"+command)
         if not can_transition:
-            self.log.info(f"{self.name} cannot check if command {command} is possible")
+            self.log.info(f"'{self.name}' cannot check if command '{command}' is possible")
         else:
             if not can_transition():
-                self.log.error(f"{self.name} cannot {command} as it is {self.state}")
-                self.return_code = ErrorCode.InvalidTransition
+                if not quiet:
+                    self.log.error(f"'{self.name}' cannot '{command}' as it is '{self.state}'")
+                    self.return_code = ErrorCode.InvalidTransition
                 return False
 
         for c in self.children:
@@ -75,14 +76,14 @@ class StatefulNode(NodeMixin):
 
     def disable(self):
         if not self.enabled:
-            self.log.error(f'Cannot disable {self.name} as it is already disabled!')
+            self.log.error(f'Cannot disable \'{self.name}\' as it is already disabled!')
             return 1
         self.enabled = False
         return 0
 
     def enable(self):
         if self.enabled:
-            self.log.error(f'Cannot enable {self.name} as it is already enabled!')
+            self.log.error(f'Cannot enable \'{self.name}\' as it is already enabled!')
             return 1
         self.enabled = True
         return 0
@@ -125,12 +126,12 @@ class StatefulNode(NodeMixin):
 
         if event.kwargs.get("ssh_exit_code"): ssh_exit_code = f", the following error code was sent from ssh: {event.kwargs['ssh_exit_code']}"
 
-        self.log.error(f"while trying to \"{command}\" \"{self.name}\""+etext+ssh_exit_code)
+        self.log.error(f"while trying to '{command}' '{self.name}'"+etext+ssh_exit_code)
 
 
     def _on_enter_callback(self, event):
         command = event.event.name
-        self.log.info(f"{self.name} received command '{command}'")
+        self.log.info(f"'{self.name}' received command '{command}'")
         source_state = event.transition.source
         force = event.kwargs.get('force')
 
