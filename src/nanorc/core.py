@@ -96,9 +96,12 @@ class NanoRC:
         self.topnode = self.cfg.get_tree_structure()
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
 
-    def get_precommand_sequence(self, command:str):
-        precommand = self.topnode.fsm.precommand_sequence.get(command)
-        return precommand if precommand else []
+    def get_command_sequence(self, command:str):
+        seq_cmd = self.topnode.fsm.command_sequences.get(command)
+        return seq_cmd if seq_cmd else [command]
+
+    def can_execute(self, command:str, quiet=False):
+        return self.topnode.can_execute(command, quiet=quiet)
 
     def execute_custom_command(self, command, data, timeout, node=None, check_dead=True):
         if not timeout:
@@ -163,8 +166,10 @@ class NanoRC:
         ret = app.parent.send_expert_command(app, data, timeout=timeout)
         self.log.info(f'Reply: {ret}')
 
-    def execute_command(self, command, *args, **kwargs):
+    def execute_command(self, command, node=None, **kwargs):
         force = kwargs.get('force')
+        if not node:
+            node=self.topnode
 
         if not force and not self.topnode.can_execute(command):
             self.return_code = self.topnode.return_code.value
@@ -172,10 +177,10 @@ class NanoRC:
 
         kwargs['timeout'] = kwargs['timeout'] if kwargs.get('timeout') else self.timeout
         self.log.debug(f'Using timeout = {kwargs["timeout"]}')
-        transition = getattr(self.topnode, command)
+        transition = getattr(node, command)
         kwargs['pm'] = self.pm
-        transition(*args, **kwargs)
-        self.return_code = self.topnode.return_code.value
+        transition(**kwargs)
+        self.return_code = node.return_code.value
 
 
     def status(self) -> NoReturn:
@@ -212,51 +217,57 @@ class NanoRC:
         )
 
 
-    def terminate(self, timeout:int=None) -> NoReturn:
+    def terminate(self, timeout:int=None, **kwargs) -> NoReturn:
         """
         Terminates applications (but keep all the subsystems structure)
         """
         self.execute_command("terminate", timeout=timeout, force=True)
 
 
-    def init(self, path, timeout:int=None) -> NoReturn:
+    def init(self, path, timeout:int=None, **kwargs) -> NoReturn:
         """
         Initializes the applications.
         """
         self.execute_command("init", path=path, raise_on_fail=True, timeout=timeout)
 
 
-    def conf(self, path, timeout:int=None) -> NoReturn:
+    def conf(self, path, timeout:int=None, **kwargs) -> NoReturn:
         """
         Sends configure command to the applications.
         """
         self.execute_command("conf", path=path, raise_on_fail=True, timeout=timeout)
 
 
-    def pause(self, force:bool=False, timeout:int=None) -> NoReturn:
+    def pause(self, force:bool=False, timeout:int=None, **kwargs) -> NoReturn:
         """
         Sends pause command
         """
         self.execute_command("pause", path=None, raise_on_fail=True, timeout=timeout, force=force)
 
 
-    def scrap(self, path, force:bool=False, timeout:int=None) -> NoReturn:
+    def scrap(self, path, force:bool=False, timeout:int=None, **kwargs) -> NoReturn:
         """
         Send scrap command
         """
         self.execute_command("scrap", path=None, raise_on_fail=True, timeout=timeout, force=force)
 
+    def start(self, timeout:int=None, **kwargs) -> NoReturn:
+        """
+        Send scrap command
+        """
+        self.execute_command("start", path=None, raise_on_fail=True, timeout=timeout)
 
-    def start(self, disable_data_storage: bool, run_type:str, message:str="", timeout:int=None) -> NoReturn:
+    def start_trigger(self, run_type:str, trigger_interval_ticks: int, disable_data_storage: bool, timeout:int=None, message:str='', **kwargs) -> NoReturn:
         """
         Sends start command to the applications
 
         Args:
-            disable_data_storage (bool): Description
-            run_type (str): Description
+            disable_data_storage (bool): whether to store or not the data
+            run_type (str): PROD or TEST
+            message (str): some free text to describe the run
         """
-        # self.return_code = self.topnode.allowed("start", None)
-        if not self.topnode.can_execute("start"):
+
+        if not self.topnode.can_execute("start_trigger"):
             self.return_code = self.topnode.return_code
             return
 
@@ -291,10 +302,14 @@ class NanoRC:
                 self.return_code = 1
                 return
 
-        self.execute_command("start", path=None, raise_on_fail=True,
-                             cfg_method="runtime_start",
-                             overwrite_data=runtime_start_data,
-                             timeout=timeout)
+        self.execute_command(
+            "start_trigger",
+            path = None,
+            raise_on_fail = True,
+            cfg_method = "runtime_start",
+            overwrite_data = runtime_start_data,
+            timeout = timeout
+        )
 
         self.return_code = self.topnode.return_code.value
         if self.return_code == 0:
@@ -303,7 +318,6 @@ class NanoRC:
                     run_number=run,
                     run_type=run_type,
                     enable_data_storage=not disable_data_storage,
-                    # message=message
                 )
             )
             text = ""
@@ -334,19 +348,19 @@ class NanoRC:
             except Exception as e:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
-    def stop(self, force:bool=False, message:str="", timeout:int=None) -> NoReturn:
+    def stop(self, force:bool=False, message:str="", timeout:int=None, **kwargs) -> NoReturn:
         """
         Sends stop command
         """
         self.execute_command("stop", path=None, raise_on_fail=True, timeout=timeout, force=force)
 
-    def prestop1(self, force:bool=False, message:str="", timeout:int=None, stop_sequence:bool=True) -> NoReturn:
+    def prestop1(self, force:bool=False, message:str="", timeout:int=None, stop_sequence:bool=True, **kwargs) -> NoReturn:
         """
         Sends stop command
         """
         self.execute_command("prestop1", path=None, raise_on_fail=True, timeout=timeout, force=force)
 
-    def prestop2(self, force:bool=False, message:str="", timeout:int=None, stop_sequence:bool=True) -> NoReturn:
+    def prestop2(self, force:bool=False, message:str="", timeout:int=None, stop_sequence:bool=True, **kwargs) -> NoReturn:
         """
         Sends stop command
         """
@@ -387,16 +401,16 @@ class NanoRC:
     def execute_script(self, timeout, data=None) -> NoReturn:
         self.execute_custom_command('scripts', data=data, timeout=timeout)
 
-    def start_trigger(self, trigger_interval_ticks: Union[int, None], timeout) -> NoReturn:
-        """
-        Start the triggers
-        """
-        self.execute_custom_command("start_trigger",
-                                    data={'trigger_interval_ticks':trigger_interval_ticks},
-                                    timeout=timeout)
+    # def start_trigger(self, trigger_interval_ticks: Union[int, None], timeout) -> NoReturn:
+    #     """
+    #     Start the triggers
+    #     """
+    #     self.execute_custom_command("start_trigger",
+    #                                 data={'trigger_interval_ticks':trigger_interval_ticks},
+    #                                 timeout=timeout)
 
 
-    def stop_trigger(self, timeout:int, force:bool=False, message:str="", stop_sequence:bool=False) -> NoReturn:
+    def stop_trigger(self, timeout:int, force:bool=False, message:str="", stop_sequence:bool=True, **kwargs) -> NoReturn:
         """
         Stop the triggers
         """

@@ -208,13 +208,13 @@ def stop(ctx, obj, stop_wait:int, force:bool, message:str, timeout:int):
         logging.getLogger("cli").error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
         return
     obj.rc.pause(force, timeout=timeout)
-    check_rc(ctx,obj)
+    check_rc(ctx,obj.rc)
     obj.rc.status()
     if obj.rc.return_code == 0:
         time.sleep(stop_wait)
         obj.rc.stop(force, message=message, timeout=timeout)
         obj.rc.status()
-    check_rc(ctx,obj)
+    check_rc(ctx,obj.rc)
 
 
 @np04cli.command('message')
@@ -249,13 +249,13 @@ def start(ctx, obj:NanoContext, run_type:str, disable_data_storage:bool, trigger
         return
 
     obj.rc.start(disable_data_storage, run_type, message=message, timeout=timeout)
-    check_rc(ctx,obj)
+    check_rc(ctx,obj.rc)
     time.sleep(resume_wait)
     if obj.rc.return_code == 0:
         obj.rc.status()
         obj.rc.resume(trigger_interval_ticks, timeout=timeout)
         obj.rc.status()
-    check_rc(ctx,obj)
+    check_rc(ctx,obj.rc)
 
 
 def main():

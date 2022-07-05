@@ -157,7 +157,7 @@ timingcli.add_command(start_shell, 'shell')
 @click.pass_context
 def start(ctx, obj, timeout:int):
     obj.rc.start(disable_data_storage=True, run_type="TEST", timeout=timeout)
-    check_rc(ctx,obj)
+    check_rc(ctx,obj.rc)
     obj.rc.status()
 
 
@@ -167,7 +167,7 @@ def start(ctx, obj, timeout:int):
 @click.pass_context
 def start(ctx, obj, timeout:int):
     obj.rc.stop(timeout=timeout)
-    check_rc(ctx,obj)
+    check_rc(ctx,obj.rc)
     obj.rc.status()
 
 
