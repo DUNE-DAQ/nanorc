@@ -207,7 +207,7 @@ def add_start_trigger_parameters():
     def add_decorator(function):
         f1 = click.argument('run_num', type=int)(function)
         f2 = click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')(f1)
-j        f3 = click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')(f2)
+        f3 = click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')(f2)
         f4 = accept_wait()(f3)
         f5 = accept_timeout(None)(f4)
         return click.option('--message', type=str, default="")(f5)
@@ -228,7 +228,7 @@ def start_trigger(ctx, obj, **kwargs):
     kwargs['path'] = None
     wait = kwargs['wait']
     execute_cmd_sequence(
-        ctx = ctx,2
+        ctx = ctx,
         rc = obj.rc,
         command = 'start_run',
         force = False,
