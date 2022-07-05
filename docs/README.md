@@ -21,7 +21,7 @@ curl -o frames.bin -O https://cernbox.cern.ch/index.php/s/0XzhExSIMQJUsp0/downlo
 Generate a configuration:
 
 ```bash 
-daqconf_multiru_gen fake_daq partition-name
+daqconf_multiru_gen fake_daq
 ```
 
 Next (if you want to), you can create a file called `top_level.json` which contains:
@@ -39,7 +39,7 @@ Now you're ready to run.
 
 To see a list of options you can pass nanorc in order to control things such as the amount of information it prints and the timeouts for transitions, run `nanorc -h`. We'll skip those for now in the following demo:
 ```
-nanorc top_level.json # or "nanorc fake_daq" if you didn't create the top_level.json
+nanorc top_level.json partition-name# or "nanorc fake_daq partition-name" if you didn't create the top_level.json
 
 ╭──────────────────────────────────────────────────────────────────────────╮
 │                              Shonky NanoRC                               │
@@ -114,7 +114,7 @@ nanorc commands can be autocompleted with TAB, for example, TAB will autocomplet
 You can also control nanorc in "batch mode", e.g.:
 ```
 run_number=999
-nanorc mdapp_fake boot init conf start --disable-data-storage $run_number wait 2 resume wait 60 pause wait 2 stop scrap terminate
+nanorc mdapp_fake partition-name boot init conf start --disable-data-storage $run_number wait 2 resume wait 60 pause wait 2 stop scrap terminate
 ```
 Notice the ability to control the time via transitions from the command line via the `wait` argument. 
 
@@ -216,5 +216,4 @@ It should be pointed out that some substitutions are made when nanorc uses a fil
 
 ## How to run WebUI
 
-WebUI running is handled by `nanocrestrc` command. WebUI needs you to provide only one parameter in addition.
-* `-s` - serveraddress - as your browser is running on your side, it needs the information where to find REST endpoints. Simply provide address of the interface of the computer you are running the server on. Default value is `localhost`
+WebUI running is handled by `nanorc --web` command. WebUI needs you to provide only one parameter in addition.
