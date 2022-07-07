@@ -61,7 +61,7 @@ class SubsystemNode(StatefulNode):
             return False
 
         for c in self.children:
-            if not c.enabled: continue
+            if not c.included: continue
 
             if check_dead and not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
                 self.return_code = ErrorCode.Failed
@@ -76,7 +76,7 @@ class SubsystemNode(StatefulNode):
             return False
 
         for c in self.children:
-            if not c.enabled: continue
+            if not c.included: continue
             if not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
                 self.return_code = ErrorCode.Failed
                 self.log.error(f'{c.name} is dead, cannot send {command} unless you disable it or --force')
@@ -106,7 +106,7 @@ class SubsystemNode(StatefulNode):
                 self.log.error(f'Couldn\'t execute the thread pinning scripts: {str(e)}')
             return ret
 
-        is_enable_disable = cmd=='enable' or cmd=='disable'
+        is_include_exclude = cmd=='include' or cmd=='exclude'
 
         cmd_dict = getattr(self.cfgmgr, cmd, None)
 
@@ -120,10 +120,10 @@ class SubsystemNode(StatefulNode):
                         # selects the app matching the argument
                         if c.name!=app: continue
                     else:
-                        if not is_enable_disable and not c.enabled: continue
+                        if not is_include_exclude and not c.included: continue
 
                     if not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
-                        if not is_enable_disable:
+                        if not is_include_exclude:
                             self.log.error(f'{c.name} is dead, cannot send {cmd} to the app')
                         return False
 
@@ -137,10 +137,10 @@ class SubsystemNode(StatefulNode):
                 if app:
                     if c.name!=app: continue
                 else:
-                    if not is_enable_disable and not c.enabled: continue
+                    if not is_include_exclude and not c.included: continue
 
                 if not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
-                    if not is_enable_disable:
+                    if not is_include_exclude:
                         self.log.error(f'{c.name} is dead, cannot send {cmd} to the app')
                     return False
 
@@ -304,7 +304,7 @@ class SubsystemNode(StatefulNode):
             self.listener.flask_manager = self.listener.create_manager()
 
         for n in appset:
-            if not n.enabled:
+            if not n.included:
                 appset.remove(n)
                 continue
             if not n.sup.desc.proc.is_alive() or not n.sup.commander.ping():
@@ -329,7 +329,7 @@ class SubsystemNode(StatefulNode):
             for child_node in appset:
                 # BERK I don't know how to sort this.
                 # This is essntially calling cfgmgr.runtime_start(runtime_start_data)
-                if not child_node.enabled: continue
+                if not child_node.included: continue
 
                 if cfg_method:
                     f=getattr(self.cfgmgr,cfg_method)
@@ -352,7 +352,7 @@ class SubsystemNode(StatefulNode):
                 if len(appset)==0: break
                 done = []
                 for child_node in appset:
-                    if not child_node.enabled: continue
+                    if not child_node.included: continue
                     try:
                         r = child_node.sup.check_response()
                     except NoResponse:
@@ -383,7 +383,7 @@ class SubsystemNode(StatefulNode):
                     self.log.error(f'node \'{n}\' is not a child of the subprocess "{self.name}", check the order list for command "{command}"')
                     continue
                 child_node = [cn for cn in appset if cn.name == n][0] # YUK
-                if not child_node.enabled: continue
+                if not child_node.included: continue
 
                 entry_state = child_node.state.upper()
                 if entry_state in appfwk_state_dictionnary: entry_state = appfwk_state_dictionnary[entry_state]

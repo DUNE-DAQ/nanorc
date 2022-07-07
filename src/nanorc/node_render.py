@@ -65,8 +65,8 @@ def print_status(topnode, console, apparatus_id='', partition='') -> int:
             last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
 
             state_str = Text()
-            if not node.enabled:
-                state_str = Text(f"{node.state} - {alive} - disabled")
+            if not node.included:
+                state_str = Text(f"{node.state} - {alive} - excluded")
             elif node.is_error():
                 state_str = Text(f"{node.state} - {alive}", style=('bold red'))
             else:
