@@ -12,10 +12,23 @@ class FSM(Machine):
                 { 'trigger': 'start',     'source': 'configured',  'dest': 'running'    },
                 { 'trigger': 'stop',      'source': 'running',     'dest': 'configured' },
                 { 'trigger': 'scrap',     'source': 'configured',  'dest': 'initialised'},
-                { 'trigger': 'terminate', 'source': '*',           'dest': 'none'       },
+                { 'trigger': 'terminate', 'source': 'initial',     'dest': 'none'       },
                 { 'trigger': 'to_error',  'source': '*',           'dest': 'error'      }
             ]
-            self.command_sequences = { }
+            self.command_sequences = {
+                'start_run': [
+                    {'cmd': 'configure', 'optional': True },
+                    {'cmd': 'start',     'optional': False},
+                ],
+                'stop_run' : [
+                    {'cmd': 'stop', 'optional': False},
+                ],
+                'shutdown' : [
+                    {'cmd': 'stop',      'optional': True },
+                    {'cmd': 'scrap',     'optional': True },
+                    {'cmd': 'terminate', 'optional': False},
+                ],
+            }
 
         else:
             self.states_cfg = [
@@ -23,27 +36,39 @@ class FSM(Machine):
                 'paused', 'prestopped1', 'prestopped2', 'error'
             ]
             self.transitions_cfg = [
-                { 'trigger': 'boot',         'source': 'none',            'dest': 'booted'         },
-                { 'trigger': 'init',         'source': 'booted',          'dest': 'initial'        },
-                { 'trigger': 'conf',         'source': 'initial',         'dest': 'configured'     },
-                { 'trigger': 'start',        'source': 'configured',      'dest': 'ready'          },
-                { 'trigger': 'start_trigger','source': 'ready',           'dest': 'running'        },
-                { 'trigger': 'pause',        'source': 'running',         'dest': 'paused'         },
-                { 'trigger': 'resume',       'source': 'paused',          'dest': 'running'        },
-                { 'trigger': 'stop_trigger', 'source': 'paused',          'dest': 'ready'          },
-                { 'trigger': 'stop_trigger', 'source': 'running',         'dest': 'ready'          },
-                { 'trigger': 'prestop1',     'source': 'ready',           'dest': 'prestopped1'    },
-                { 'trigger': 'prestop2',     'source': 'prestopped1',     'dest': 'prestopped2'    },
-                { 'trigger': 'stop',         'source': 'prestopped2',     'dest': 'configured'     },
-                { 'trigger': 'scrap',        'source': 'configured',      'dest': 'initial'        },
-                { 'trigger': 'terminate',    'source': '*',               'dest': 'none'           },
-                { 'trigger': 'to_error',     'source': '*',               'dest': 'error'          }
+                { 'trigger': 'boot',             'source': 'none',            'dest': 'booted'     },
+                { 'trigger': 'init',             'source': 'booted',          'dest': 'initial'    },
+                { 'trigger': 'conf',             'source': 'initial',         'dest': 'configured' },
+                { 'trigger': 'start',            'source': 'configured',      'dest': 'ready'      },
+                { 'trigger': 'enable_triggers',  'source': 'ready',           'dest': 'running'    },
+                { 'trigger': 'disable_triggers', 'source': 'running',         'dest': 'ready'      },
+                { 'trigger': 'prestop1',         'source': 'ready',           'dest': 'prestopped1'},
+                { 'trigger': 'prestop2',         'source': 'prestopped1',     'dest': 'prestopped2'},
+                { 'trigger': 'stop',             'source': 'prestopped2',     'dest': 'configured' },
+                { 'trigger': 'scrap',            'source': 'configured',      'dest': 'initial'    },
+                { 'trigger': 'terminate',        'source': 'initial',         'dest': 'none'       },
+                { 'trigger': 'to_error',         'source': '*',               'dest': 'error'      }
             ]
             self.command_sequences = {
-                'go'       : ['conf', 'start', 'start_trigger'],
-                'start_run': ['start', 'start_trigger'],
-                'end_run'  : ['stop_trigger', 'prestop1', 'prestop2', 'stop'],
-                'terminate': ['stop_trigger', 'prestop1', 'prestop2', 'stop', 'scrap', 'terminate'],
+                'start_run': [
+                    {'cmd': 'conf',            'optional': True },
+                    {'cmd': 'start',           'optional': False},
+                    {'cmd': 'enable_triggers', 'optional': False}
+                ],
+                'stop_run' : [
+                    {'cmd': 'disable_triggers', 'optional': True },
+                    {'cmd': 'prestop1',         'optional': False},
+                    {'cmd': 'prestop2',         'optional': False},
+                    {'cmd': 'stop',             'optional': False},
+                ],
+                'shutdown' : [
+                    {'cmd': 'disable_triggers', 'optional': True },
+                    {'cmd': 'prestop1',         'optional': True },
+                    {'cmd': 'prestop2',         'optional': True },
+                    {'cmd': 'stop',             'optional': True },
+                    {'cmd': 'scrap',            'optional': True },
+                    {'cmd': 'terminate',        'optional': False},
+                ],
             }
 
         if verbose:

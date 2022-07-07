@@ -32,7 +32,7 @@ class StatefulNode(NodeMixin):
         self.return_code = ErrorCode.Success
         self.status_receiver_queue = Queue()
         self.order = order if order else dict()
-        self.enabled = True
+        self.included = True
 
 
     def can_execute_custom_or_expert(self, command, check_dead=True):
@@ -42,7 +42,7 @@ class StatefulNode(NodeMixin):
             return False
 
         for c in self.children:
-            if not c.enabled: continue
+            if not c.included: continue
 
             if not c.can_execute_custom_or_expert(command, check_dead):
                 self.return_code = ErrorCode.Failed
@@ -64,7 +64,7 @@ class StatefulNode(NodeMixin):
                 return False
 
         for c in self.children:
-            if not c.enabled: continue
+            if not c.included: continue
 
             if not c.can_execute(command):
                 self.return_code = ErrorCode.Failed
@@ -74,18 +74,18 @@ class StatefulNode(NodeMixin):
         return True
 
 
-    def disable(self):
-        if not self.enabled:
-            self.log.error(f'Cannot disable \'{self.name}\' as it is already disabled!')
+    def exclude(self):
+        if not self.included:
+            self.log.error(f'Cannot exclude \'{self.name}\' as it is already excluded!')
             return 1
-        self.enabled = False
+        self.included = False
         return 0
 
-    def enable(self):
-        if self.enabled:
-            self.log.error(f'Cannot enable \'{self.name}\' as it is already enabled!')
+    def include(self):
+        if self.included:
+            self.log.error(f'Cannot include \'{self.name}\' as it is already included!')
             return 1
-        self.enabled = True
+        self.included = True
         return 0
 
     def get_custom_commands(self):
@@ -97,7 +97,7 @@ class StatefulNode(NodeMixin):
     def send_custom_command(self, cmd, data, timeout) -> dict:
         ret = {}
         for c in self.children:
-            if c.enabled:
+            if c.included:
                 ret[c.name] = c.send_custom_command(cmd, data, timeout)
         return ret
 
@@ -136,7 +136,7 @@ class StatefulNode(NodeMixin):
         force = event.kwargs.get('force')
 
         if command in self.order:
-            self.log.info(f'Propagating to the enabled children nodes in the order {self.order[command]}')
+            self.log.info(f'Propagating to the included children nodes in the order {self.order[command]}')
         else:
             self.order[command] = [c.name for c in self.children]
             self.log.info(f'Propagating to children nodes in the figured out order: {self.order[command]}')
@@ -145,7 +145,7 @@ class StatefulNode(NodeMixin):
 
         for cn in self.order[command]:
             child = [c for c in self.children if c.name == cn][0]
-            if not child.enabled: continue
+            if not child.included: continue
 
             try:
                 child.trigger(command, **event.kwargs)

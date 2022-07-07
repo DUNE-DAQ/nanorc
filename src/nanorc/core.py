@@ -354,12 +354,6 @@ class NanoRC:
         """
         self.execute_command("stop", path=None, raise_on_fail=True, timeout=timeout, force=force)
 
-    def prestop1(self, force:bool=False, message:str="", timeout:int=None, stop_sequence:bool=True, **kwargs) -> NoReturn:
-        """
-        Sends stop command
-        """
-        self.execute_command("prestop1", path=None, raise_on_fail=True, timeout=timeout, force=force)
-
     def prestop2(self, force:bool=False, message:str="", timeout:int=None, stop_sequence:bool=True, **kwargs) -> NoReturn:
         """
         Sends stop command
@@ -401,21 +395,28 @@ class NanoRC:
     def execute_script(self, timeout, data=None) -> NoReturn:
         self.execute_custom_command('scripts', data=data, timeout=timeout)
 
-    # def start_trigger(self, trigger_interval_ticks: Union[int, None], timeout) -> NoReturn:
-    #     """
-    #     Start the triggers
-    #     """
-    #     self.execute_custom_command("start_trigger",
-    #                                 data={'trigger_interval_ticks':trigger_interval_ticks},
-    #                                 timeout=timeout)
+    def enable_triggers(self, trigger_interval_ticks: Union[int, None], timeout) -> NoReturn:
+        """
+        Start the triggers
+        """
+        self.execute_custom_command("enable_triggers",
+                                    data={'trigger_interval_ticks':trigger_interval_ticks},
+                                    timeout=timeout)
 
+    def disable_triggers(self, trigger_interval_ticks: Union[int, None], timeout) -> NoReturn:
+        """
+        Start the triggers
+        """
+        self.execute_custom_command("disable_triggers",
+                                    data={'trigger_interval_ticks':trigger_interval_ticks},
+                                    timeout=timeout)
 
-    def stop_trigger(self, timeout:int, force:bool=False, message:str="", stop_sequence:bool=True, **kwargs) -> NoReturn:
+    def prestop1(self, timeout:int, force:bool=False, message:str="", stop_sequence:bool=True, **kwargs) -> NoReturn:
         """
         Stop the triggers
         """
 
-        if not force and not self.topnode.can_execute("stop_trigger"):
+        if not force and not self.topnode.can_execute("disable_triggers"):
             self.return_code = self.topnode.return_code
             return
 
@@ -457,35 +458,35 @@ class NanoRC:
                                     timeout=timeout)
 
 
-    def disable(self, node, timeout, resource_name) -> NoReturn:
+    def exclude(self, node, timeout, resource_name) -> NoReturn:
         """
         Start the triggers
         """
 
-        if not node.can_execute_custom_or_expert("disable", False):
+        if not node.can_execute_custom_or_expert("exclude", False):
             self.return_code = node.return_code
             return
-        ret = node.disable()
+        ret = node.exclude()
         if ret != 0:
             return
-        self.execute_custom_command("disable",
+        self.execute_custom_command("exclude",
                                     data={'resource_name': resource_name if resource_name else node.name},
                                     timeout=timeout,
                                     node=node,
                                     check_dead=False)
 
 
-    def enable(self, node, timeout, resource_name) -> NoReturn:
+    def include(self, node, timeout, resource_name) -> NoReturn:
         """
         Start the triggers
         """
-        if not node.can_execute_custom_or_expert("enable", True):
+        if not node.can_execute_custom_or_expert("include", True):
             self.return_code = node.return_code
             return
-        ret = node.enable()
+        ret = node.include()
         if ret != 0:
             return
-        self.execute_custom_command("enable",
+        self.execute_custom_command("include",
                                     data={'resource_name': resource_name if resource_name else node.name},
                                     timeout=timeout,
                                     node=node)

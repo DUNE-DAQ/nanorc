@@ -202,71 +202,62 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
 ########### Commands ###########
 ################################
 
-def add_start_trigger_parameters():
+def add_enable_triggers_parameters():
     # sigh start...
     def add_decorator(function):
         f1 = click.argument('run_num', type=int)(function)
         f2 = click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')(f1)
         f3 = click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')(f2)
-        f4 = accept_wait()(f3)
-        f5 = accept_timeout(None)(f4)
-        return click.option('--message', type=str, default="")(f5)
+        f4 = accept_timeout(None)(f3)
+        return click.option('--message', type=str, default="")(f4)
      # sigh end
     return add_decorator
 
 
-def start_trigger_defaults_overwrite(kwargs):
+def enable_triggers_defaults_overwrite(kwargs):
     kwargs['run_type'] = 'TEST'
+    kwargs['path'] = None
     return kwargs
 
-@cli.command('start_run')
-@add_start_trigger_parameters()
+@cli.command('enable_triggers')
+@add_enable_triggers_parameters()
 @click.pass_obj
 @click.pass_context
-def start_trigger(ctx, obj, **kwargs):
+def enable_triggers(ctx, obj, **kwargs):
     obj.rc.run_num_mgr.set_run_number(kwargs['run_num'])
-    kwargs['path'] = None
+    obj.rc.enable_triggers(**enable_triggers_defaults_overwrite(kwargs))
+
+
+@cli.command('start_run')
+@add_enable_triggers_parameters()
+@accept_wait()
+@click.pass_obj
+@click.pass_context
+def start_run(ctx, obj, **kwargs):
+    obj.rc.run_num_mgr.set_run_number(kwargs['run_num'])
     wait = kwargs['wait']
     execute_cmd_sequence(
         ctx = ctx,
         rc = obj.rc,
         command = 'start_run',
+        wait = wait,
         force = False,
-        **start_trigger_defaults_overwrite(kwargs)
+        **enable_triggers_defaults_overwrite(kwargs)
     )
 
 
-@cli.command('go')
-@add_start_trigger_parameters()
+@cli.command('shutdown')
+@click.option('--force', default=False, is_flag=True)
 @click.pass_obj
 @click.pass_context
-def go(ctx, obj, **kwargs):
-    obj.rc.run_num_mgr.set_run_number(kwargs['run_num'])
-    kwargs['path'] = None
+def start_trigger(ctx, obj, force:bool):
     wait = kwargs['wait']
     execute_cmd_sequence(
         ctx = ctx,
         rc = obj.rc,
-        command = 'go',
-        force = False,
-        **start_trigger_defaults_overwrite(kwargs)
-    )
-
-
-@cli.command('start_trigger')
-@add_start_trigger_parameters()
-@click.pass_obj
-@click.pass_context
-def start_trigger(ctx, obj, timeout, **kwargs):
-    obj.rc.run_num_mgr.set_run_number(kwargs['run_num'])
-    kwargs['path'] = None
-    wait = kwargs['wait']
-    execute_cmd_sequence(
-        ctx = ctx,
-        rc = obj.rc,
-        command = 'start_trigger',
-        force = False,
-        **start_trigger_defaults_overwrite(kwargs)
+        wait = wait,
+        command = 'shutdown',
+        force = force
     )
 
 

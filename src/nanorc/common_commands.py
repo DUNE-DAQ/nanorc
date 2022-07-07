@@ -109,8 +109,8 @@ def start(ctx, obj:NanoContext, timeout:int):
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def stop_trigger(ctx, obj, timeout, force):
-    obj.rc.stop_trigger(
+def disable_triggers(ctx, obj, timeout, force):
+    obj.rc.disable_triggers(
         timeout=timeout,
         force=force,
         stop_sequence=False
@@ -126,17 +126,12 @@ def stop_trigger(ctx, obj, timeout, force):
 @click.pass_obj
 @click.pass_context
 def terminate(ctx, obj, wait:int, timeout:int, message:str, force:bool):
-    execute_cmd_sequence(
-        ctx = ctx,
-        rc = obj.rc,
-        command = 'terminate',
-        force = force,
-        wait = wait,
-        path = None,
-        message = message,
-        timeout = timeout,
-        skip_intermediate = True
+    obj.rc.terminate(
+        timeout=timeout,
+        force=force,
     )
+    check_rc(ctx,obj.rc)
+    obj.rc.status()
 
 
 @click.command()
@@ -146,19 +141,37 @@ def terminate(ctx, obj, wait:int, timeout:int, message:str, force:bool):
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def end_run(ctx, obj, wait:int, force:bool, message:str, timeout:int):
+def shutdown(ctx, obj, wait:int, timeout:int, message:str, force:bool):
+    execute_cmd_sequence(
+        ctx = ctx,
+        rc = obj.rc,
+        wait = wait,
+        command = 'shutdown',
+        force = force,
+        stop_sequence = True,
+        timeout = timeout,
+        message = message
+    )
+
+@click.command()
+@accept_wait()
+@click.option('--force', default=False, is_flag=True)
+@accept_message(argument=False)
+@accept_timeout(None)
+@click.pass_obj
+@click.pass_context
+def stop_run(ctx, obj, wait:int, force:bool, message:str, timeout:int):
     execute_cmd_sequence(
         ctx = ctx,
         rc = obj.rc,
         path = None,
-        command = 'end_run',
+        command = 'stop_run',
         force = force,
         wait = wait,
         stop_sequence = True,
         message = message,
         timeout = timeout,
     )
-
 
 
 
@@ -178,24 +191,6 @@ def scrap(ctx, obj, path, force, timeout):
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def pause(ctx, obj, timeout:int):
-    obj.rc.pause(timeout=timeout)
-    check_rc(ctx,obj.rc)
-    obj.rc.status()
-
-
-@click.command()
-@click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
-@accept_timeout(None)
-@click.pass_obj
-@click.pass_context
-def resume(ctx, obj, trigger_interval_ticks:int, timeout:int):
-    obj.rc.resume(trigger_interval_ticks, timeout=timeout)
-    check_rc(ctx,obj)
-    obj.rc.status()
-
-
-
 @click.command()
 @click.argument('trigger-interval-ticks', type=int)
 @accept_timeout(None)
@@ -213,8 +208,8 @@ def change_rate(ctx, obj, trigger_interval_ticks, timeout):
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def enable(ctx, obj, path, resource_name, timeout):
-    obj.rc.enable(path, timeout=timeout, resource_name=resource_name)
+def include(ctx, obj, path, resource_name, timeout):
+    obj.rc.include(path, timeout=timeout, resource_name=resource_name)
     check_rc(ctx,obj.rc)
     obj.rc.status()
 
@@ -225,8 +220,8 @@ def enable(ctx, obj, path, resource_name, timeout):
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def disable(ctx, obj, path, resource_name, timeout):
-    obj.rc.disable(path, timeout=timeout, resource_name=resource_name)
+def exclude(ctx, obj, path, resource_name, timeout):
+    obj.rc.exclude(path, timeout=timeout, resource_name=resource_name)
     check_rc(ctx,obj.rc)
     obj.rc.status()
 
@@ -279,14 +274,13 @@ def add_common_cmds(shell):
     shell.add_command(init          , 'init'          )
     shell.add_command(conf          , 'conf'          )
     shell.add_command(start         , 'start'         )
-    shell.add_command(end_run       , 'end_run'       )
+    shell.add_command(stop_run      , 'stop_run'      )
     shell.add_command(scrap         , 'scrap'         )
-    shell.add_command(pause         , 'pause'         )
-    shell.add_command(resume        , 'resume'        )
     shell.add_command(terminate     , 'terminate'     )
+    shell.add_command(shutdown      , 'shutdown'      )
     shell.add_command(change_rate   , 'change_rate'   )
-    shell.add_command(enable        , 'enable'        )
-    shell.add_command(disable       , 'disable'       )
+    shell.add_command(include       , 'include'       )
+    shell.add_command(exclude       , 'exclude'       )
     shell.add_command(expert_command, 'expert_command')
     shell.add_command(wait          , 'wait'          )
     shell.add_command(start_shell   , 'start_shell'   )
@@ -322,7 +316,7 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
 def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool=False, skip_intermediate=False, **kwargs):
     sequence = rc.get_command_sequence(command)
     import time
-    
+
     for seq_cmd in sequence:
         if not rc.can_execute(seq_cmd, quiet=True):
             if skip_intermediate:
@@ -330,13 +324,13 @@ def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool=False, skip_
             elif not force:
                 rc.log.error(f"Cannot execute '{seq_cmd}' in the '{command}' sequence as the root node is '{rc.topnode.state}'!")
                 break
-            
+
         rc.console.print(f'Executing {seq_cmd}')
         seq_func = getattr(rc, seq_cmd, None)
         if not seq_func:
             rc.log.error(f"Function {seq_cmd} doesn't exist in nanorc.core, omitting!")
             if not force: break
-        
+
         seq_func(**kwargs)
 
         check_rc(ctx, rc)
@@ -344,5 +338,5 @@ def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool=False, skip_
 
         if rc.return_code != 0 and not force:
             break
-        
+
         time.sleep(wait)
