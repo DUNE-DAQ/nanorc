@@ -57,9 +57,6 @@ def validate_partition_number(ctx, param, number):
     return number
 
 def validate_partition(ctx, param, partition):
-    if ctx.obj.rc.pm.use_k8spm() and not partition:
-        raise click.BadParameter(f'You need to feed a partition to run with k8s')
-
     pat = re.compile(r'[a-z0-9]([-a-z0-9]*[a-z0-9])?') ## Nanorc-12334 allowed (with hyphen) This is straight from k8s error message when the partition name isn't right
     if not re.fullmatch(pat, partition):
         raise click.BadParameter(f'Partition {partition} should be alpha-numeric-hyphen! Make sure you name has the form [a-z0-9]([-a-z0-9]*[a-z0-9])?')

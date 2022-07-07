@@ -40,7 +40,7 @@ import dunedaq.cmdlib.cmd as cmd  # AddressedCmd,
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
-    def __init__(self, console: Console, top_cfg: str, run_num_mgr, run_registry, logbook_type:str, timeout: int,
+    def __init__(self, console: Console, top_cfg: str, partition_label:str, run_num_mgr, run_registry, logbook_type:str, timeout: int,
                  use_kerb=True, logbook_prefix="", fsm_cfg="partition", port_offset=0,
                  pm=None):
         super(NanoRC, self).__init__()
@@ -59,7 +59,7 @@ class NanoRC:
             fsm_conf=fsm_cfg,
             resolve_hostname = pm.use_sshpm(),
             port_offset=self.port_offset)
-        self.partition = None
+        self.partition = partition_label
 
         self.custom_cmd = self.cfg.get_custom_commands()
         self.console.print(f'Extra commands are {list(self.custom_cmd.keys())}')
@@ -203,14 +203,13 @@ class NanoRC:
         self.return_code = print_node(node=self.topnode, console=self.console, leg=leg)
 
 
-    def boot(self, partition:str, timeout:int=None) -> NoReturn:
+    def boot(self, timeout:int=None) -> NoReturn:
         """
         Boot applications
         """
-        self.partition=partition
         self.execute_command(
             "boot",
-            partition=partition,
+            partition=self.partition,
             timeout=timeout,
             ssh_conf=self.ssh_conf,
             log_path=self.log_path,

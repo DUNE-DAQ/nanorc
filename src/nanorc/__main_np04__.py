@@ -45,9 +45,10 @@ from .cli import *
 @click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=argval.validate_partition_number)
 @click.argument('cfg_dir', type=str, callback=argval.validate_conf)
 @click.argument('user', type=str)
+@click.argument('partition-label', type=str, callback=argval.validate_partition)
 @click.pass_obj
 @click.pass_context
-def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, dotnanorc, kerberos, timeout, partition_number, web, pm, cfg_dir, user):
+def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, dotnanorc, kerberos, timeout, partition_number, partition_label, web, pm, cfg_dir, user):
 
     if not elisa_conf:
         with resources.path(confdata, "elisa_conf.json") as p:
@@ -92,15 +93,18 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
         logging.getLogger("cli").info("RunDB socket "+rundb_socket)
         logging.getLogger("cli").info("RunRegistryDB socket "+runreg_socket)
 
-        rc = NanoRC(console = obj.console,
-                    top_cfg = cfg_dir,
-                    run_num_mgr = DBRunNumberManager(rundb_socket),
-                    run_registry = DBConfigSaver(runreg_socket),
-                    logbook_type = elisa_conf,
-                    timeout = timeout,
-                    use_kerb = kerberos,
-                    port_offset = port_offset,
-                    pm = pm)
+        rc = NanoRC(
+            console = obj.console,
+            top_cfg = cfg_dir,
+            partition_label = partition_label,
+            run_num_mgr = DBRunNumberManager(rundb_socket),
+            run_registry = DBConfigSaver(runreg_socket),
+            logbook_type = elisa_conf,
+            timeout = timeout,
+            use_kerb = kerberos,
+            port_offset = port_offset,
+            pm = pm
+        )
 
         rc.log_path = os.path.abspath(log_path)
         add_custom_cmds(ctx.command, rc.execute_custom_command, rc.custom_cmd)

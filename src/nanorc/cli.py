@@ -86,9 +86,10 @@ def updateLogLevel(loglevel):
 @click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=argval.validate_partition_number)
 @click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn WEBUI')
 @click.argument('top_cfg', type=str, callback=argval.validate_conf)
+@click.argument('partition-label', type=str, callback=argval.validate_partition)
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, timeout, kerberos, partition_number, web, top_cfg, pm):
+def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, timeout, kerberos, partition_number, web, top_cfg, partition_label, pm):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f'{credentials.user}@rc> '
@@ -113,16 +114,19 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
     webui_thread = threading.Thread()
 
     try:
-        rc = NanoRC(console = obj.console,
-                    top_cfg = top_cfg,
-                    run_num_mgr = SimpleRunNumberManager(),
-                    run_registry = FileConfigSaver(cfg_dumpdir),
-                    logbook_type = "file",
-                    timeout = timeout,
-                    use_kerb = kerberos,
-                    logbook_prefix = logbook_prefix,
-                    pm = pm,
-                    port_offset = port_offset)
+        rc = NanoRC(
+            console = obj.console,
+            top_cfg = top_cfg,
+            run_num_mgr = SimpleRunNumberManager(),
+            run_registry = FileConfigSaver(cfg_dumpdir),
+            logbook_type = "file",
+            timeout = timeout,
+            use_kerb = kerberos,
+            partition_label = partition_label,
+            logbook_prefix = logbook_prefix,
+            pm = pm,
+            port_offset = port_offset
+        )
 
         if log_path:
             rc.log_path = os.path.abspath(log_path)
