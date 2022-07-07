@@ -216,11 +216,11 @@ class NanoRC:
         )
 
 
-    def terminate(self, timeout:int=None, **kwargs) -> NoReturn:
+    def terminate(self, timeout:int=None, force:bool=False, **kwargs) -> NoReturn:
         """
         Terminates applications (but keep all the subsystems structure)
         """
-        self.execute_command("terminate", timeout=timeout, force=True)
+        self.execute_command("terminate", timeout=timeout, force=force)
 
 
     def init(self, path, timeout:int=None, **kwargs) -> NoReturn:

@@ -187,7 +187,7 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
 
     def cleanup_rc():
         if rc.topnode.state != 'none': logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
-        rc.terminate()
+        rc.terminate(force=True)
         if rc.return_code:
             ctx.exit(rc.return_code)
 
