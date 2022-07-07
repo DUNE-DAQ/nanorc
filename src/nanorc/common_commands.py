@@ -63,12 +63,11 @@ def pin_threads(ctx, obj:NanoContext, pin_thread_file, timeout:int):
 
 
 @click.command()
-@click.argument('partition', type=str, callback=argval.validate_partition)
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def boot(ctx, obj, partition:str, timeout:int):
-    obj.rc.boot(partition=partition, timeout=timeout)
+def boot(ctx, obj, timeout:int):
+    obj.rc.boot(timeout=timeout)
     check_rc(ctx,obj.rc)
     obj.rc.status()
 
