@@ -82,8 +82,11 @@ def print_status(topnode, console, apparatus_id='', partition='') -> int:
             )
 
         else:
+            state_str = node.state
+            if not node.included:
+                state_str = Text(f"{node.state} - excluded")
             table.add_row(Text(pre)+Text(node.name),
-                          Text(f"{node.state}", style=('bold red' if node.is_error() else "")))
+                          Text(f"{state_str}", style=('bold red' if node.is_error() else "")))
 
     console.print(table)
 

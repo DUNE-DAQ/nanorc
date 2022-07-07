@@ -322,6 +322,8 @@ class SSHProcessManager(object):
             if desc.proc is not None and desc.proc.is_alive():
                 try:
                     desc.proc.terminate()
+                    while desc.proc.is_alive():
+                        time.sleep(0.1)
                 except OSError:
                     pass
         self.apps = {}

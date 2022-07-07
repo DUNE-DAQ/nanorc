@@ -78,13 +78,23 @@ class StatefulNode(NodeMixin):
         if not self.included:
             self.log.error(f'Cannot exclude \'{self.name}\' as it is already excluded!')
             return 1
+
+        ret = 0
+        for child in self.children:
+            ret += child.exclude()
+
         self.included = False
-        return 0
+        return ret
 
     def include(self):
         if self.included:
             self.log.error(f'Cannot include \'{self.name}\' as it is already included!')
             return 1
+
+        ret = 0
+        for child in self.children:
+            ret += child.include()
+
         self.included = True
         return 0
 
@@ -105,8 +115,15 @@ class StatefulNode(NodeMixin):
     def on_enter_terminate_ing(self, _) -> NoReturn:
         if self.children:
             for child in self.children:
-                child.terminate()
+                if child.included:
+                    child.terminate()
         self.end_terminate()
+
+    def on_enter_abort_ing(self, _) -> NoReturn:
+        if self.children:
+            for child in self.children:
+                child.abort()
+        self.end_abort()
 
 
     def on_enter_error(self, event):

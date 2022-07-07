@@ -47,6 +47,10 @@ class ApplicationNode(StatefulNode):
         self.sup.terminate()
         self.end_terminate()
 
+    def on_enter_abort_ing(self, _):
+        self.sup.terminate()
+        self.end_abort()
+
 class SubsystemNode(StatefulNode):
     def __init__(self, name:str, log, cfgmgr, fsm_conf, console, parent=None, children=None):
         super().__init__(name=name, log=log, console=console, fsm_conf=fsm_conf, parent=parent, children=children)
@@ -266,20 +270,37 @@ class SubsystemNode(StatefulNode):
         super()._on_exit_callback(event)
 
 
+    def terminate_logic(self) -> NoReturn:
+        self.log.debug(f"Terminate logic of {self.name}")
+        if self.listener:
+            self.listener.terminate()
+        if self.pm:
+            self.pm.terminate()
+            self.pm = None
+        self.log.debug(f"DONE Terminate logic of {self.name}")
+
     def on_enter_terminate_ing(self, _) -> NoReturn:
+        self.log.debug(f"Terminating {self.name}")
         if self.children:
             for child in self.children:
                 child.terminate()
                 if child.parent.listener:
                     child.parent.listener.unregister(child.name)
                 child.parent = None
-
-        if self.listener:
-            self.listener.terminate()
-        if self.pm:
-            self.pm.terminate()
-            self.pm = None
+        self.terminate_logic()
         self.end_terminate()
+
+    def on_enter_abort_ing(self, _) -> NoReturn:
+        self.log.debug(f"Aborting {self.name}")
+        if self.children:
+            for child in self.children:
+                child.abort()
+                if child.parent.listener: # isn't child.parent==self?? confusing...
+                    child.parent.listener.unregister(child.name)
+                child.parent = None # abandon your child
+        self.terminate_logic()
+        self.end_abort()
+        self.log.debug(f"DONE Aborting {self.name}")
 
     def _on_enter_callback(self, event):
         command = event.event.name

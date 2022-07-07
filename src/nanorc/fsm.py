@@ -13,6 +13,7 @@ class FSM(Machine):
                 { 'trigger': 'stop',      'source': 'running',     'dest': 'configured' },
                 { 'trigger': 'scrap',     'source': 'configured',  'dest': 'initialised'},
                 { 'trigger': 'terminate', 'source': 'initial',     'dest': 'none'       },
+                { 'trigger': 'abort',     'source': '*',           'dest': 'none'       },
                 { 'trigger': 'to_error',  'source': '*',           'dest': 'error'      }
             ]
             self.command_sequences = {
@@ -47,6 +48,9 @@ class FSM(Machine):
                 { 'trigger': 'stop',             'source': 'prestopped2',     'dest': 'configured' },
                 { 'trigger': 'scrap',            'source': 'configured',      'dest': 'initial'    },
                 { 'trigger': 'terminate',        'source': 'initial',         'dest': 'none'       },
+                { 'trigger': 'terminate',        'source': 'booted',          'dest': 'none'       },
+                { 'trigger': 'terminate',        'source': 'error',           'dest': 'none'       },
+                { 'trigger': 'abort',            'source': '*',               'dest': 'none'       },
                 { 'trigger': 'to_error',         'source': '*',               'dest': 'error'      }
             ]
             self.command_sequences = {

@@ -186,8 +186,9 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
         raise click.Abort()
 
     def cleanup_rc():
-        if rc.topnode.state != 'none': logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
-        rc.terminate(force=True)
+        if rc.topnode.state != 'none':
+            logging.getLogger("cli").warning("NanoRC context cleanup: Aborting applications before exiting")
+            rc.abort(timeout=120)
         if rc.return_code:
             ctx.exit(rc.return_code)
 
@@ -206,7 +207,7 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
 ########### Commands ###########
 ################################
 
-def add_enable_triggers_parameters():
+def add_run_start_parameters():
     # sigh start...
     def add_decorator(function):
         f1 = click.argument('run_num', type=int)(function)
@@ -217,51 +218,36 @@ def add_enable_triggers_parameters():
      # sigh end
     return add_decorator
 
-
-def enable_triggers_defaults_overwrite(kwargs):
+def start_defaults_overwrite(kwargs):
     kwargs['run_type'] = 'TEST'
     kwargs['path'] = None
     return kwargs
 
-@cli.command('enable_triggers')
-@add_enable_triggers_parameters()
-@click.pass_obj
-@click.pass_context
-def enable_triggers(ctx, obj, **kwargs):
-    obj.rc.run_num_mgr.set_run_number(kwargs['run_num'])
-    obj.rc.enable_triggers(**enable_triggers_defaults_overwrite(kwargs))
-
 
 @cli.command('start_run')
-@add_enable_triggers_parameters()
+@add_run_start_parameters()
 @accept_wait()
 @click.pass_obj
 @click.pass_context
-def start_run(ctx, obj, **kwargs):
+def start_run(ctx, obj,wait:int, **kwargs):
     obj.rc.run_num_mgr.set_run_number(kwargs['run_num'])
-    wait = kwargs['wait']
     execute_cmd_sequence(
         ctx = ctx,
         rc = obj.rc,
         command = 'start_run',
         wait = wait,
         force = False,
-        **enable_triggers_defaults_overwrite(kwargs)
+        cmd_args = start_defaults_overwrite(kwargs)
     )
 
 
-@cli.command('shutdown')
-@click.option('--force', default=False, is_flag=True)
+@cli.command('start')
+@add_run_start_parameters()
 @click.pass_obj
 @click.pass_context
-def start_trigger(ctx, obj, force:bool):
-    wait = kwargs['wait']
-    execute_cmd_sequence(
-        ctx = ctx,
-        rc = obj.rc,
-        wait = wait,
-        command = 'shutdown',
-        force = force
-    )
-
+def start(ctx, obj:NanoContext, **kwargs):
+    obj.rc.run_num_mgr.set_run_number(kwargs['run_num'])
+    obj.rc.start(**start_defaults_overwrite(kwargs))
+    check_rc(ctx,obj.rc)
+    obj.rc.status()
 
