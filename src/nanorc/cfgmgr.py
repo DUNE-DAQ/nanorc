@@ -272,7 +272,7 @@ class ConfigManager:
                     json.dump(cmd_data[app], f, indent=4, sort_keys=True)
 
         self.conf_dirs.append(td)
-        return td.name
+        return "file://"+td.name
 
     def __del__(self):
         for td in self.conf_dirs:
