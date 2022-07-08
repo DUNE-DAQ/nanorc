@@ -6,13 +6,13 @@ class FSM(Machine):
         if fsm_type == 'timing':
             self.states_cfg = [ 'none', 'booted', 'initialised', 'configured', 'error', 'running' ]
             self.transitions_cfg = [
-                { 'trigger': 'boot',      'source': 'none',        'dest': 'booted'     },
-                { 'trigger': 'init',      'source': 'booted',      'dest': 'initialised'},
-                { 'trigger': 'conf',      'source': 'initialised', 'dest': 'configured' },
+                { 'trigger': 'boot',      'source': 'none',        'dest': 'initial'    },
+                { 'trigger': 'conf',      'source': 'initial',     'dest': 'configured' },
                 { 'trigger': 'start',     'source': 'configured',  'dest': 'running'    },
                 { 'trigger': 'stop',      'source': 'running',     'dest': 'configured' },
                 { 'trigger': 'scrap',     'source': 'configured',  'dest': 'initialised'},
                 { 'trigger': 'terminate', 'source': 'initial',     'dest': 'none'       },
+                { 'trigger': 'terminate', 'source': 'error',       'dest': 'none'       },
                 { 'trigger': 'abort',     'source': '*',           'dest': 'none'       },
                 { 'trigger': 'to_error',  'source': '*',           'dest': 'error'      }
             ]
@@ -37,8 +37,7 @@ class FSM(Machine):
                 'paused', 'prestopped1', 'prestopped2', 'error'
             ]
             self.transitions_cfg = [
-                { 'trigger': 'boot',             'source': 'none',            'dest': 'booted'     },
-                { 'trigger': 'init',             'source': 'booted',          'dest': 'initial'    },
+                { 'trigger': 'boot',             'source': 'none',            'dest': 'initial'    },
                 { 'trigger': 'conf',             'source': 'initial',         'dest': 'configured' },
                 { 'trigger': 'start',            'source': 'configured',      'dest': 'ready'      },
                 { 'trigger': 'enable_triggers',  'source': 'ready',           'dest': 'running'    },
@@ -48,7 +47,6 @@ class FSM(Machine):
                 { 'trigger': 'stop',             'source': 'prestopped2',     'dest': 'configured' },
                 { 'trigger': 'scrap',            'source': 'configured',      'dest': 'initial'    },
                 { 'trigger': 'terminate',        'source': 'initial',         'dest': 'none'       },
-                { 'trigger': 'terminate',        'source': 'booted',          'dest': 'none'       },
                 { 'trigger': 'terminate',        'source': 'error',           'dest': 'none'       },
                 { 'trigger': 'abort',            'source': '*',               'dest': 'none'       },
                 { 'trigger': 'to_error',         'source': '*',               'dest': 'error'      }

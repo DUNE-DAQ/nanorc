@@ -97,17 +97,6 @@ def ls_thread(ctx, obj):
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def init(ctx, obj, node_path, timeout:int):
-    obj.rc.init(node_path=node_path, timeout=timeout)
-    check_rc(ctx,obj.rc)
-    obj.rc.status()
-
-
-@click.command()
-@accept_path()
-@accept_timeout(None)
-@click.pass_obj
-@click.pass_context
 def conf(ctx, obj, node_path, timeout:int):
     obj.rc.conf(node_path=node_path, timeout=timeout)
     check_rc(ctx,obj.rc)
@@ -313,7 +302,6 @@ def add_common_cmds(shell):
     shell.add_command(ls              , 'ls'              )
     shell.add_command(pin_threads     , 'pin_threads'     )
     shell.add_command(boot            , 'boot'            )
-    shell.add_command(init            , 'init'            )
     shell.add_command(conf            , 'conf'            )
     shell.add_command(enable_triggers , 'enable_triggers' )
     shell.add_command(disable_triggers, 'disable_triggers')

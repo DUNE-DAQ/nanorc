@@ -176,7 +176,7 @@ class NanoRC:
             return
 
         kwargs['timeout'] = kwargs['timeout'] if kwargs.get('timeout') else self.timeout
-        print(command, node_path.name)
+
         self.log.debug(f'Executing the cmd {command} on the node {node_path.name}, using timeout = {kwargs["timeout"]}')
         transition = getattr(node_path, command)
         kwargs['pm'] = self.pm
@@ -236,13 +236,7 @@ class NanoRC:
         """
         Abort applications
         """
-        self.execute_command("abort", timeout=timeout)
-
-    def init(self, node_path, timeout:int, **kwargs) -> NoReturn:
-        """
-        Initializes the applications.
-        """
-        self.execute_command("init", node_path=node_path, raise_on_fail=True, timeout=timeout)
+        self.execute_command("abort", timeout=timeout, force=True)
 
 
     def conf(self, node_path, timeout:int, **kwargs) -> NoReturn:
