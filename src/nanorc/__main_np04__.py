@@ -12,6 +12,7 @@ import click_shell
 import os.path
 import logging
 import importlib.resources as resources
+import threading
 
 from . import __version__
 from rich.table import Table
@@ -28,7 +29,10 @@ from nanorc.credmgr import credentials
 from . import confdata
 import nanorc.argval as argval
 
-from .cli import *
+from nanorc.common_commands import add_common_cmds, add_custom_cmds, accept_timeout, accept_wait, check_rc, execute_cmd_sequence
+from nanorc.cli import CONTEXT_SETTINGS, loglevels, updateLogLevel
+from nanorc.nano_context import NanoContext
+
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='anonymous@np04rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 @click.version_option(__version__)
@@ -107,7 +111,9 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
         )
 
         rc.log_path = os.path.abspath(log_path)
+        add_common_cmds(ctx.command)
         add_custom_cmds(ctx.command, rc.execute_custom_command, rc.custom_cmd)
+
         if web:
             host = socket.gethostname()
 
@@ -154,8 +160,9 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
         raise click.Abort()
 
     def cleanup_rc():
-        if rc.topnode.state != 'none': logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
-        rc.terminate()
+        if rc.topnode.state != 'none':
+            logging.getLogger("cli").warning("NanoRC context cleanup: Aborting applications before exiting")
+            rc.abort(timeout=120)
         if rc.return_code:
             ctx.exit(rc.return_code)
 
@@ -167,25 +174,6 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
         rest_thread.join()
         webui_thread.join()
 
-np04cli.add_command(status, 'status')
-np04cli.add_command(boot, 'boot')
-np04cli.add_command(init, 'init')
-np04cli.add_command(conf, 'conf')
-np04cli.add_command(pause, 'pause')
-np04cli.add_command(resume, 'resume')
-np04cli.add_command(scrap, 'scrap')
-np04cli.add_command(wait, 'wait')
-np04cli.add_command(terminate, 'terminate')
-np04cli.add_command(pin_threads, 'pin-threads')
-np04cli.add_command(start_shell, 'shell')
-np04cli.add_command(start_trigger, 'start_trigger')
-np04cli.add_command(stop_trigger, 'stop_trigger')
-np04cli.add_command(change_rate, 'change_rate')
-np04cli.add_command(enable, 'enable')
-np04cli.add_command(disable, 'disable')
-np04cli.add_command(expert_command, 'expert_command')
-
-
 @np04cli.command('change_user')
 @click.argument('user', type=str, default=None)
 @click.pass_obj
@@ -194,72 +182,56 @@ def change_user(ctx, obj, user):
     if credentials.change_user(user):
         ctx.parent.command.shell.prompt = f"{credentials.user}@np04rc > "
 
+
 @np04cli.command('kinit')
 @click.pass_obj
 @click.pass_context
 def kinit(ctx, obj):
     credentials.new_kerberos_ticket()
 
-@np04cli.command('stop')
-@click.option('--stop-wait', type=int, default=0, help='Seconds to wait between Pause and Stop commands')
-@click.option('--force', default=False, is_flag=True)
-@click.option('--message', type=str, default="")
-@accept_timeout(None)
+def add_run_start_parameters():
+    # sigh start...
+    def add_decorator(function):
+        f1 = click.argument('run-type', required=True, type=click.Choice(['TEST', 'PROD']))(function)
+        f2 = click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')(f1)
+        f3 = click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')(f2)
+        f4 = accept_timeout(None)(f3)
+        return click.option('--message', type=str, default="")(f4)
+     # sigh end
+    return add_decorator
+
+def start_defaults_overwrite(kwargs):
+    kwargs['path'] = None
+    return kwargs
+
+
+@np04cli.command('start_run')
+@add_run_start_parameters()
+@accept_wait()
 @click.pass_obj
 @click.pass_context
-def stop(ctx, obj, stop_wait:int, force:bool, message:str, timeout:int):
-    if not credentials.check_kerberos_credentials():
-        logging.getLogger("cli").error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
-        return
-    obj.rc.pause(force, timeout=timeout)
-    check_rc(ctx,obj.rc)
-    obj.rc.status()
-    if obj.rc.return_code == 0:
-        time.sleep(stop_wait)
-        obj.rc.stop(force, message=message, timeout=timeout)
-        obj.rc.status()
-    check_rc(ctx,obj.rc)
+def start_run(ctx, obj, wait:int, **kwargs):
 
+    kwargs['node_path'] = None
+    execute_cmd_sequence(
+        ctx = ctx,
+        rc = obj.rc,
+        command = 'start_run',
+        wait = wait,
+        force = False,
+        cmd_args = start_defaults_overwrite(kwargs)
+    )
 
-@np04cli.command('message')
-@click.argument('message', type=str, default=None)
-@click.pass_obj
-def message(obj, message):
-    if not credentials.check_kerberos_credentials():
-        logging.getLogger("cli").error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
-        return
-    obj.rc.message(message)
 
 @np04cli.command('start')
-@click.argument('run-type', required=True,
-                type=click.Choice(['TEST', 'PROD']))
-@click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')
-@click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
-@click.option('--resume-wait', type=int, default=0, help='Seconds to wait between Start and Resume commands')
-@click.option('--message', type=str, default="")
-@accept_timeout(None)
+@add_run_start_parameters()
 @click.pass_obj
 @click.pass_context
-def start(ctx, obj:NanoContext, run_type:str, disable_data_storage:bool, trigger_interval_ticks:int, resume_wait:int, message:str, timeout:int):
-    """
-    Start Command
+def start(ctx, obj:NanoContext, **kwargs):
 
-    Args:
-        obj (NanoContext): Context object
-        disable_data_storage (bool): Flag to disable data writing to storage
-    """
-    if not credentials.check_kerberos_credentials():
-        logging.getLogger("cli").error(f'User {credentials.user} doesn\'t have valid kerberos ticket, use kinit to create a ticket (in a shell or in nanorc)')
-        return
-
-    obj.rc.start(disable_data_storage, run_type, message=message, timeout=timeout)
+    obj.rc.start(**start_defaults_overwrite(kwargs))
     check_rc(ctx,obj.rc)
-    time.sleep(resume_wait)
-    if obj.rc.return_code == 0:
-        obj.rc.status()
-        obj.rc.resume(trigger_interval_ticks, timeout=timeout)
-        obj.rc.status()
-    check_rc(ctx,obj.rc)
+    obj.rc.status()
 
 
 def main():

@@ -189,6 +189,7 @@ def shutdown(ctx, obj, wait:int, **kwargs):
 
 @click.command()
 @accept_wait()
+@accept_message()
 @add_run_end_parameters()
 @click.pass_obj
 @click.pass_context
