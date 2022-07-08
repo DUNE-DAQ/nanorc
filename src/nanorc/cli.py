@@ -229,8 +229,9 @@ def start_defaults_overwrite(kwargs):
 @accept_wait()
 @click.pass_obj
 @click.pass_context
-def start_run(ctx, obj,wait:int, **kwargs):
+def start_run(ctx, obj, wait:int, **kwargs):
     obj.rc.run_num_mgr.set_run_number(kwargs['run_num'])
+    kwargs['node_path'] = None
     execute_cmd_sequence(
         ctx = ctx,
         rc = obj.rc,
