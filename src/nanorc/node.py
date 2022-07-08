@@ -357,7 +357,7 @@ class SubsystemNode(StatefulNode):
                     f=getattr(self.cfgmgr,cfg_method)
                     data = f(event.kwargs['overwrite_data'])
                 else:
-                    data = getattr(self.cfgmgr, command)
+                    data = {} # getattr(self.cfgmgr, command)
 
                 entry_state = child_node.state.upper()
                 if entry_state in appfwk_state_dictionnary: entry_state = appfwk_state_dictionnary[entry_state]
@@ -415,7 +415,7 @@ class SubsystemNode(StatefulNode):
                     f=getattr(self.cfgmgr,cfg_method)
                     data = f(event.kwargs['overwrite_data'])
                 else:
-                    data = getattr(self.cfgmgr, command)
+                    data = {}#getattr(self.cfgmgr, command)
 
                 kwargs = {'wait': False,
                           'cmd_data': data}
