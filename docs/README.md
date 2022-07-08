@@ -218,7 +218,7 @@ It should be pointed out that some substitutions are made when nanorc uses a fil
 
 To access the WebUI, add the --web option when running nanorc. When nanorc starts up, it will display a box like this :
 
-![node](https://user-images.githubusercontent.com/9658612/178017684-f7474113-6c8c-4cee-b745-486751ac085a.png)
+![node](node.png)
 
 which shows what lxplus node to connect to (in dark blue in the picture above lxplusXXXX.cern.ch).
 
@@ -226,7 +226,7 @@ Before you can connect, a SOCKS proxy must be set up to that node in another ter
 
 Once you have set up your browser to use a SOCKS proxy, connect to the address in the browser, and you should see something like this:
 
-![GUI](https://user-images.githubusercontent.com/9658612/178019281-769d12cc-2653-4080-ac77-0aca9ce79d62.png)
+![GUI](GUI.png)
 
 
 From here, using nanorc is just about the same as in the terminal: 
