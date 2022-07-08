@@ -216,8 +216,23 @@ It should be pointed out that some substitutions are made when nanorc uses a fil
 
 ## How to run WebUI
 
-To access the WebUI, add the --web option when running nanorc. When nanorc starts up, it will [display a box](https://jonathanhancock0.github.io/img/node.png) which shows what lxplus node to connect to.
+To access the WebUI, add the --web option when running nanorc. When nanorc starts up, it will display a box like this :
+
+![node](https://user-images.githubusercontent.com/9658612/178017684-f7474113-6c8c-4cee-b745-486751ac085a.png)
+
+which shows what lxplus node to connect to (in dark blue in the picture above lxplusXXXX.cern.ch).
+
 Before you can connect, a SOCKS proxy must be set up to that node in another terminal window, using `ssh -N -D 8080 username@lxplusXXXX.cern.ch` and substituting XXXX with whatever number is shown.
-Once you have set up your browser to use a SOCKS proxy, connect to the address in the browser, and you should see something [like this](https://jonathanhancock0.github.io/img/GUI.png).
-From here, using nanorc is just about the same: transitions between FSM states can be done using the State Control Buttons, and the information that nanorc outputs can be viewed by clicking the triangle under "Last response from nanorc".
-Note that this information will still be output to the terminal.  
+
+Once you have set up your browser to use a SOCKS proxy, connect to the address in the browser, and you should see something like this:
+
+![GUI](https://user-images.githubusercontent.com/9658612/178019281-769d12cc-2653-4080-ac77-0aca9ce79d62.png)
+
+
+From here, using nanorc is just about the same as in the terminal: 
+
+*  transitions between FSM states can be done using the State Control Buttons, 
+*  the information that nanorc outputs can be viewed by clicking the expansion triangle under "Last response from nanorc" to see the details of the response.
+
+**Note that this information will also be shown as output to the terminal.**
+
