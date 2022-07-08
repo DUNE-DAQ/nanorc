@@ -149,8 +149,8 @@ class SSHProcessManager(object):
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"] + [cmd]
             proc = sh.ssh(ssh_args)
             self.log.info(proc)
-            
-    def boot(self, boot_info, timeout):
+
+    def boot(self, boot_info, conf_loc, timeout):
 
         if self.apps:
             raise RuntimeError(
@@ -172,6 +172,7 @@ class SSHProcessManager(object):
                 "APP_NAME": app_name,
                 "APP_PORT": app_conf["port"],
                 "APP_WD": os.getcwd(),
+                "CONF_LOC": conf_loc,
             }
 
             exec_vars_cp = cp.deepcopy(boot_info['exec'][app_conf['exec']]['env'])

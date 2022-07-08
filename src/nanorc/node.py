@@ -187,8 +187,9 @@ class SubsystemNode(StatefulNode):
             boot_info['env']['DUNEDAQ_PARTITION'] = partition
 
             self.pm.boot(
-                boot_info=boot_info,
-                timeout=timeout
+                boot_info = boot_info,
+                timeout = timeout,
+                conf_loc = self.cfgmgr.get_conf_location()
             )
 
         except Exception as e:
