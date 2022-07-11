@@ -61,18 +61,19 @@ class FileConfigSaver:
 
         return filename+postfix+ext
 
-    def save_on_start(self, apps:StatefulNode, run:int, run_type:str,
-                      overwrite_data:dict, cfg_method:str) -> str:
+    def save_on_start(self,
+                      apps:StatefulNode,
+                      run:int,
+                      run_type:str,
+                      data:dict) -> str:
         """
         Save the configuration runtime start parameter set
         :param      apps:  the application tree
         :type       apps:  StatefulNode
         :param      run :  run number
         :type       run :  int
-        :param      overwrite_data :  the runtime start data
-        :type       overwrite_data :  dict
-        :param      cfg_method :  which config method to call on start
-        :type       cfg_method :  str
+        :param      data :  the runtime start data
+        :type       data :  dict
         :param      run_type :  run type
         :type       run_type :  str
 
@@ -96,48 +97,15 @@ class FileConfigSaver:
                 os.makedirs(full_path)
                 copy_tree(node.cfgmgr.cfg_dir, full_path)
                 
-                if cfg_method:
-                    f=getattr(node.cfgmgr,cfg_method)
-                    data = f(overwrite_data)
+                runtime_data = node.cfgmgr.generate_data_for_module(data)
 
                 f = open(full_path+"/start_parsed.json", "w")
-                f.write(json.dumps(data, indent=2))
+                f.write(json.dumps(runtime_data, indent=2))
                 f.close()
         
-        # tgz_path = os.path.normpath(self.thisrun_outdir)+".tgz"
-        # make_tarfile(output_filename=tgz_path, source_dir=self.thisrun_outdir)
-
         return self.thisrun_outdir
 
 
-    def save_on_resume(self, topnode:StatefulNode, overwrite_data: dict, cfg_method:str) -> dict:
-        """
-        :param      apps:  the application tree
-        :type       apps:  StatefulNode
-        :param      overwrite_data :  the runtime start data
-        :type       overwrite_data :  dict
-        :param      cfg_method :  which config method to call on start
-        :type       cfg_method :  str
-
-        :returns: None
-        """
-        for node in PreOrderIter(topnode):
-            if isinstance(node, SubsystemNode):
-                this_path = ""
-                for parent in node.path:
-                    this_path += "/"+parent.name
-                    
-                full_path = self.thisrun_outdir+this_path
-                
-                if cfg_method:
-                    f=getattr(node.cfgmgr,cfg_method)
-                    data = f(overwrite_data)
-
-                f = open(self._get_new_resume_file_name(full_path), "w")
-                f.write(json.dumps(data, indent=2))
-                f.close()
-
-    
     def save_on_stop(self, run:int):
         pass
         
@@ -157,9 +125,11 @@ class DBConfigSaver:
     def save_on_resume(self, topnode, overwrite_data:dict, cfg_method:str) -> str:
         return "not_saving_to_db_on_resume"
     
-    def save_on_start(self, topnode,
-                      run:int, run_type:str,
-                      overwrite_data:dict, cfg_method:str) -> str:
+    def save_on_start(self,
+                      topnode,
+                      run:int,
+                      run_type:str,
+                      data:dict) -> str:
 
         fname=None
         dname=None
@@ -180,12 +150,10 @@ class DBConfigSaver:
                     os.makedirs(full_path)
                     copy_tree(node.cfgmgr.cfg_dir, full_path)
                 
-                    if cfg_method:
-                        f=getattr(node.cfgmgr,cfg_method)
-                        data = f(overwrite_data)
+                    runtime_data = node.cfgmgr.generate_data_for_module(data)
 
                     f = open(full_path+"/start_parsed.json", "w")
-                    f.write(json.dumps(data, indent=2))
+                    f.write(json.dumps(runtime_data, indent=2))
                     f.close()
             
             with tempfile.NamedTemporaryFile(suffix='.tar.gz', delete=False) as f:

@@ -122,7 +122,7 @@ class ConfigManager:
     def _load(self) -> None:
 
         pm_cfg = ["boot"]
-        self.rc_cmds = ["init", "conf", "start", "enable_triggers", "disable_triggers", "prestop1", "prestop2", "stop", "scrap"]
+        self.rc_cmds = ["init", "conf"]
         cfgs = {}
         for f in pm_cfg + self.rc_cmds:
             fpath = os.path.join(self.cfg_dir, f + ".json")
@@ -281,39 +281,31 @@ class ConfigManager:
     def get_conf_location(self) -> str:
         return self.get_flat_dir()
 
-    def runtime_start(self, data: dict) -> dict:
+    def generate_data_for_module(self, data: dict=None, module:str="") -> dict:
         """
         Generates runtime start parameter set
         :param      data:  The data
         :type       data:  dict
+        :param      module:  which module (default all)
+        :type       module:  str
 
         :returns:   Complete parameter set.
         :rtype:     dict
         """
+        if module != "":
+            raise RuntimeError("cannot send data to one specific module that isn't conf of init!")
 
-        start = copy.deepcopy(self.start)
+        if not data:
+            return {}
 
-        for c in json_extract(start, "modules"):
-            for m in c:
-                m["data"].update(data)
-        return start
-
-    def runtime_resume(self, data: dict) -> dict:
-        """
-        Generates runtime resume parameter set
-        :param      data:  The data
-        :type       data:  dict
-
-        :returns:   Complete parameter set.
-        :rtype:     dict
-        """
-        resume = copy.deepcopy(self.resume)
-
-        for c in json_extract(resume, "modules"):
-            for m in c:
-                m["data"].update(data)
-        return resume
-
+        return {
+            "modules": [
+                {
+                    "data": data,
+                    "match": ""
+                }
+            ]
+        }
 
 
 if __name__ == "__main__":
@@ -346,6 +338,3 @@ if __name__ == "__main__":
     console.print(Pretty(cfg.stop))
     console.print("Stop order :busstop:")
     console.print(Pretty(cfg.stop_order))
-
-    console.print("Start data V:runner:")
-    console.print(Pretty(cfg.runtime_start({"aa": "bb"})))

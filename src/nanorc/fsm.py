@@ -34,22 +34,22 @@ class FSM(Machine):
         else:
             self.states_cfg = [
                 'none', 'booted', 'initial', 'configured', 'ready', 'running',
-                'paused', 'prestopped1', 'prestopped2', 'error'
+                'paused', 'dataflow_drained', 'trigger_sources_stopped', 'error'
             ]
             self.transitions_cfg = [
-                { 'trigger': 'boot',             'source': 'none',            'dest': 'initial'    },
-                { 'trigger': 'conf',             'source': 'initial',         'dest': 'configured' },
-                { 'trigger': 'start',            'source': 'configured',      'dest': 'ready'      },
-                { 'trigger': 'enable_triggers',  'source': 'ready',           'dest': 'running'    },
-                { 'trigger': 'disable_triggers', 'source': 'running',         'dest': 'ready'      },
-                { 'trigger': 'prestop1',         'source': 'ready',           'dest': 'prestopped1'},
-                { 'trigger': 'prestop2',         'source': 'prestopped1',     'dest': 'prestopped2'},
-                { 'trigger': 'stop',             'source': 'prestopped2',     'dest': 'configured' },
-                { 'trigger': 'scrap',            'source': 'configured',      'dest': 'initial'    },
-                { 'trigger': 'terminate',        'source': 'initial',         'dest': 'none'       },
-                { 'trigger': 'terminate',        'source': 'error',           'dest': 'none'       },
-                { 'trigger': 'abort',            'source': '*',               'dest': 'none'       },
-                { 'trigger': 'to_error',         'source': '*',               'dest': 'error'      }
+                { 'trigger': 'boot',                 'source': 'none',                    'dest': 'initial'                },
+                { 'trigger': 'conf',                 'source': 'initial',                 'dest': 'configured'             },
+                { 'trigger': 'start',                'source': 'configured',              'dest': 'ready'                  },
+                { 'trigger': 'enable_triggers',      'source': 'ready',                   'dest': 'running'                },
+                { 'trigger': 'disable_triggers',     'source': 'running',                 'dest': 'ready'                  },
+                { 'trigger': 'drain_dataflow',       'source': 'ready',                   'dest': 'dataflow_drained'       },
+                { 'trigger': 'stop_trigger_sources', 'source': 'dataflow_drained',        'dest': 'trigger_sources_stopped'},
+                { 'trigger': 'stop',                 'source': 'trigger_sources_stopped', 'dest': 'configured'             },
+                { 'trigger': 'scrap',                'source': 'configured',              'dest': 'initial'                },
+                { 'trigger': 'terminate',            'source': 'initial',                 'dest': 'none'                   },
+                { 'trigger': 'terminate',            'source': 'error',                   'dest': 'none'                   },
+                { 'trigger': 'abort',                'source': '*',                       'dest': 'none'                   },
+                { 'trigger': 'to_error',             'source': '*',                       'dest': 'error'                  }
             ]
             self.command_sequences = {
                 'start_run': [
@@ -58,18 +58,18 @@ class FSM(Machine):
                     {'cmd': 'enable_triggers', 'optional': False}
                 ],
                 'stop_run' : [
-                    {'cmd': 'disable_triggers', 'optional': True },
-                    {'cmd': 'prestop1',         'optional': False},
-                    {'cmd': 'prestop2',         'optional': False},
-                    {'cmd': 'stop',             'optional': False},
+                    {'cmd': 'disable_triggers',     'optional': True },
+                    {'cmd': 'drain_dataflow',       'optional': False},
+                    {'cmd': 'stop_trigger_sources', 'optional': False},
+                    {'cmd': 'stop',                 'optional': False},
                 ],
                 'shutdown' : [
-                    {'cmd': 'disable_triggers', 'optional': True },
-                    {'cmd': 'prestop1',         'optional': True },
-                    {'cmd': 'prestop2',         'optional': True },
-                    {'cmd': 'stop',             'optional': True },
-                    {'cmd': 'scrap',            'optional': True },
-                    {'cmd': 'terminate',        'optional': False},
+                    {'cmd': 'disable_triggers',     'optional': True },
+                    {'cmd': 'drain_dataflow',       'optional': True },
+                    {'cmd': 'stop_trigger_sources', 'optional': True },
+                    {'cmd': 'stop',                 'optional': True },
+                    {'cmd': 'scrap',                'optional': True },
+                    {'cmd': 'terminate',            'optional': False},
                 ],
             }
 

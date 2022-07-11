@@ -37,6 +37,7 @@ import dunedaq.rcif.cmd as rccmd  # AddressedCmd,
 import dunedaq.cmdlib.cmd as cmd  # AddressedCmd,
 
 
+
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
@@ -262,6 +263,7 @@ class NanoRC:
             message (str): some free text to describe the run
         """
 
+
         if not self.topnode.can_execute("start"):
             self.return_code = self.topnode.return_code
             return
@@ -271,6 +273,12 @@ class NanoRC:
             run = self.run_num_mgr.get_run_number()
         else:
             run = 1
+
+        runtime_start_data = rccmd.StartParams(
+            trigger_interval_ticks = trigger_interval_ticks,
+            run = run,
+            disable_data_storage = disable_data_storage
+        ).pod() # EnFoRcE tHiS sChEmA aNd DiTcH iT
 
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
@@ -282,16 +290,14 @@ class NanoRC:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
 
-        runtime_start_data = {
-            "disable_data_storage": disable_data_storage,
-            "run": run,
-        }
-
         if self.cfgsvr:
             try:
-                cfg_save_dir = self.cfgsvr.save_on_start(self.topnode, run=run, run_type=run_type,
-                                                         overwrite_data=runtime_start_data,
-                                                         cfg_method="runtime_start")
+                cfg_save_dir = self.cfgsvr.save_on_start(
+                    self.topnode,
+                    run=run,
+                    run_type=run_type,
+                    data=runtime_start_data,
+                )
             except Exception as e:
                 self.log.error(f'Couldn\'t save the configuration so not starting a run!\n{str(e)}')
                 self.return_code = 1
@@ -301,7 +307,6 @@ class NanoRC:
             "start",
             node_path = None,
             raise_on_fail = True,
-            cfg_method = "runtime_start",
             overwrite_data = runtime_start_data,
             timeout = timeout
         )
@@ -349,11 +354,11 @@ class NanoRC:
         """
         self.execute_command("stop", node_path=None, raise_on_fail=True, timeout=timeout, force=force)
 
-    def prestop2(self, force:bool, timeout:int, **kwargs) -> NoReturn:
+    def stop_trigger_sources(self, force:bool, timeout:int, **kwargs) -> NoReturn:
         """
         Sends stop command
         """
-        self.execute_command("prestop2", node_path=None, raise_on_fail=True, timeout=timeout, force=force)
+        self.execute_command("stop_trigger_sources", node_path=None, raise_on_fail=True, timeout=timeout, force=force)
 
 
     def execute_script(self, timeout, data=None) -> NoReturn:
@@ -364,18 +369,23 @@ class NanoRC:
         """
         Start the triggers
         """
+
+        enable_trigger_data = rccmd.StartTriggerParams(
+            trigger_interval_ticks = trigger_interval_ticks,
+        ).pod() # quick schema check
+
         self.execute_command(
             "enable_triggers",
             node_path = None,
             raise_on_fail = True,
             force = False,
-            trigger_interval_ticks = trigger_interval_ticks,
+            overwrite_data = enable_trigger_data,
             timeout = timeout
         )
 
     def disable_triggers(self, timeout:int, force:bool, **kwargs) -> NoReturn:
         """
-        Start the triggers
+        Stop the triggers
         """
         self.execute_command(
             "disable_triggers",
@@ -385,12 +395,12 @@ class NanoRC:
             timeout = timeout,
         )
 
-    def prestop1(self, timeout:int, force:bool, message:str, **kwargs) -> NoReturn:
+    def drain_dataflow(self, timeout:int, force:bool, message:str, **kwargs) -> NoReturn:
         """
         Stop the triggers
         """
 
-        if not force and not self.topnode.can_execute("prestop1"):
+        if not force and not self.topnode.can_execute("drain_dataflow"):
             self.return_code = self.topnode.return_code
             return
 
@@ -405,7 +415,7 @@ class NanoRC:
         if self.cfgsvr:
             self.cfgsvr.save_on_stop(self.runs[-1].run_number)
 
-        self.execute_command("prestop1", node_path=None, raise_on_fail=True, timeout=timeout, force=force)
+        self.execute_command("drain_dataflow", node_path=None, raise_on_fail=True, timeout=timeout, force=force)
         self.return_code = self.topnode.return_code.value
 
         if self.return_code == 0:
@@ -423,10 +433,15 @@ class NanoRC:
         """
         Change the trigger interval ticks
         """
+        trigger_data = rccmd.StartTriggerParams(
+            trigger_interval_ticks = trigger_interval_ticks,
+        ).pod() # quick schema check
+
+
         self.execute_custom_command(
             "change_rate",
-            data={'trigger_interval_ticks':trigger_interval_ticks},
-            timeout=timeout
+            data = trigger_data,
+            timeout = timeout
         )
 
 

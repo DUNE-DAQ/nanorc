@@ -130,8 +130,8 @@ def enable_triggers(ctx, obj, **kwargs):
 @add_run_end_parameters()
 @click.pass_obj
 @click.pass_context
-def prestop1(ctx, obj, **kwargs):
-    obj.rc.prestop1(**kwargs)
+def drain_dataflow(ctx, obj, **kwargs):
+    obj.rc.drain_dataflow(**kwargs)
     check_rc(ctx,obj.rc)
     obj.rc.status()
 
@@ -140,8 +140,8 @@ def prestop1(ctx, obj, **kwargs):
 @click.option('--force', default=False, is_flag=True)
 @click.pass_obj
 @click.pass_context
-def prestop2(ctx, obj, **kwargs):
-    obj.rc.prestop2(**kwargs)
+def stop_trigger_sources(ctx, obj, **kwargs):
+    obj.rc.stop_trigger_sources(**kwargs)
     check_rc(ctx,obj.rc)
     obj.rc.status()
 
@@ -298,27 +298,27 @@ def start_shell(ctx, obj):
 
 
 def add_common_cmds(shell):
-    shell.add_command(message         , 'message'         )
-    shell.add_command(status          , 'status'          )
-    shell.add_command(ls              , 'ls'              )
-    shell.add_command(pin_threads     , 'pin_threads'     )
-    shell.add_command(boot            , 'boot'            )
-    shell.add_command(conf            , 'conf'            )
-    shell.add_command(enable_triggers , 'enable_triggers' )
-    shell.add_command(disable_triggers, 'disable_triggers')
-    shell.add_command(prestop1        , 'prestop1'        )
-    shell.add_command(prestop2        , 'prestop2'        )
-    shell.add_command(stop            , 'stop'            )
-    shell.add_command(stop_run        , 'stop_run'        )
-    shell.add_command(scrap           , 'scrap'           )
-    shell.add_command(terminate       , 'terminate'       )
-    shell.add_command(shutdown        , 'shutdown'        )
-    shell.add_command(change_rate     , 'change_rate'     )
-    shell.add_command(include         , 'include'         )
-    shell.add_command(exclude         , 'exclude'         )
-    shell.add_command(expert_command  , 'expert_command'  )
-    shell.add_command(wait            , 'wait'            )
-    shell.add_command(start_shell     , 'start_shell'     )
+    shell.add_command(message             , 'message'             )
+    shell.add_command(status              , 'status'              )
+    shell.add_command(ls                  , 'ls'                  )
+    shell.add_command(pin_threads         , 'pin_threads'         )
+    shell.add_command(boot                , 'boot'                )
+    shell.add_command(conf                , 'conf'                )
+    shell.add_command(enable_triggers     , 'enable_triggers'     )
+    shell.add_command(disable_triggers    , 'disable_triggers'    )
+    shell.add_command(drain_dataflow      , 'drain_dataflow'      )
+    shell.add_command(stop_trigger_sources, 'stop_trigger_sources')
+    shell.add_command(stop                , 'stop'                )
+    shell.add_command(stop_run            , 'stop_run'            )
+    shell.add_command(scrap               , 'scrap'               )
+    shell.add_command(terminate           , 'terminate'           )
+    shell.add_command(shutdown            , 'shutdown'            )
+    shell.add_command(change_rate         , 'change_rate'         )
+    shell.add_command(include             , 'include'             )
+    shell.add_command(exclude             , 'exclude'             )
+    shell.add_command(expert_command      , 'expert_command'      )
+    shell.add_command(wait                , 'wait'                )
+    shell.add_command(start_shell         , 'start_shell'         )
     # shell.add_command(ls_thread       , 'ls_thread'       )
 
 def add_custom_cmds(cli, rc_cmd_exec, cmds):
