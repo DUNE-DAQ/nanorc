@@ -13,6 +13,7 @@ import os.path
 import logging
 import importlib.resources as resources
 import threading
+import socket
 
 from . import __version__
 from rich.table import Table
@@ -28,6 +29,8 @@ from nanorc.cfgsvr import DBConfigSaver
 from nanorc.credmgr import credentials
 from . import confdata
 import nanorc.argval as argval
+from nanorc.rest import RestApi, NanoWebContext, rc_context
+from nanorc.webui import WebServer
 
 from nanorc.common_commands import add_common_cmds, add_custom_cmds, accept_timeout, accept_wait, check_rc, execute_cmd_sequence
 from nanorc.cli import CONTEXT_SETTINGS, loglevels, updateLogLevel
