@@ -271,6 +271,9 @@ def expert_command(obj, node_path, json_file, timeout):
 @click.pass_obj
 @click.argument('seconds', type=int)
 def wait(obj, seconds):
+    from rich.progress import (Progress, SpinnerColumn, BarColumn, TextColumn,
+                               TimeRemainingColumn, TimeElapsedColumn)
+    import time
 
     with Progress(
         SpinnerColumn(),
@@ -290,8 +293,11 @@ def wait(obj, seconds):
 
 
 @click.command()
+@click.pass_obj
 @click.pass_context
 def start_shell(ctx, obj):
+    from click_shell import make_click_shell
+
     ctx.command = obj.shell
     shell = make_click_shell(ctx,prompt=ctx.command.shell.prompt)
     shell.cmdloop()

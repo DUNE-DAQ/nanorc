@@ -27,7 +27,6 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.console import Console
 from rich.traceback import Traceback
-from rich.progress import *
 
 from nanorc.runmgr import SimpleRunNumberManager
 from nanorc.cfgsvr import FileConfigSaver
