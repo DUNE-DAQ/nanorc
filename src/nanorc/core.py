@@ -274,11 +274,15 @@ class NanoRC:
         else:
             run = 1
 
-        runtime_start_data = rccmd.StartParams(
-            trigger_interval_ticks = trigger_interval_ticks,
-            run = run,
-            disable_data_storage = disable_data_storage
-        ).pod() # EnFoRcE tHiS sChEmA aNd DiTcH iT
+        stparam = {
+            "run":run,
+            "disable_data_storage":disable_data_storage
+        }
+
+        if not trigger_interval_ticks is None:
+            stparam['trigger_interval_ticks'] = trigger_interval_ticks
+
+        runtime_start_data = rccmd.StartParams(**stparam).pod() # EnFoRcE tHiS sChEmA aNd DiTcH iT
 
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
@@ -370,9 +374,10 @@ class NanoRC:
         Start the triggers
         """
 
+
         enable_trigger_data = rccmd.StartTriggerParams(
             trigger_interval_ticks = trigger_interval_ticks,
-        ).pod() # quick schema check
+        ).pod() if not trigger_interval_ticks is None else rccmd.StartTriggerParams().pod() # quick schema check
 
         self.execute_command(
             "enable_triggers",

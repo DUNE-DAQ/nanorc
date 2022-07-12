@@ -339,15 +339,20 @@ class SubsystemNode(StatefulNode):
                     return
 
         for child_node in appset:
-
             data = self.cfgmgr.generate_data_for_module(event.kwargs.get('overwrite_data'))
+            self.log.debug(f'Sending {command} to {child_node.name}')
 
             entry_state = child_node.state.upper()
 
             child_node.trigger(command)
             ## APP now in *_ing
 
-            child_node.sup.send_command(command, cmd_data=data, entry_state=entry_state, exit_state=exit_state)
+            child_node.sup.send_command(
+                cmd_id = command,
+                cmd_data = data,
+                entry_state=entry_state,
+                exit_state=exit_state
+            )
 
         start = datetime.now()
 
