@@ -210,7 +210,7 @@ def add_run_start_parameters():
     # sigh start...
     def add_decorator(function):
         f1 = click.argument('run_num', type=int)(function)
-        f2 = click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')(f1)
+        f2 = click.option('--trigger-rate', type=float, default=None, help='Trigger rate (Hz)')(f1)
         f3 = click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')(f2)
         f4 = accept_timeout(None)(f3)
         return click.option('--message', type=str, default="")(f4)

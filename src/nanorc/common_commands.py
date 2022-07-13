@@ -117,7 +117,6 @@ def disable_triggers(ctx, obj, timeout, force):
     obj.rc.status()
 
 @click.command()
-@click.option('--trigger-interval-ticks', type=int, default=None, help='Trigger separation in ticks')
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
@@ -216,12 +215,12 @@ def scrap(ctx, obj, node_path, force, timeout):
 
 
 @click.command()
-@click.argument('trigger-interval-ticks', type=int)
+@click.argument('trigger-rate', type=float)
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
-def change_rate(ctx, obj, trigger_interval_ticks, timeout):
-    obj.rc.change_rate(trigger_interval_ticks, timeout)
+def change_rate(ctx, obj, trigger_rate, timeout):
+    obj.rc.change_rate(trigger_rate, timeout)
     check_rc(ctx,obj.rc)
     obj.rc.status()
 

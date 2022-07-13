@@ -253,7 +253,7 @@ class NanoRC:
         """
         self.execute_command("scrap", node_path=node_path, raise_on_fail=True, timeout=timeout, force=force)
 
-    def start(self, run_type:str, trigger_interval_ticks:int, disable_data_storage:bool, timeout:int, message:str, **kwargs) -> NoReturn:
+    def start(self, run_type:str, trigger_rate:float, disable_data_storage:bool, timeout:int, message:str, **kwargs) -> NoReturn:
         """
         Sends start command to the applications
 
@@ -279,8 +279,8 @@ class NanoRC:
             "disable_data_storage":disable_data_storage
         }
 
-        if not trigger_interval_ticks is None:
-            stparam['trigger_interval_ticks'] = trigger_interval_ticks
+        if not trigger_rate is None:
+            stparam['trigger_rate'] = trigger_rate
 
         runtime_start_data = rccmd.StartParams(**stparam).pod() # EnFoRcE tHiS sChEmA aNd DiTcH iT
 
@@ -369,22 +369,16 @@ class NanoRC:
         self.execute_custom_command('scripts', data=data, timeout=timeout)
 
 
-    def enable_triggers(self, trigger_interval_ticks: Union[int, None], timeout, **kwargs) -> NoReturn:
+    def enable_triggers(self, timeout, **kwargs) -> NoReturn:
         """
         Start the triggers
         """
-
-
-        enable_trigger_data = rccmd.StartTriggerParams(
-            trigger_interval_ticks = trigger_interval_ticks,
-        ).pod() if not trigger_interval_ticks is None else rccmd.StartTriggerParams().pod() # quick schema check
 
         self.execute_command(
             "enable_triggers",
             node_path = None,
             raise_on_fail = True,
             force = False,
-            overwrite_data = enable_trigger_data,
             timeout = timeout
         )
 
@@ -434,12 +428,12 @@ class NanoRC:
                 self.console.rule(f"[bold magenta]Stopped running[/bold magenta]")
 
 
-    def change_rate(self, trigger_interval_ticks, timeout) -> NoReturn:
+    def change_rate(self, trigger_rate:float, timeout) -> NoReturn:
         """
         Change the trigger interval ticks
         """
-        trigger_data = rccmd.StartTriggerParams(
-            trigger_interval_ticks = trigger_interval_ticks,
+        trigger_data = rccmd.ChangeRateParams(
+            trigger_rate = trigger_rate,
         ).pod() # quick schema check
 
 
