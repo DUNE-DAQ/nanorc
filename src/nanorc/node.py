@@ -142,8 +142,13 @@ class SubsystemNode(StatefulNode):
                     if not is_include_exclude:
                         self.log.error(f'{c.name} is dead, cannot send {cmd} to the app')
                     return False
-
-                ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=data, timeout=timeout)
+                cmd_data = {
+                    "modules": [{
+                        "data": data,
+                        "match": ""
+                    }]
+                }
+                ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=cmd_data, timeout=timeout)
         return ret
 
     def send_expert_command(self, app, cmd, timeout) -> dict:
