@@ -4,6 +4,17 @@ from os import path
 import click
 from .pmdesc import pm_desc
 import re
+import ers
+
+class PermissionDenied( ers.PyIssue ):
+    def __init__( self, cause = None ):
+        ers.PyIssue.__init__( self, 'Permission denied', {}, cause )
+
+class CantOpenFile( ers.PyIssue ):
+    def __init__( self, TOP_CFG, err, cause = None ):
+        ers.PyIssue.__init__( self, f"TOP_CFG should either be a directory, a json file, or a config service utility with the form confservice://the_conf_name?1 (where the ?1 at the end is optionnal and represents the version). You provided: '{top_cfg}'",
+	    { 'filename' : TOP_CFG, 'error' : err },
+	    cause )
 
 def validate_path_exists(prompted_path):
     if not prompted_path: return prompted_path
@@ -58,23 +69,25 @@ def validate_partition(ctx, param, partition):
     return partition
 
 def validate_conf(ctx, param, top_cfg):
-    confurl = urlparse(top_cfg)
-    if path.isdir(confurl.path):
-        confurl=ParseResult(
-            scheme='dir',
-            path=top_cfg,
-            netloc='', params='', query='', fragment='')
-        return confurl
-    if path.exists(confurl.path) and confurl.path[-5:]=='.json':
-        confurl=ParseResult(
-            scheme='file',
-            path=top_cfg,
-            netloc='', params='', query='', fragment='')
-        return confurl
-    if confurl.scheme == 'confservice':
-        return confurl
+    try:
+        confurl = urlparse(top_cfg)
+        if path.isdir(confurl.path):
+            confurl=ParseResult(
+                scheme='dir',
+                path=top_cfg,
+                netloc='', params='', query='', fragment='')
+            return confurl
+        if path.exists(confurl.path) and confurl.path[-5:]=='.json':
+            confurl=ParseResult(
+                scheme='file',
+                path=top_cfg,
+                netloc='', params='', query='', fragment='')
+            return confurl
+        if confurl.scheme == 'confservice':
+            return confurl
 
-    raise click.BadParameter(f"TOP_CFG should either be a directory, a json file, or a config service utility with the form confservice://the_conf_name?1 (where the ?1 at the end is optionnal and represents the version). You provided: '{top_cfg}'")
+    except PermissionDenied as e:
+        raise CantOpenFile( "test.py", 13, e )
 
 
 

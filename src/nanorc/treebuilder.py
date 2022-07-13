@@ -4,6 +4,7 @@ from .cfgmgr import ConfigManager
 import os
 import copy as cp
 import json
+import ers
 from pathlib import Path
 from urllib.parse import ParseResult
 from collections import OrderedDict
@@ -20,6 +21,10 @@ def dict_raise_on_duplicates(ordered_pairs):
         else:
             d[k]=v
     return d
+
+class InvaildCFG( ers.PyIssue ):
+    def __init__( self, cause = None ):
+        ers.PyIssue.__init__( self, 'The provided top_cfg is not functional.', {}, cause )
 
 class TreeBuilder:
     def extract_json_to_nodes(self, js, mother, fsm_conf) -> StatefulNode:
@@ -64,39 +69,43 @@ class TreeBuilder:
         self.subsystem_port_offset = 0
         self.subsystem_port_increment = 50
         
-        if top_cfg.scheme == 'dir':
-            apparatus_id = Path(top_cfg.path).name
-            data = {
-                "apparatus_id": apparatus_id,
-                apparatus_id: top_cfg
-            }
-            self.top_cfg = data
-        elif top_cfg.scheme == 'file':
-            from .argval import validate_conf
-            f = open(top_cfg.path)
-            data = json.load(f)
-            if not 'apparatus_id' in data:
-                self.log.error(f'{top_cfg} doesn\'t have an \'apparatus_id\' entry')
-                exit(1)
-            data_cp = cp.deepcopy(data)
-            for key, val in data.items():
-                if key=='apparatus_id':continue
-                try:
-                    data_cp[key] = validate_conf(None, None, val)
-                except Exception as e:
-                    self.log.error(f'Error parsing the line {key}:{val} of the configuration: {e}')
+        try:
+            if top_cfg.scheme == 'dir':
+                apparatus_id = Path(top_cfg.path).name
+                data = {
+                    "apparatus_id": apparatus_id,
+                    apparatus_id: top_cfg
+                }
+                self.top_cfg = data
+            elif top_cfg.scheme == 'file':
+                from .argval import validate_conf
+                f = open(top_cfg.path)
+                data = json.load(f)
+                if not 'apparatus_id' in data:
+                    self.log.error(f'{top_cfg} doesn\'t have an \'apparatus_id\' entry')
+                    exit(1)
+                data_cp = cp.deepcopy(data)
+                for key, val in data.items():
+                    if key=='apparatus_id':continue
+                    try:
+                        data_cp[key] = validate_conf(None, None, val)
+                    except Exception as e:
+                        self.log.error(f'Error parsing the line {key}:{val} of the configuration: {e}')
 
-            self.top_cfg = data_cp
-        elif top_cfg.scheme == 'confservice':
-            pretty_name = top_cfg.netloc
-            data = {
-                "apparatus_id": pretty_name,
-                pretty_name: top_cfg
-            }
-            self.top_cfg = data
-        else:
-            self.log.error(f"{top_cfg} invalid! You must provide either a top level json file, a directory name, or confservice:configuration")
-            exit(1)
+                self.top_cfg = data_cp
+            elif top_cfg.scheme == 'confservice':
+                pretty_name = top_cfg.netloc
+                data = {
+                    "apparatus_id": pretty_name,
+                    pretty_name: top_cfg
+                }
+                self.top_cfg = data
+            else:
+                self.log.error(f"{top_cfg} invalid! You must provide either a top level json file, a directory name, or confservice:configuration")
+                exit(1)
+                
+        except Exception as e:
+            raise InvaildCFG(e)
 
         self.console = console
 

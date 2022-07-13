@@ -4,6 +4,7 @@ from .cfgmgr import ConfigManager
 from .appctrl import AppSupervisor, ResponseListener
 import json
 import os
+import ers
 import copy as cp
 from rich.console import Console
 from rich.style import Style
@@ -52,13 +53,16 @@ class NanoRC:
         if not use_kerb:
             self.ssh_conf = ["-o GSSAPIAuthentication=no"]
         self.port_offset = port_offset
-        self.cfg = TreeBuilder(
-            log=self.log,
-            top_cfg=top_cfg,
-            console=self.console,
-            fsm_conf=fsm_cfg,
-            resolve_hostname = pm.use_sshpm(),
-            port_offset=self.port_offset)
+        try:
+            self.cfg = TreeBuilder(
+                log=self.log,
+                top_cfg=top_cfg,
+                console=self.console,
+                fsm_conf=fsm_cfg,
+                resolve_hostname = pm.use_sshpm(),
+                port_offset=self.port_offset)
+        except ers.PyIssue as e:
+            ers.pyfatal(e.ai)
         self.partition = partition_label
 
         self.custom_cmd = self.cfg.get_custom_commands()
