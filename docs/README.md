@@ -8,6 +8,8 @@ This tutorial will guide you through the one-host minidaq example.
 
 This tutorial assumes you run on a linux host with /cvmfs mounted, such as lxplus at CERN.
 
+To run with Kubernetes support, scroll down to the "Kubernetes support" section
+
 ### Setup
 
 First, set up a working area according to [the daq-buildtools instructions](https://dune-daq-sw.readthedocs.io/en/latest/packages/daq-buildtools/).
@@ -238,7 +240,7 @@ From here, using nanorc is just about the same as in the terminal:
 
 # Kubernetes support
 
-This page describes the functionality which is supported within Kubernetes in v3.00.0.
+This page describes the functionality which is supported within Kubernetes in v3.1.0.
 
 ## Overview
 
