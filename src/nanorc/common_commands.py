@@ -356,7 +356,7 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
 def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool, cmd_args:dict):
     sequence = rc.get_command_sequence(command)
     import time
-    last_cmd = sequence[-1]
+    last_cmd = sequence[-1]['cmd']
     
     for seq_cmd in sequence:
         cmd = seq_cmd['cmd']
@@ -382,6 +382,6 @@ def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool, cmd_args:di
 
         if rc.return_code != 0 and not force:
             break
-        
+
         if last_cmd != cmd:
             time.sleep(wait)
