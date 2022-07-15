@@ -8,7 +8,7 @@ This tutorial will guide you through the one-host minidaq example.
 
 This tutorial assumes you run on a linux host with /cvmfs mounted, such as lxplus at CERN.
 
-To run with Kubernetes support, scroll down to the "Kubernetes support" section
+_If you want to run with Kubernetes support, the "Kubernetes support" section is later in this document_
 
 ### Setup
 
@@ -238,11 +238,11 @@ From here, using nanorc is just about the same as in the terminal:
 
 **Note that this information will also be shown as output to the terminal.**
 
-# Kubernetes support
+## Kubernetes support
 
 This page describes the functionality which is supported within Kubernetes in v3.1.0.
 
-## Overview
+### Overview
 
 The Kubernetes prototype process manager in `nanorc` knows about three types of DUNE DAQ applications: readout applications, dataflow applications and other applications. Applications are booted in the order above, with anti-affinity between readout applications and all other applications (they cannot be started on the same host).
 
@@ -250,13 +250,13 @@ Applications are run in `pods` with a restart policy of never, so failing applic
 
 `nanorc` makes use of a set of `microservices` either outside the k8s cluster or inside, in addition to the other services running on the NP04 cluster.
 
-### Partitions and resource management
+#### Partitions and resource management
 
 Partitions are supported to the same level that they are in the ssh process manager version of `nanorc`, that is two or more instances of `nanorc` may be run concurrently.
 
 The `k8s` version implements a first version of resource management: Felix cards and data storage (?) cannot be claimed by more than one partition. Readout apps start on the hosts specified in the configuration, all other apps have anti-affinity with readout apps, so start on other hosts.
 
-### Microservices
+#### Microservices
 
 The following `nanorc` microservices are supported and can be used inside the k8s cluster or outside.
 
@@ -268,7 +268,7 @@ The following `nanorc` microservices are supported and can be used inside the k8
 |Configuration|Interface to MongoDB service to provide configuration|
 |Felix Plugin|Registers detected Felix cards with k8s as a custom resource|
 
-### Debugging
+#### Debugging
 
 In addition to the usual `ERS` and `Opmon` output to access the pod of a corresponding application from the control plane host
 ```
@@ -293,13 +293,13 @@ $ kubectl logs dataflow0 -n partition-name
 
 If the application crashed you can still get the log by adding `--previous` to the end of the command.
 
-## Known missing functionality
+### Known missing functionality
 
 * Data files appear in the `/dataX/pvc-{XXX}` (where `{XXX}` is a long hash) directory. The data files are moved to their corresponding `/dataX` after `terminate`.
 
 * It is currently not possible to address more than one Felix card on the same host (not a problem at NP04)
 
-## Testing
+### Testing
 
 Documentation on the k8s test cluster at NP04 is here: https://twiki.cern.ch/twiki/bin/view/CENF/NP04k8s
 
@@ -314,22 +314,22 @@ Current config:
 |np04-srv-025||
 |np04-srv-004|Storage|
 
-### Tested configurations
+#### Tested configurations
 
 * Config: readout=srv-026, trigger, DFO, dataflow, hsi, dqm=localhost (tested on srv-015) 
 
 `daqconf_multiru_gen --image  np04docker.cern.ch/dunedaq-local/pocket-daq-area-cvmfs:N22-05-25-cs8 --host-ru np04-srv-026 --ers-impl cern --opmon-impl cern daq`
 
-# Walk through to run your app on k8s:
+## Walkthrough to run your app on k8s:
 
-## Getting started
+### Getting started
 Log on to the np04 cluster and run:
 ```
 mkdir -p $HOME/.kube
 cp -i /nfs/home/np04daq/np04-kubernetes/config $HOME/.kube/config
 ```
 
-### Setup the nightly/release
+#### Setup the nightly/release
 Following this information at this [link](https://github.com/DUNE-DAQ/daqconf/wiki/Instructions-for-setting-up-a-development-software-area).
 For example
 ```sh
@@ -340,7 +340,7 @@ setup_dbt latest
 dbt-create -c -n N22-06-27 swdir # or a later nightly!
 ```
 
-### Clone pocket, daqconf and nanorc's k8s
+#### Clone pocket, daqconf and nanorc's k8s
 Note that `pocket` and `nanorc` need no be in sourcecode!
 ```
 # cd dunedaq-k8s
@@ -359,7 +359,7 @@ git clone https://github.com/DUNE-DAQ/pocket.git
 ```
 It is worth mentioning that the `dbt-workarea-env` command will set up `spack`, which is the DAQ build system. This makes some alterations to a low-level library in `LD_LIBRARY_PATH`, which can cause some utilities like `ssh`, `nano` and `htop` to not work (you would get a segfault when running them). To fix this, run `LD_LIBRARY_PATH=/lib64 [PROGRAM_NAME]`: this will manually reset the path to what it was before spack was set up. However, this should not be required in order to run any of the commands on this page.
 
-### Build a `daq_app` image and distribute it
+#### Build a `daq_app` image and distribute it
 NOTE: You need to be on `np04-srv-{015,016,026}` for this to work, if you are not, setup the daqenv above from above in the usual way (the first 4 commented out instructions):
 ```sh
 # cd dunedaq-k8s/swdir
@@ -418,7 +418,7 @@ username-image-name        N22-06-27   3e53688480dc   9 hours ago    1.79GB
 
 </details>
 
-### Generate a configuration
+#### Generate a configuration
 ```sh
 cd ../../../../ # go back to swdir
 mkdir runarea
@@ -432,7 +432,7 @@ daqconf_multiru_gen --use-k8s --image username-image-name:N22-06-27 --output-pat
 
 In the example above, you should rename `np04docker.cern.ch/dunedaq-local/username-image-name:N22-06-27` or `username-image-name:N22-06-27` to whichever image name you have generated.
 
-### Run nanorc
+#### Run nanorc
 ... **after** unsetting the proxy.
 ```sh
 source ~np04daq/bin/web_proxy.sh -u
@@ -444,18 +444,18 @@ nanorc> [...]
 ```
 
 
-## K8s dashboard, logs and monitoring
-### K8s dashboard
+### K8s dashboard, logs and monitoring
+#### K8s dashboard
 Hop on http://np04-srv-015:31001/ (after setting up web SOCKS proxy to `lxplus` if you are not physically at CERN) to check the status of the cluster. Note you will need to select the partition you fed at `boot`. You'll be able to see if the pods are running or not, and where.
 
-### Log on a node
+#### Log on a node
 From `np04-srv-015` do:
 ```
 kubectl exec -n partition-name --stdin --tty dataflow0 -- /bin/bash
 ```
 to log on the pod which run the dataflow app. The app runs in `/dunedaq/run` (which is where the data file will be too in this particular example).
 
-### Logs
+#### Logs
 To get the log, open a new terminal window on `np04-srv-015`, on which k8s is already installed, and do:
 
 ```sh
@@ -480,13 +480,13 @@ If by any "chance" something terrible happened with your pod and it core dumped 
 $ kubectl logs dataflow0 -n partition-name --previous
 ```
 
-### Monitoring and Grafana
+#### Monitoring and Grafana
 Go to http://np04-srv-009:3000/ and select your partition on the left.
 
-## Caveat list by decreasing order of importance:
+### Caveat list by decreasing order of importance:
  - labelling/affinity to assign pod: readout app is assigned to the node supplied by daqconf (unless that host is `localhost`); other apps have anti-affinity with readout app, which means they won't run on the same node.
 
-## "Feature" list:
+### "Feature" list:
  - For now the output data files will appear on the `/data?/pvc-XXX` during the run, and after the run they are moved in their corresponding `/data` folder.
  - `daq_apps` live in pod (not deployment), with k8s pod restart policy of "Never".
  - mounts `cvmfs` in the pod (`dunedaq` and `dunedaq-development` if the image has a version that resembles nightly, i.e. starts with N).
