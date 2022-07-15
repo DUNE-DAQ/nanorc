@@ -160,10 +160,11 @@ class ConfigManager:
 
         # Post-process conf
         # Boot:
-        self.boot["hosts"] = {
-            n: (h if (not h in ("localhost", "127.0.0.1")) else socket.gethostname())
-            for n, h in self.boot["hosts"].items()
-        }
+        if self.resolve_hostname:
+            self.boot["hosts"] = {
+                n: (h if (not h in ("localhost", "127.0.0.1")) else socket.gethostname())
+                for n, h in self.boot["hosts"].items()
+            }
 
         #port offseting
         for app in self.boot["apps"]:
@@ -222,7 +223,7 @@ class ConfigManager:
 
         # Conf:
         external_connections = self.boot['external_connections']
-        hosts = self.boot["hosts"]
+        hosts = self.boot["hosts"] if self.resolve_hostname else {}
 
         for connections in json_extract(self.init, "connections"):
             for c in connections:

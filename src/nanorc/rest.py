@@ -83,9 +83,10 @@ class fsm(Resource):
             return "I'm busy!"
         topnode = rc_context.rc.topnode
         if topnode:
-            fsm_data = {'states': topnode.fsm.states_cfg,
-                        'transitions': topnode.fsm.transitions_cfg
-                        }
+            fsm_data = {
+                'states': topnode.fsm.states_cfg,
+                'transitions': topnode.fsm.transitions_cfg
+            }
             resp = make_response(jsonify(fsm_data))
             return resp
         return "No FSM initiated!"
@@ -108,7 +109,7 @@ def parse_argument(form, ctx):
             if str(param.type) == 'INT':
                 value = int(value)
             elif str(param.type) == 'BOOL':
-                value = bool(value)
+                value = True if value == 'true' else False
 
         ### <hack>
         if param.name == 'timeout':
@@ -119,9 +120,13 @@ def parse_argument(form, ctx):
             value = argval.validate_stop_wait(None, None, value)
         elif param.name == 'pin_thread_file':
             value = argval.validate_path_exists(value)
+        elif param.name == 'partition':
+            value = argval.validate_partition(None, None, value)
+
         ### </hack>
         ret[param.name] = value
 
+    print(f"Command args: {ret}")
     return ret
 
 

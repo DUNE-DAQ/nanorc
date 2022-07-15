@@ -168,6 +168,118 @@ class K8SProcessManager(object):
                 )]
         return ret
 
+    def get_node_affinity(self, info:dict):
+        if not info: return None
+        # node_selection
+        node_selector_terms_required = []
+        scheduled_terms_preferred = []
+
+        first_preferred_weight = 100
+
+        for node_affinity in info:
+            strict = node_affinity['strict']
+            del node_affinity['strict']
+
+            if strict:
+                node_selector_terms_required += [
+                    client.V1NodeSelectorTerm(
+                        match_expressions = [
+                            {
+                                'key': key,
+                                "operator": 'In',
+                                'values': values,
+                            }
+                            for key, values in node_affinity.items()
+                        ]
+                    )
+                ]
+
+            else:
+                scheduled_terms_preferred += [
+                    client.V1PreferredSchedulingTerm(
+                        weight = first_preferred_weight,
+                        preference = client.V1NodeSelectorTerm(
+                            match_expressions = [
+                                {
+                                    'key': key,
+                                    "operator": 'In',
+                                    'values': values,
+                                }
+                            for key, values in node_affinity.items()
+                            ]
+                        )
+                    )
+                ]
+                first_preferred_weight -= 1
+
+        return client.V1NodeAffinity(
+            required_during_scheduling_ignored_during_execution = client.V1NodeSelector(
+                node_selector_terms = node_selector_terms_required
+            ) if node_selector_terms_required else None,
+            preferred_during_scheduling_ignored_during_execution = scheduled_terms_preferred
+        )
+
+
+    def get_pod_affinity(self, affinities:list, affinity_sign:bool=True): #affnity_sign=false for anti-affinity
+        if not affinities: return None
+        # affinity
+        pod_affinity_terms_required = []
+        pod_affinity_terms_preferred = []
+
+        first_preferred_weight = 100
+
+        for affinity in affinities:
+            strict = affinity['strict']
+            del affinity['strict']
+
+            if strict:
+                pod_affinity_terms_required += [
+                    client.V1PodAffinityTerm(
+                        topology_key="kubernetes.io/hostname",#??? not sure what this does
+                        label_selector=client.V1LabelSelector(
+                            match_expressions=[
+                                client.V1LabelSelectorRequirement(
+                                    key=key,
+                                    operator="In",
+                                    values=values,
+                                )
+                                for key, values in affinity.items()
+                            ]
+                        )
+                    )
+                ]
+            else:
+                pod_affinity_terms_preferred += [
+                    client.V1WeightedPodAffinityTerm(
+                        weight = first_preferred_weight,
+                        pod_affinity_term = client.V1PodAffinityTerm(
+                            topology_key="kubernetes.io/hostname",#??? not sure what this does
+                            label_selector=client.V1LabelSelector(
+                                match_expressions=[
+                                    client.V1LabelSelectorRequirement(
+                                        key=key,
+                                        operator="In",
+                                        values=values,
+                                    )
+                                for key, values in affinity.items()
+                                ]
+                            )
+                        )
+                    )
+                ]
+                first_preferred_weight -= 1
+
+        if affinity_sign:
+            return client.V1PodAffinity(
+                required_during_scheduling_ignored_during_execution=pod_affinity_terms_required,
+                preferred_during_scheduling_ignored_during_execution=pod_affinity_terms_preferred
+            )
+        else:
+            return client.V1PodAntiAffinity(
+                required_during_scheduling_ignored_during_execution=pod_affinity_terms_required,
+                preferred_during_scheduling_ignored_during_execution=pod_affinity_terms_preferred
+            )
+
     # ----
     def create_daqapp_pod(
             self,
@@ -176,8 +288,24 @@ class K8SProcessManager(object):
             app_boot_info:dict,
             namespace: str,
             run_as: dict = None):
+        info_str  = f"Creating \"{namespace}:{name}\" daq application"
+        debug_str = "(image: \"{app_boot_info['image']}\""
+        if app_boot_info['resources']:
+            debug_str += f' resources: {app_boot_info["resources"]}'
+        if app_boot_info['pvcs']:
+            debug_str+=f' PVCs={[pvc["claim_name"] for pvc in app_boot_info["pvcs"]]}'
+        if app_boot_info['node-selection']:
+            debug_str+=f' node-selection={app_boot_info["node-selection"]}'
+        if app_boot_info['affinity']:
+            debug_str+=f' affinity={app_boot_info["affinity"]}'
+        if app_boot_info['anti-affinity']:
+            debug_str+=f' anti-affinity={app_boot_info["anti-affinity"]}'
+        debug_str+=')'
+        self.log.info(info_str)
+        self.log.debug(debug_str)
 
-        self.log.info(f"Creating \"{namespace}:{name}\" daq application (image: \"{app_boot_info['image']}\", use_flx={app_boot_info['use_flx']})")
+        ## Need to mount /dev and be privileged in this case...
+        use_felix = ("felix.cern/flx" in app_boot_info['resources']) # HACK
 
         pod = client.V1Pod(
             # Run the pod with same user id and group id as the current user
@@ -187,139 +315,134 @@ class K8SProcessManager(object):
                 labels={"app": app_label}
             ),
             spec = client.V1PodSpec(
-                restart_policy="Never",
-                security_context=client.V1PodSecurityContext(
-                    run_as_user=run_as['uid'],
-                    run_as_group=run_as['gid'],
+                restart_policy = "Never",
+                security_context = client.V1PodSecurityContext(
+                    run_as_user = run_as['uid'],
+                    run_as_group = run_as['gid'],
                 ) if run_as else None,
-                host_pid=True,
-                affinity=client.V1Affinity(
-                    node_affinity = client.V1NodeAffinity(
-                        required_during_scheduling_ignored_during_execution=client.V1NodeSelector(
-                            node_selector_terms = [
-                                client.V1NodeSelectorTerm(
-                                    match_expressions=[
-                                        # client.V1NodeSelectorRequirement(
-                                        {
-                                            'key':'kubernetes.io/hostname',
-                                            'operator':'In',
-                                            'values':[app_boot_info['node']]
-                                        }
-                                    ]
-                                )
-                            ]
-                        )
-                   ) if app_boot_info.get("node") else None,
-                    pod_anti_affinity = client.V1PodAntiAffinity(
-                        required_during_scheduling_ignored_during_execution=[
-                            client.V1PodAffinityTerm(
-                                topology_key="kubernetes.io/hostname",#??? not sure what this does
-                                label_selector=client.V1LabelSelector(
-                                    match_expressions=[
-                                        client.V1LabelSelectorRequirement(
-                                            key='app',
-                                            operator="In",
-                                            values=app_boot_info['anti_affinity_pods'],
-                                        )
-                                    ]
-                                )
-                            )
-                            # for pod in
-                        ]
-                    ) if app_boot_info.get('anti_affinity_pods') else None,
+                host_pid = True, # HACK
+                affinity = client.V1Affinity(
+                    node_affinity = self.get_node_affinity(app_boot_info['node-selection']),
+                    pod_affinity      = self.get_pod_affinity(app_boot_info['affinity']     , affinity_sign=True ),
+                    pod_anti_affinity = self.get_pod_affinity(app_boot_info['anti-affinity'], affinity_sign=False),
                 ),
                 # List of processes
-                containers=[
+                containers = [
                     # DAQ application container
                     client.V1Container(
-                        name="daq-application",
-                        image=app_boot_info["image"],
+                        name = "daq-application",
+                        image = app_boot_info["image"],
                         image_pull_policy= "IfNotPresent",
-                        # Environment variables
-                        security_context = client.V1SecurityContext(privileged=app_boot_info['use_flx']),
+                        security_context = client.V1SecurityContext(
+                            privileged = use_felix # HACK
+                        ),
                         resources = (
-                            client.V1ResourceRequirements({
-                                "felix.cern/flx": "2", # requesting 2 FLXs
-                                "memory": "32Gi" # yes bro
-                            })
-                        ) if app_boot_info['use_flx'] else None,
+                            client.V1ResourceRequirements(
+                                app_boot_info['resources']
+                            )
+                        ),
+                        # Environment variables
                         env = [
                             client.V1EnvVar(
                                 name=k,
                                 value=str(v)
                             ) for k,v in app_boot_info['env'].items()
                         ],
-                        command=['/dunedaq/run/app-entrypoint.sh'],
+                        command=app_boot_info['command'],
                         args=app_boot_info['args'],
-                        ports=self.get_container_port_list_from_connections(app_name=name, connections=app_boot_info['connections'], cmd_port=app_boot_info['cmd_port']),
+                        ports=self.get_container_port_list_from_connections(
+                            app_name=name,
+                            connections=app_boot_info['connections'],
+                            cmd_port=app_boot_info['cmd_port']
+                        ),
                         volume_mounts=(
-                            ([
-                                client.V1VolumeMount(
-                                    mount_path="/"+app_boot_info['pvc'],
-                                    name=app_boot_info['pvc'],
-                                    read_only=True
-                            )] if app_boot_info['pvc'] else []) +
-                            ([
-                                client.V1VolumeMount(
-                                    mount_path="/cvmfs/dunedaq.opensciencegrid.org",
-                                    name="dunedaq-cvmfs",
-                                    read_only=True
-                            )] if self.mount_cvmfs else []) +
-                            ([
-                                client.V1VolumeMount(
-                                    mount_path="/cvmfs/dunedaq-development.opensciencegrid.org",
-                                    name="dunedaq-dev-cvmfs",
-                                    read_only=True
-                            )] if self.mount_cvmfs and app_boot_info['mount_cvmfs_dev'] else []) +
-                            ([
-                                client.V1VolumeMount(
-                                    mount_path="/dunedaq/pocket",
-                                    name="pocket",
-                                    read_only=False
-                            )] if self.cluster_config.is_kind else []) +
-                            ([
-                                client.V1VolumeMount(
-                                    mount_path="/dev",
-                                    name="devfs",
-                                    read_only=False
-                            )] if app_boot_info['use_flx'] else [])
+                            (
+                                [
+                                    client.V1VolumeMount(
+                                        mount_path = pvc['mount'],
+                                        name = pvc['claim_name'],
+                                        read_only = pvc['read_only'])
+                                    for pvc in app_boot_info['pvcs']
+                                ]
+                            ) + (
+                                [
+                                    client.V1VolumeMount(
+                                        mount_path = "/cvmfs/dunedaq.opensciencegrid.org",
+                                        name = "dunedaq-cvmfs",
+                                        read_only = True)
+                                ]
+                                if self.mount_cvmfs else []
+                            ) + (
+                                [
+                                    client.V1VolumeMount(
+                                        mount_path = "/cvmfs/dunedaq-development.opensciencegrid.org",
+                                        name = "dunedaq-dev-cvmfs",
+                                        read_only = True)
+                                ]
+                                if self.mount_cvmfs and app_boot_info['mount_cvmfs_dev'] else []
+                            ) + (
+                                [
+                                    client.V1VolumeMount(
+                                        mount_path = "/dunedaq/pocket",
+                                        name = "pocket",
+                                        read_only = False)
+                                ]
+                                if self.cluster_config.is_kind else []
+                            ) + (
+                                [
+                                    client.V1VolumeMount(
+                                        mount_path = "/dev",
+                                        name = "devfs",
+                                        read_only = False)
+                                ]
+                                if use_felix else []
+                            )
                         )
                     )
                 ],
                 volumes=(
-                    ([
-                        client.V1Volume(
-                            name=app_boot_info['pvc'],
-                            persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
-                                claim_name=app_boot_info['pvc'],
-                                read_only=True
-                            )
-                        )
-                    ] if app_boot_info['pvc'] else []) +
-                    ([
-                        client.V1Volume(
-                            name="dunedaq-cvmfs",
-                            host_path=client.V1HostPathVolumeSource(path='/cvmfs/dunedaq.opensciencegrid.org')
-                        )
-                    ] if self.mount_cvmfs else []) +
-                    ([
-                        client.V1Volume(
-                            name="dunedaq-dev-cvmfs",
-                            host_path=client.V1HostPathVolumeSource(path='/cvmfs/dunedaq-development.opensciencegrid.org')
-                        )
-                    ] if self.mount_cvmfs and app_boot_info['mount_cvmfs_dev'] else []) +
-                    ([
-                        client.V1Volume(
-                            name="pocket",
-                            host_path=client.V1HostPathVolumeSource(path='/pocket')
-                        )
-                    ] if self.cluster_config.is_kind else [])+
-                    ([
-                        client.V1Volume(
-                            name="devfs",
-                            host_path=client.V1HostPathVolumeSource(path='/dev')
-                        )
-                    ] if app_boot_info['use_flx'] else [])
+                    (
+                        [
+                            client.V1Volume(
+                                name = pvc['claim_name'],
+                                persistent_volume_claim = client.V1PersistentVolumeClaimVolumeSource(
+                                    claim_name = pvc['claim_name'],
+                                    read_only = pvc['read_only']))
+                            for pvc in app_boot_info['pvcs']
+                        ]
+                    ) + (
+                        [
+                            client.V1Volume(
+                                name = "dunedaq-cvmfs",
+                                host_path = client.V1HostPathVolumeSource(
+                                    path = '/cvmfs/dunedaq.opensciencegrid.org'))
+                        ]
+                        if self.mount_cvmfs else []
+                    ) + (
+                        [
+                            client.V1Volume(
+                                name = "dunedaq-dev-cvmfs",
+                                host_path = client.V1HostPathVolumeSource(
+                                    path = '/cvmfs/dunedaq-development.opensciencegrid.org'))
+                        ]
+                        if self.mount_cvmfs and app_boot_info['mount_cvmfs_dev'] else []
+                    ) + (
+                        [
+                            client.V1Volume(
+                                name = "pocket",
+                                host_path = client.V1HostPathVolumeSource(
+                                    path = '/pocket'))
+                        ]
+                        if self.cluster_config.is_kind else []
+                    ) + (
+                        [
+                            client.V1Volume(
+                                name = "devfs",
+                                host_path = client.V1HostPathVolumeSource(
+                                    path = '/dev'))
+                        ]
+                        if use_felix else []
+                    )
                 )
             )
         )
@@ -445,61 +568,18 @@ class K8SProcessManager(object):
             raise RuntimeError(f"Failed to create persistent volume claim \"{namespace}:{name}\"") from e
 
 
-    def create_data_pvc(self, name:str, namespace:str):
-        # # Create persistent volume
-        # This shouldn't be in nanorc (as it should only be executed once)
-        # claim = client.V1PersistentVolume(
-        #     # Meta-data
-        #     metadata=client.V1ObjectMeta(
-        #         name=name,
-        #     ),
-        #     # Claim
-        #     spec=client.V1PersistentVolumeSpec(
-        #         access_modes=['ReadOnlyMany'],
-        #         # persistent_volume_reclaim_policy="Retain",
-        #         storage_class_name=name,
-        #         capacity={
-        #             "storage": "5Gi"
-        #         },
-        #         node_affinity = client.V1VolumeNodeAffinity(
-        #             client.V1NodeSelector(
-        #                 node_selector_terms = [
-        #                     client.V1NodeSelectorTerm(
-        #                         match_expressions=[
-        #                             {
-        #                                 'key':'kubernetes.io/hostname',
-        #                                 'operator':'In',
-        #                                 'values':['np04-srv-004']
-        #                             }
-        #                         ]
-        #                     )
-        #                 ]
-        #             )
-        #         ),
-        #         local=client.V1LocalVolumeSource(
-        #             path="/"+name,
-        #             # type='Directory'
-        #         )
-        #     )
-        # )
-
-        # try:
-        #     self._core_v1_api.create_persistent_volume(claim)
-        # except Exception as e:
-        #     self.log.error(e)
-        #     raise RuntimeError(f"Failed to create persistent volume claim \"{namespace}:{name}\"") from e
-
+    def create_data_pvc(self, pvc:dict, namespace:str):
         # Create claim
         claim = client.V1PersistentVolumeClaim(
             # Meta-data
             metadata=client.V1ObjectMeta(
-                name=name,
+                name=pvc['claim_name'],
                 namespace=namespace
             ),
             # Claim
             spec=client.V1PersistentVolumeClaimSpec(
-                access_modes=['ReadOnlyMany'],
-                storage_class_name=name,
+                access_modes=['ReadWriteOnce'], # ONCE? Does't work with ReadOnlyMany, but that doesn't seem to break things...
+                storage_class_name=pvc['storage_class_name'],
                 resources=client.V1ResourceRequirements(
                     requests={'storage': '2Gi'}
                 ),
@@ -546,38 +626,40 @@ class K8SProcessManager(object):
 
         apps = boot_info["apps"].copy()
         env_vars = boot_info["env"]
-        hosts = boot_info["hosts"]
 
         self.partition = boot_info['env']['DUNEDAQ_PARTITION']
 
         # Create partition
         self.create_namespace(self.partition)
-        # Create the persistent volume claim
-        # self.create_cvmfs_pvc('dunedaq.opensciencegrid.org', self.partition)
-        # self.create_data_pvc('data1', self.partition)
 
         run_as = {
             'uid': os.getuid(),
             'gid': os.getgid(),
         }
 
-        readout_apps = [aname for aname in apps.keys() if "ruflx" in aname or "ruemu" in aname]
-        dataflow_apps = [aname for aname in apps.keys() if "dataflow" in aname]
-        rest_apps = [aname for aname in apps.keys() if aname not in readout_apps+dataflow_apps]
+        pvcs = {}
+        for app in apps.values():
+            app_pvcs=app['pvcs']
+            for pvc in app_pvcs:
+                claim_name = pvc['claim_name']
 
-        app_boot_order = readout_apps + dataflow_apps + rest_apps
+                if claim_name in pvcs and pvc == pvcs[claim_name]:
+                    raise RuntimeError(f"The same PVC {claim_name} is defined twice in boot.json, but isn't strictly identical!")
 
-        for app_name in app_boot_order:
+                pvcs[claim_name] = pvc
+
+        # Create the persistent volume claim
+        for pvc in pvcs.values():
+            self.create_data_pvc(pvc, self.partition)
+
+        for app_name in boot_info['order']:
             app_conf = apps[app_name]
-
-            host = hosts[app_conf["host"]]
             cmd_port = app_conf['port']
             env_formatter = {
-                "APP_HOST": host,
                 "DUNEDAQ_PARTITION": env_vars['DUNEDAQ_PARTITION'],
                 "APP_NAME": app_name,
+                "APP_HOST": app_name, # For the benefit of TRACE_FILE... Hacky...
                 "APP_PORT": cmd_port,
-                "APP_WD": os.getcwd(),
             }
 
             exec_data = boot_info['exec'][app_conf['exec']]
@@ -622,22 +704,26 @@ class K8SProcessManager(object):
             else:
                 raise RuntimeError("Malformed image name in boot.json")
 
-            app_boot_info ={
-                "env": app_env,
-                "args": app_args,
-                "image": app_img,
-                "cmd_port": cmd_port,
-                "mount_cvmfs_dev": mount_cvmfs_dev,
-                "pvc": None,#('data1' if "dataflow" in app_name else None), ## TODO: find a nice way to do that thru config
-                "use_flx": ("ruflx" in app_name), ## TODO: find a nice way to do that thru config
-                "connections": self.connections[app_name],
+            app_boot_info = {
+                "env"             : app_env,
+                "command"         : app_cmd,
+                "args"            : app_args,
+                "image"           : app_img,
+                "cmd_port"        : cmd_port,
+                "mount_cvmfs_dev" : mount_cvmfs_dev,
+                "pvcs"            : app_conf['pvcs'],
+                "resources"       : app_conf['resources'],
+                "affinity"        : app_conf['affinity'],
+                "anti-affinity"   : app_conf['anti-affinity'],
+                "node-selection"  : app_conf['node-selection'],
+                "connections"     : self.connections[app_name],
             }
 
-            if self.cluster_config.is_k8s_cluster:
-                if app_name in readout_apps:
-                    app_boot_info["node"] = host
-                else:
-                    app_boot_info["anti_affinity_pods"] = readout_apps
+            if self.cluster_config.is_kind:
+                # discard most of the nice features of k8s if we use kind
+                app_boot_info["node-selection"] = None
+                app_boot_info["affinity"] = None
+                app_boot_info["anti-affinity"] = None
 
             self.log.debug(json.dumps(app_boot_info, indent=2))
             app_desc = AppProcessDescriptor(app_name)
