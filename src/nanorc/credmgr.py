@@ -117,7 +117,7 @@ class CredentialManager:
         max_tries = 3
         it_try = 0
         args=["cern-get-sso-cookie", "--krb", "-r", "-u", website, "-o", f"{SSO_COOKIE_PATH}"]
-        proc = subprocess.run(args)
+        proc = subprocess.run(args, env={ 'LD_LIBRARY_PATH':'/lib64' })
         if proc.returncode != 0:
             self.log.error("CredentialManager: Couldn't get SSO cookie!")
             raise RuntimeError("CredentialManager: Couldn't get SSO cookie!")

@@ -48,6 +48,7 @@ class ConfigManager:
 
     def __init__(self, log, config, resolve_hostname=True, port_offset=0):
         super().__init__()
+        self.conf_dirs = []
         self.resolve_hostname = resolve_hostname
         self.log = log
 
@@ -121,9 +122,9 @@ class ConfigManager:
     def _load(self) -> None:
 
         pm_cfg = ["boot"]
-        rc_cmds = ["init", "conf", "start", "stop", "pause", "resume", "scrap"]
+        self.rc_cmds = ["init", "conf"]
         cfgs = {}
-        for f in pm_cfg + rc_cmds:
+        for f in pm_cfg + self.rc_cmds:
             fpath = os.path.join(self.cfg_dir, f + ".json")
             if not os.path.exists(fpath):
                 raise RuntimeError(f"ERROR: {f}.json not found in {self.cfg_dir}")
@@ -143,7 +144,7 @@ class ConfigManager:
         for json_file in json_files:
             cmd = json_file.split(".")[0]
 
-            if cmd in rc_cmds+pm_cfg:
+            if cmd in self.rc_cmds+pm_cfg:
                 continue
 
             with open(os.path.join(self.cfg_dir,json_file), 'r') as jf:
@@ -154,7 +155,7 @@ class ConfigManager:
                 except json.decoder.JSONDecodeError as e:
                     raise RuntimeError(f"ERROR: failed to load {cmd}.json") from e
 
-        for c in rc_cmds+list(self.extra_cmds.keys()):
+        for c in self.rc_cmds+list(self.extra_cmds.keys()):
             self._import_cmd_data(c, cfgs[c])
 
         # Post-process conf
@@ -254,39 +255,58 @@ class ConfigManager:
                 self.log.debug(f"{c['uid']}: {c['uri']}")
 
 
-    def runtime_start(self, data: dict) -> dict:
+    def get_flat_dir(self) -> str:
+        import tempfile
+        import os
+        td = tempfile.TemporaryDirectory(
+            dir=os.getcwd(),
+            prefix='nanorc-flatconf-',
+        )
+        # data_path = os.path.join(td.name, 'data')
+        # os.mkdir(data_path)
+
+        import json
+        for app in self.boot["apps"]:
+            for cmd in self.rc_cmds:
+                with open(f'{os.path.join(td.name, app)}_{cmd}.json', 'w') as f:
+                    cmd_data = getattr(self, cmd)
+                    json.dump(cmd_data[app], f, indent=4, sort_keys=True)
+
+        self.conf_dirs.append(td)
+        return "file://"+td.name
+
+    def __del__(self):
+        for td in self.conf_dirs:
+            td.cleanup()
+
+    def get_conf_location(self) -> str:
+        return self.get_flat_dir()
+
+    def generate_data_for_module(self, data: dict=None, module:str="") -> dict:
         """
         Generates runtime start parameter set
         :param      data:  The data
         :type       data:  dict
+        :param      module:  which module (default all)
+        :type       module:  str
 
         :returns:   Complete parameter set.
         :rtype:     dict
         """
+        if module != "":
+            raise RuntimeError("cannot send data to one specific module that isn't conf of init!")
 
-        start = copy.deepcopy(self.start)
+        if not data:
+            return {}
 
-        for c in json_extract(start, "modules"):
-            for m in c:
-                m["data"].update(data)
-        return start
-
-    def runtime_resume(self, data: dict) -> dict:
-        """
-        Generates runtime resume parameter set
-        :param      data:  The data
-        :type       data:  dict
-
-        :returns:   Complete parameter set.
-        :rtype:     dict
-        """
-        resume = copy.deepcopy(self.resume)
-
-        for c in json_extract(resume, "modules"):
-            for m in c:
-                m["data"].update(data)
-        return resume
-
+        return {
+            "modules": [
+                {
+                    "data": data,
+                    "match": ""
+                }
+            ]
+        }
 
 
 if __name__ == "__main__":
@@ -319,6 +339,3 @@ if __name__ == "__main__":
     console.print(Pretty(cfg.stop))
     console.print("Stop order :busstop:")
     console.print(Pretty(cfg.stop_order))
-
-    console.print("Start data V:runner:")
-    console.print(Pretty(cfg.runtime_start({"aa": "bb"})))

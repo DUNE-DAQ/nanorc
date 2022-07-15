@@ -136,15 +136,27 @@ class command(Resource):
         resp_data = {}
         state = rc_context.rc.topnode.state
         state_allowed_transitions = []
-
+        rc_context.rc.topnode.fsm.transitions_cfg
         for transition in rc_context.rc.topnode.fsm.transitions_cfg:
             if transition['source'] == state or transition['source'] == '*':
                 state_allowed_transitions += [transition['trigger']]
 
-        if not state in ['none', "booted"]:
-            state_allowed_transitions += list(rc_context.rc.custom_cmd.keys()) + ["enable", "disable"]
-        if state in ['paused', "running"]:
-            state_allowed_transitions += ["start_trigger"+ "stop_trigger", "change_rate"]
+        for key, command_list in rc_context.rc.topnode.fsm.command_sequences.items():
+            add_it = True
+            for cmd in command_list:
+                if not cmd['cmd'] in state_allowed_transitions and not cmd['optional']:
+                    add_it = False
+                    break
+                elif cmd['cmd'] in state_allowed_transitions:
+                    break
+
+            if add_it:
+                state_allowed_transitions += [key]
+
+        if state != 'none':
+            state_allowed_transitions += list(rc_context.rc.custom_cmd.keys()) + ["include", "exclude"]
+        if state == 'running':
+            state_allowed_transitions += ["change_rate"]
         if state in ['configured', 'running']:
             state_allowed_transitions += ["pin-threads"]
 

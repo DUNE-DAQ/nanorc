@@ -37,6 +37,7 @@ import dunedaq.rcif.cmd as rccmd  # AddressedCmd,
 import dunedaq.cmdlib.cmd as cmd  # AddressedCmd,
 
 
+
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
@@ -96,23 +97,30 @@ class NanoRC:
         self.topnode = self.cfg.get_tree_structure()
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
 
-    def execute_custom_command(self, command, data, timeout, node=None, check_dead=True):
+    def get_command_sequence(self, command:str):
+        seq_cmd = self.topnode.fsm.command_sequences.get(command)
+        return seq_cmd if seq_cmd else [command]
+
+    def can_execute(self, command:str, quiet=False):
+        return self.topnode.can_execute(command, quiet=quiet)
+
+    def execute_custom_command(self, command, data, timeout, node_path=None, check_dead=True):
         if not timeout:
             timeout = self.timeout
 
         node_to_send = None
         extra_arg={}
 
-        if not node:
+        if not node_path:
             self.log.info(f'Sending {command} to all the nodes')
             node_to_send = self.topnode
-        elif isinstance(node, ApplicationNode):
-            self.log.info(f'Telling {node.parent.name} to send {command} to {node.name}')
-            node_to_send = node.parent
-            extra_arg['app'] = node.name
+        elif isinstance(node_path, ApplicationNode):
+            self.log.info(f'Telling {node_path.parent.name} to send {command} to {node_path.name}')
+            node_to_send = node_path.parent
+            extra_arg['app'] = node_path.name
         else:
-            self.log.info(f'Sending {command} to {node.name}')
-            node_to_send = node
+            self.log.info(f'Sending {command} to {node_path.name}')
+            node_to_send = node_path
 
         if not node_to_send.can_execute_custom_or_expert(command, check_dead):
             self.return_code = node_to_send.return_code
@@ -121,12 +129,12 @@ class NanoRC:
         ret = node_to_send.send_custom_command(command, data, timeout=timeout, **extra_arg)
         self.log.debug(ret)
 
-    def send_expert_command(self, app, json_file, timeout):
+    def send_expert_command(self, node_path, json_file, timeout):
         if not timeout:
             timeout = self.timeout
 
-        if not app.can_execute_custom_or_expert("expert", check_dead=True):
-            self.return_code = app.return_code
+        if not node_path.can_execute_custom_or_expert("expert", check_dead=True):
+            self.return_code = node_path.return_code
             return
 
         data = json.load(open(json_file,'r'))
@@ -152,26 +160,29 @@ class NanoRC:
             self.log.error(f'The file {json_file} content doesn\'t correspond to a rcif.command.RCCommand, bailing\n{e}')
             return
 
-        if not isinstance(app, ApplicationNode):
+        if not isinstance(node_path, ApplicationNode):
             self.log.error(f'You can only send expert commands to individual application! I\'m not sending anything for now.')
             return
 
-        ret = app.parent.send_expert_command(app, data, timeout=timeout)
+        ret = node_path.parent.send_expert_command(node_path, data, timeout=timeout)
         self.log.info(f'Reply: {ret}')
 
-    def execute_command(self, command, *args, **kwargs):
+    def execute_command(self, command, node_path=None, **kwargs):
         force = kwargs.get('force')
+        if not node_path:
+            node_path=self.topnode
 
-        if not force and not self.topnode.can_execute(command):
-            self.return_code = self.topnode.return_code.value
+        if not force and not node_path.can_execute(command):
+            self.return_code = node_path.return_code.value
             return
 
         kwargs['timeout'] = kwargs['timeout'] if kwargs.get('timeout') else self.timeout
-        self.log.debug(f'Using timeout = {kwargs["timeout"]}')
-        transition = getattr(self.topnode, command)
+
+        self.log.debug(f'Executing the cmd {command} on the node {node_path.name}, using timeout = {kwargs["timeout"]}')
+        transition = getattr(node_path, command)
         kwargs['pm'] = self.pm
-        transition(*args, **kwargs)
-        self.return_code = self.topnode.return_code.value
+        transition(**kwargs)
+        self.return_code = node_path.return_code.value
 
 
     def status(self) -> NoReturn:
@@ -187,14 +198,14 @@ class NanoRC:
             print_run_info(self.runs[-1], self.console)
         print_status(apparatus_id=self.apparatus_id, topnode=self.topnode, console=self.console, partition=self.partition)
 
-    def ls(self, leg:bool=True) -> NoReturn:
+    def ls(self, leg:bool) -> NoReturn:
         """
         Print the nodes
         """
         self.return_code = print_node(node=self.topnode, console=self.console, leg=leg)
 
 
-    def boot(self, timeout:int=None) -> NoReturn:
+    def boot(self, timeout:int) -> NoReturn:
         """
         Boot applications
         """
@@ -207,50 +218,52 @@ class NanoRC:
         )
 
 
-    def terminate(self, timeout:int=None) -> NoReturn:
+    def terminate(self, timeout:int, force:bool, **kwargs) -> NoReturn:
         """
         Terminates applications (but keep all the subsystems structure)
         """
-        self.execute_command("terminate", timeout=timeout, force=True)
+        self.execute_command("terminate", timeout=timeout, force=force)
 
+    def ls_thread(self) -> NoReturn:
+        import threading
+        self.console.print("Threading threads")
+        self.console.print(threading.enumerate())
+        from multiprocessing import Manager
+        with Manager() as manager:
+            self.console.print("Multiprocess threads")
+            self.console.print(manager.list())
 
-    def init(self, path, timeout:int=None) -> NoReturn:
+    def abort(self, timeout:int, **kwargs) -> NoReturn:
         """
-        Initializes the applications.
+        Abort applications
         """
-        self.execute_command("init", path=path, raise_on_fail=True, timeout=timeout)
+        self.execute_command("abort", timeout=timeout, force=True)
 
 
-    def conf(self, path, timeout:int=None) -> NoReturn:
+    def conf(self, node_path, timeout:int, **kwargs) -> NoReturn:
         """
         Sends configure command to the applications.
         """
-        self.execute_command("conf", path=path, raise_on_fail=True, timeout=timeout)
+        self.execute_command("conf", node_path=node_path, raise_on_fail=True, timeout=timeout)
 
 
-    def pause(self, force:bool=False, timeout:int=None) -> NoReturn:
-        """
-        Sends pause command
-        """
-        self.execute_command("pause", path=None, raise_on_fail=True, timeout=timeout, force=force)
-
-
-    def scrap(self, path, force:bool=False, timeout:int=None) -> NoReturn:
+    def scrap(self, node_path, force:bool, timeout:int, **kwargs) -> NoReturn:
         """
         Send scrap command
         """
-        self.execute_command("scrap", path=None, raise_on_fail=True, timeout=timeout, force=force)
+        self.execute_command("scrap", node_path=node_path, raise_on_fail=True, timeout=timeout, force=force)
 
-
-    def start(self, disable_data_storage: bool, run_type:str, message:str="", timeout:int=None) -> NoReturn:
+    def start(self, run_type:str, trigger_rate:float, disable_data_storage:bool, timeout:int, message:str, **kwargs) -> NoReturn:
         """
         Sends start command to the applications
 
         Args:
-            disable_data_storage (bool): Description
-            run_type (str): Description
+            disable_data_storage (bool): whether to store or not the data
+            run_type (str): PROD or TEST
+            message (str): some free text to describe the run
         """
-        # self.return_code = self.topnode.allowed("start", None)
+
+
         if not self.topnode.can_execute("start"):
             self.return_code = self.topnode.return_code
             return
@@ -260,6 +273,16 @@ class NanoRC:
             run = self.run_num_mgr.get_run_number()
         else:
             run = 1
+
+        stparam = {
+            "run":run,
+            "disable_data_storage":disable_data_storage
+        }
+
+        if not trigger_rate is None:
+            stparam['trigger_rate'] = trigger_rate
+
+        runtime_start_data = rccmd.StartParams(**stparam).pod() # EnFoRcE tHiS sChEmA aNd DiTcH iT
 
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
@@ -271,34 +294,35 @@ class NanoRC:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
 
-        runtime_start_data = {
-            "disable_data_storage": disable_data_storage,
-            "run": run,
-        }
-
         if self.cfgsvr:
             try:
-                cfg_save_dir = self.cfgsvr.save_on_start(self.topnode, run=run, run_type=run_type,
-                                                         overwrite_data=runtime_start_data,
-                                                         cfg_method="runtime_start")
+                cfg_save_dir = self.cfgsvr.save_on_start(
+                    self.topnode,
+                    run=run,
+                    run_type=run_type,
+                    data=runtime_start_data,
+                )
             except Exception as e:
                 self.log.error(f'Couldn\'t save the configuration so not starting a run!\n{str(e)}')
                 self.return_code = 1
                 return
 
-        self.execute_command("start", path=None, raise_on_fail=True,
-                             cfg_method="runtime_start",
-                             overwrite_data=runtime_start_data,
-                             timeout=timeout)
+        self.execute_command(
+            "start",
+            node_path = None,
+            raise_on_fail = True,
+            overwrite_data = runtime_start_data,
+            timeout = timeout
+        )
 
         self.return_code = self.topnode.return_code.value
         if self.return_code == 0:
             self.runs.append(
                 start_run(
-                    run_number=run,
-                    run_type=run_type,
-                    enable_data_storage=not disable_data_storage,
-                    # message=message
+                    run_number = run,
+                    run_type = run_type,
+                    enable_data_storage = not disable_data_storage,
+                    trigger_rate = trigger_rate
                 )
             )
             text = ""
@@ -312,10 +336,10 @@ class NanoRC:
 
             self.console.rule(f"[bold magenta]{text}[/bold magenta]")
         else:
-            self.log.error(f"[bold red]There was an error when starting the run #{run}[/bold red]:")
+            self.log.error(f"There was an error when starting the run #{run}:")
             self.log.error(f'Response: {self.topnode.response}')
 
-    def message(self, message:str="") -> NoReturn:
+    def message(self, message:str) -> NoReturn:
         """
         Append the logbook
         """
@@ -329,13 +353,54 @@ class NanoRC:
             except Exception as e:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
-
-    def stop(self, force:bool=False, message:str="", timeout:int=None) -> NoReturn:
+    def stop(self, force:bool, timeout:int, **kwargs) -> NoReturn:
         """
         Sends stop command
         """
+        self.execute_command("stop", node_path=None, raise_on_fail=True, timeout=timeout, force=force)
 
-        if not force and not self.topnode.can_execute("stop"):
+    def stop_trigger_sources(self, force:bool, timeout:int, **kwargs) -> NoReturn:
+        """
+        Sends stop command
+        """
+        self.execute_command("stop_trigger_sources", node_path=None, raise_on_fail=True, timeout=timeout, force=force)
+
+
+    def execute_script(self, timeout, data=None) -> NoReturn:
+        self.execute_custom_command('scripts', data=data, timeout=timeout)
+
+
+    def enable_triggers(self, timeout, **kwargs) -> NoReturn:
+        """
+        Start the triggers
+        """
+
+        self.execute_command(
+            "enable_triggers",
+            node_path = None,
+            raise_on_fail = True,
+            force = False,
+            timeout = timeout
+        )
+
+    def disable_triggers(self, timeout:int, force:bool, **kwargs) -> NoReturn:
+        """
+        Stop the triggers
+        """
+        self.execute_command(
+            "disable_triggers",
+            node_path = None,
+            raise_on_fail = True,
+            force = force,
+            timeout = timeout,
+        )
+
+    def drain_dataflow(self, timeout:int, force:bool, message:str, **kwargs) -> NoReturn:
+        """
+        Stop the triggers
+        """
+
+        if not force and not self.topnode.can_execute("drain_dataflow"):
             self.return_code = self.topnode.return_code
             return
 
@@ -350,7 +415,7 @@ class NanoRC:
         if self.cfgsvr:
             self.cfgsvr.save_on_stop(self.runs[-1].run_number)
 
-        self.execute_command("stop", path=None, raise_on_fail=True, timeout=timeout, force=force)
+        self.execute_command("drain_dataflow", node_path=None, raise_on_fail=True, timeout=timeout, force=force)
         self.return_code = self.topnode.return_code.value
 
         if self.return_code == 0:
@@ -364,98 +429,56 @@ class NanoRC:
                 self.console.rule(f"[bold magenta]Stopped running[/bold magenta]")
 
 
-
-
-    def resume(self, trigger_interval_ticks: Union[int, None], timeout:int=None) -> NoReturn:
+    def change_rate(self, trigger_rate:float, timeout) -> NoReturn:
         """
-        Sends resume command
-
-        :param      trigger_interval_ticks:  The trigger interval ticks
-        :type       trigger_interval_ticks:  int
+        Change the trigger interval ticks
         """
-        if not self.topnode.can_execute("resume"):
-            self.return_code = self.topnode.return_code
+        trigger_data = rccmd.ChangeRateParams(
+            trigger_rate = trigger_rate,
+        ).pod() # quick schema check
+
+
+        self.execute_custom_command(
+            "change_rate",
+            data = trigger_data,
+            timeout = timeout
+        )
+        if self.runs:
+            self.runs[-1].trigger_rate = trigger_rate
+
+
+    def exclude(self, node_path, timeout, resource_name) -> NoReturn:
+
+        if not node_path.can_execute_custom_or_expert("exclude", False):
+            self.return_code = node_path.return_code
             return
 
-        runtime_resume_data = {}
-
-        if not trigger_interval_ticks is None:
-            runtime_resume_data["trigger_interval_ticks"] = trigger_interval_ticks
-
-        self.cfgsvr.save_on_resume(self.topnode,
-                                   overwrite_data=runtime_resume_data,
-                                   cfg_method="runtime_resume")
-
-        self.execute_command("resume",
-                             path=None, raise_on_fail=True,
-                             cfg_method="runtime_resume",
-                             overwrite_data=runtime_resume_data,
-                             timeout=timeout)
-        self.return_code = self.topnode.return_code.value
-
-        if self.return_code == 0:
-            if self.runs: self.runs[-1].trigger_interval_ticks = trigger_interval_ticks
-
-
-    def execute_script(self, timeout, data=None) -> NoReturn:
-        self.execute_custom_command('scripts', data=data, timeout=timeout)
-
-    def start_trigger(self, trigger_interval_ticks: Union[int, None], timeout) -> NoReturn:
-        """
-        Start the triggers
-        """
-        self.execute_custom_command("start_trigger",
-                                    data={'trigger_interval_ticks':trigger_interval_ticks},
-                                    timeout=timeout)
-
-
-    def stop_trigger(self, timeout) -> NoReturn:
-        """
-        Stop the triggers
-        """
-        self.execute_custom_command("stop_trigger",
-                                    data={},
-                                    timeout=timeout)
-
-
-    def change_rate(self, trigger_interval_ticks, timeout) -> NoReturn:
-        """
-        Start the triggers
-        """
-        self.execute_custom_command("change_rate",
-                                    data={'trigger_interval_ticks':trigger_interval_ticks},
-                                    timeout=timeout)
-
-
-    def disable(self, node, timeout, resource_name) -> NoReturn:
-        """
-        Start the triggers
-        """
-
-        if not node.can_execute_custom_or_expert("disable", False):
-            self.return_code = node.return_code
-            return
-        ret = node.disable()
+        ret = node_path.exclude()
         if ret != 0:
             return
-        self.execute_custom_command("disable",
-                                    data={'resource_name': resource_name if resource_name else node.name},
-                                    timeout=timeout,
-                                    node=node,
-                                    check_dead=False)
+
+        self.execute_custom_command(
+            "exclude",
+            data={'resource_name': resource_name if resource_name else node_path.name},
+            timeout=timeout,
+            node_path=node_path,
+            check_dead=False
+        )
 
 
-    def enable(self, node, timeout, resource_name) -> NoReturn:
-        """
-        Start the triggers
-        """
-        if not node.can_execute_custom_or_expert("enable", True):
-            self.return_code = node.return_code
+    def include(self, node_path, timeout, resource_name) -> NoReturn:
+
+        if not node_path.can_execute_custom_or_expert("include", True):
+            self.return_code = node_path.return_code
             return
-        ret = node.enable()
+
+        ret = node_path.include()
         if ret != 0:
             return
-        self.execute_custom_command("enable",
-                                    data={'resource_name': resource_name if resource_name else node.name},
-                                    timeout=timeout,
-                                    node=node)
+
+        self.execute_custom_command(
+            "include",
+            data={'resource_name': resource_name if resource_name else node_paht.name},
+            timeout=timeout,
+            node_path=node_path
+        )

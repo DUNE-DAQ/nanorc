@@ -19,6 +19,11 @@ def validate_timeout(ctx, param, timeout):
         raise click.BadParameter('Timeout should be >0')
     return timeout
 
+def validate_wait(ctx, param, wait):
+    if wait<0:
+        raise click.BadParameter('Wait should be >=0')
+    return wait
+
 def validate_stop_wait(ctx, param, stop_wait):
     if stop_wait is None:
         return stop_wait
