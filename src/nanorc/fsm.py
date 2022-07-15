@@ -4,13 +4,13 @@ from functools import partial
 class FSM(Machine):
     def __init__(self,console, fsm_type, verbose=False):
         if fsm_type == 'timing':
-            self.states_cfg = [ 'none', 'booted', 'initialised', 'configured', 'error', 'running' ]
+            self.states_cfg = [ 'none', 'booted', 'initial', 'configured', 'error', 'running' ]
             self.transitions_cfg = [
                 { 'trigger': 'boot',      'source': 'none',        'dest': 'initial'    },
                 { 'trigger': 'conf',      'source': 'initial',     'dest': 'configured' },
                 { 'trigger': 'start',     'source': 'configured',  'dest': 'running'    },
                 { 'trigger': 'stop',      'source': 'running',     'dest': 'configured' },
-                { 'trigger': 'scrap',     'source': 'configured',  'dest': 'initialised'},
+                { 'trigger': 'scrap',     'source': 'configured',  'dest': 'initial'    },
                 { 'trigger': 'terminate', 'source': 'initial',     'dest': 'none'       },
                 { 'trigger': 'terminate', 'source': 'error',       'dest': 'none'       },
                 { 'trigger': 'abort',     'source': '*',           'dest': 'none'       },
@@ -18,8 +18,8 @@ class FSM(Machine):
             ]
             self.command_sequences = {
                 'start_run': [
-                    {'cmd': 'configure', 'optional': True },
-                    {'cmd': 'start',     'optional': False},
+                    {'cmd': 'conf',  'optional': True },
+                    {'cmd': 'start', 'optional': False},
                 ],
                 'stop_run' : [
                     {'cmd': 'stop', 'optional': False},
