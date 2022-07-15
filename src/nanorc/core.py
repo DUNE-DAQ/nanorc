@@ -319,9 +319,10 @@ class NanoRC:
         if self.return_code == 0:
             self.runs.append(
                 start_run(
-                    run_number=run,
-                    run_type=run_type,
-                    enable_data_storage=not disable_data_storage,
+                    run_number = run,
+                    run_type = run_type,
+                    enable_data_storage = not disable_data_storage,
+                    trigger_rate = trigger_rate
                 )
             )
             text = ""
@@ -442,6 +443,8 @@ class NanoRC:
             data = trigger_data,
             timeout = timeout
         )
+        if self.runs:
+            self.runs[-1].trigger_rate = trigger_rate
 
 
     def exclude(self, node_path, timeout, resource_name) -> NoReturn:
