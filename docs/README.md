@@ -60,7 +60,7 @@ shonky rc> help
 
 Documented commands (type help <topic>):
 ========================================
-boot  conf  init  pause  resume  scrap  start  status  stop  terminate  wait
+boot  conf   pause  resume  scrap  start  status  stop  terminate  wait
 
 Undocumented commands:
 ======================
@@ -88,7 +88,7 @@ shonky rc> boot
 
 ```
 
-You can then send the `init`, `conf`, `start`, and `resume` commands to get things going. `start` requires a run number as argument. It also optionally takes booleans to toggle data storage (`--disable-data-storage` and `--enable-data-storage`) and an integer to control trigger separation in ticks (`--trigger-interval-ticks <num ticks>`).
+You can then send the `start_run`command to get things going. `start_run` requires a run number as argument. It also optionally takes booleans to toggle data storage (`--disable-data-storage` and `--enable-data-storage`) and an integer to control trigger separation in ticks (`--trigger-interval-ticks <num ticks>`).
 
 The commands produce quite verbose output so that you can see what was sent directly to the applications without digging in the logfiles.
 
@@ -109,14 +109,14 @@ shonky rc> status
 └──────────┴───────────┴───────┴───────┴──────────┴────────────────┘
 ```
 
-When you've seen enough use `stop`, `scrap` and `terminate` commands. In case you experience timeout problems booting applications or sending commands, consider changing the `hosts` values from `localhost` to the hostname of your machine. This has to do with SSH authentication.
+When you've seen enough use `stop_run` or `shutdown` commands. In case you experience timeout problems booting applications or sending commands, consider changing the `hosts` values from `localhost` to the hostname of your machine. This has to do with SSH authentication.
 
-nanorc commands can be autocompleted with TAB, for example, TAB will autocomplete `r` to `resume`. Options like `--disable-data-storage` will be completed with TAB after typing `start --d`.
+nanorc commands can be autocompleted with TAB, for example, TAB will autocomplete `r` to `resume`. Options like `--disable-data-storage` will be completed with TAB after typing `start_run --d`.
 
 You can also control nanorc in "batch mode", e.g.:
 ```
 run_number=999
-nanorc mdapp_fake partition-name boot init conf start --disable-data-storage $run_number wait 2 resume wait 60 pause wait 2 stop scrap terminate
+nanorc daq_fake partition-name boot conf start_run --disable-data-storage $run_number wait 2 shutdown
 ```
 Notice the ability to control the time via transitions from the command line via the `wait` argument. 
 
