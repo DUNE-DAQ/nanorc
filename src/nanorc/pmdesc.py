@@ -50,10 +50,13 @@ class PMFactory:
         if pm.use_k8spm():
             # Yes, we need the list of connections here
             connections = {}
-            for app, data in self.cfgmgr.init.items():
+            for app, data in self.cfgmgr.data.items():
+                if not isinstance(data, dict): continue
+                if not 'init' in data: continue
                 connections[app] = []
-                for connection in data['connections']:
-                    if connection["service_type"] == "kQueue":
+                # please hide all this configuration details from me!
+                for connection in data['init']['connections']:
+                    if connection["service_type"] == "kQueue": # this is burnin my eyes
                         continue
                     connections[app].append(connection)
 
