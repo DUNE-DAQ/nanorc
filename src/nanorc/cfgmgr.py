@@ -40,6 +40,7 @@ class ConfigManager:
         self.port_offset = port_offset
         self.tmp = None # hack
         self.scheme = None
+        self.expected_std_cmds = ['init', 'conf']
 
         self.scheme = config.scheme+'://'
         if config.scheme == 'db':
@@ -78,6 +79,7 @@ class ConfigManager:
                 else:
                     self.log.error(f'Something went horribly wrong while getting http://{self.conf_str}')
                 exit(1)
+            self.custom_commands = self._get_custom_commands_from_dict(self.data)
         else:
             self.scheme = 'file://'
             conf_path = os.path.expandvars(config.path)
@@ -93,6 +95,7 @@ class ConfigManager:
                 hosts = self.boot["hosts"],
                 port_offset = self.port_offset
             )
+            self.custom_commands = self._get_custom_commands_from_dirs(conf_path)
 
     def _import_data(self, cfg_path: dict) -> None:
         data = {}
@@ -105,12 +108,38 @@ class ConfigManager:
             except json.decoder.JSONDecodeError as e:
                 raise RuntimeError(f"ERROR: failed to load {fpath}") from e
 
+    def _get_custom_commands_from_dict(self, data:dict):
+        from collections import defaultdict
+        custom_cmds = defaultdict(list)
+        for app in data.keys():
+            if data.get('conf'):
+                for key, value in data[app].items():
+                    if key in self.expected_std_cmds: continue # normal command
+                    custom_cmds[key].append(value)
+
+        return custom_cmds
+
+
+    def _get_custom_commands_from_dirs(self, path:str):
+        from collections import defaultdict
+        custom_cmds = defaultdict(list)
+        for cmd_file in os.listdir(path+'/data'):
+            std_cmd_flag = False
+            for std_cmd in self.expected_std_cmds:
+                if std_cmd+".json" in cmd_file:
+                    std_cmd_flag = True
+                    break # just a normal command
+
+            if std_cmd_flag:
+                continue
+
+            cmd_name = '_'.join(cmd_file.split('_')[1:]).replace('.json', '')
+            custom_cmds[cmd_name].append(json.load(open(path+'/data/'+cmd_file, 'r')))
+
+        return custom_cmds
 
     def get_custom_commands(self):
-        ret = {}
-        # for cmd in self.extra_cmds.keys():
-        #     ret[cmd] = getattr(self, cmd)
-        return ret
+        return self.custom_commands
 
 
     def _resolve_dir_and_save_to_tmpdir(self, conf_path, hosts:dict, port_offset:int=0) -> None:

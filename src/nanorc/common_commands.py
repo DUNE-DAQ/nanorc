@@ -330,7 +330,7 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
     for c,d in cmds.items():
         arg_list = {}
         arg_default = {}
-        for app, app_data in d.items():
+        for app_data in d:
             for modules_data in app_data.values():
                 for module_data in modules_data:
                     module = module_data['match']
