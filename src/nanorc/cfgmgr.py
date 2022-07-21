@@ -11,6 +11,24 @@ import importlib.resources as resources
 from . import confdata
 from urllib.parse import urlparse
 
+def parse_string(string_to_format:str, dico:dict={}) -> str:
+    from string import Formatter
+    fieldnames = [fname for _, fname, _, _ in Formatter().parse(string_to_format) if fname]
+
+    if len(fieldnames)>1:
+        raise RuntimeError(f"Too many fields in string {string_to_format}")
+
+    elif len(fieldname)==0:
+        return string_to_format
+
+    fieldname = fieldnames[0]
+    try:
+        string_to_format = string_to_format.format(**dico)
+    except Exception as e:
+        raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
+
+    return string_to_format
+
 class ConfigManager:
 
     def __init__(self, log, config, resolve_hostname=True, port_offset=0):
@@ -99,7 +117,7 @@ class ConfigManager:
     def _resolve_dir_and_save_to_tmpdir(self, conf_path, hosts:dict, port_offset:int=0) -> None:
         if not os.path.exists(conf_path):
             raise RuntimeError(f"ERROR: {conf_path} does not exist!")
-        # Conf:
+
         external_connections = self.boot['external_connections']
 
         self.tmp = tempfile.TemporaryDirectory(
@@ -128,7 +146,7 @@ class ConfigManager:
                 continue
 
             origuri = connection['uri']
-            connection['uri'] = Template(connection['uri']).substitute(hosts)
+            connection['uri'] = parse_string(connection['uri'], hosts)
 
         return data
 
