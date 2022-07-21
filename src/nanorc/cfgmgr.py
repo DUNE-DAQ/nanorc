@@ -17,8 +17,7 @@ def parse_string(string_to_format:str, dico:dict={}) -> str:
 
     if len(fieldnames)>1:
         raise RuntimeError(f"Too many fields in string {string_to_format}")
-
-    elif len(fieldname)==0:
+    elif len(fieldnames)==0:
         return string_to_format
 
     fieldname = fieldnames[0]
@@ -127,8 +126,10 @@ class ConfigManager:
 
         for original_file in os.listdir(conf_path):
             data = self._import_data(conf_path/original_file)
+            self.log.debug(f"Original conections in '{conf_path/original_file}':")
             data = self._resolve_hostnames(data, hosts)
             if port_offset:
+                self.log.debug(f"Offsetting the ports by {port_offset}, new connections:")
                 data = self._offset_ports(data, external_connections)
 
             with open(os.path.join(self.tmp.name, original_file), 'w') as parsed_file:
@@ -147,7 +148,7 @@ class ConfigManager:
 
             origuri = connection['uri']
             connection['uri'] = parse_string(connection['uri'], hosts)
-
+            self.log.debug(f" - '{connection['uid']}': {connection['uri']} ({origuri})")
         return data
 
 
@@ -157,14 +158,14 @@ class ConfigManager:
             return data
 
         for connection in data['connections']:
-            if "queue://" in c['uri']:
+            if "queue://" in connection['uri']:
                 continue
 
-            if not c['uid'] in external_connections:
-                port = urlparse(c['uri']).port
+            if not connection['uid'] in external_connections:
+                port = urlparse(connection['uri']).port
                 newport = port + self.port_offset
-                c['uri'] = c['uri'].replace(str(port), str(newport))
-                self.log.debug(f"{c['uid']}: {c['uri']}")
+                connection['uri'] = connection['uri'].replace(str(port), str(newport))
+                self.log.debug(f" - '{connection['uid']}': {connection['uri']}")
 
         return data
 
