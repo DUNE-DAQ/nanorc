@@ -75,7 +75,7 @@ class ConfigManager:
                     raise RuntimeError(f'Couldn\'t get the configuration {conf_name}')
             except:
                 if r:
-                    self.log.error(f'Couldn\'t get the configuration from the conf service.\nService response: {json.loads(r.text)["message"]}')
+                    self.log.error(f'Couldn\'t get the configuration from the conf service.\nService response: {json.loads(r.text).get("message","no response")}')
                 else:
                     self.log.error(f'Something went horribly wrong while getting http://{self.conf_str}')
                 exit(1)
