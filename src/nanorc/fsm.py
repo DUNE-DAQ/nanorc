@@ -4,35 +4,75 @@ from functools import partial
 class FSM(Machine):
     def __init__(self,console, fsm_type, verbose=False):
         if fsm_type == 'timing':
-            self.states_cfg = [ "none", "booted", "initialised", "configured", "error", "running" ]
+            self.states_cfg = [ 'none', 'booted', 'initial', 'configured', 'error', 'running' ]
             self.transitions_cfg = [
-                { "trigger": "boot",      "source": "none",        "dest": "booted"     },
-                { "trigger": "init",      "source": "booted",      "dest": "initialised"},
-                { "trigger": "conf",      "source": "initialised", "dest": "configured" },
-                { "trigger": "start",     "source": "configured",  "dest": "running"    },
-                { "trigger": "stop",      "source": "running",     "dest": "configured" },
-                { "trigger": "scrap",     "source": "configured",  "dest": "initialised"},
-                { "trigger": "terminate", "source": "*",           "dest": "none"       },
-                { "trigger": "to_error",  "source": "*",           "dest": "error"      }
+                { 'trigger': 'boot',      'source': 'none',        'dest': 'initial'    },
+                { 'trigger': 'conf',      'source': 'initial',     'dest': 'configured' },
+                { 'trigger': 'start',     'source': 'configured',  'dest': 'running'    },
+                { 'trigger': 'stop',      'source': 'running',     'dest': 'configured' },
+                { 'trigger': 'scrap',     'source': 'configured',  'dest': 'initial'    },
+                { 'trigger': 'terminate', 'source': 'initial',     'dest': 'none'       },
+                { 'trigger': 'terminate', 'source': 'error',       'dest': 'none'       },
+                { 'trigger': 'abort',     'source': '*',           'dest': 'none'       },
+                { 'trigger': 'to_error',  'source': '*',           'dest': 'error'      }
             ]
+            self.command_sequences = {
+                'start_run': [
+                    {'cmd': 'conf',  'optional': True },
+                    {'cmd': 'start', 'optional': False},
+                ],
+                'stop_run' : [
+                    {'cmd': 'stop', 'optional': False},
+                ],
+                'shutdown' : [
+                    {'cmd': 'stop',      'optional': True },
+                    {'cmd': 'scrap',     'optional': True },
+                    {'cmd': 'terminate', 'optional': False},
+                ],
+            }
 
         else:
-            self.states_cfg = [ "none", "booted", "initialised", "configured", "running", "paused", "error"]
-            self.transitions_cfg = [
-                { "trigger": "boot",      "source": "none",        "dest": "booted"     },
-                { "trigger": "init",      "source": "booted",      "dest": "initialised"},
-                { "trigger": "conf",      "source": "initialised", "dest": "configured" },
-                { "trigger": "start",     "source": "configured",  "dest": "running"    },
-                { "trigger": "stop",      "source": "running" ,    "dest": "configured" },
-                { "trigger": "stop",      "source": "paused" ,     "dest": "configured" },
-                { "trigger": "resume",    "source": "running",     "dest": "running"    },
-                { "trigger": "resume",    "source": "paused",      "dest": "running"    },
-                { "trigger": "pause",     "source": "running",     "dest": "paused"     },
-                { "trigger": "pause",     "source": "paused",      "dest": "paused"     },
-                { "trigger": "scrap",     "source": "configured",  "dest": "initialised"},
-                { "trigger": "terminate", "source": "*",           "dest": "none"       },
-                { "trigger": "to_error",  "source": "*",           "dest": "error"      }
+            self.states_cfg = [
+                'none', 'booted', 'initial', 'configured', 'ready', 'running',
+                'paused', 'dataflow_drained', 'trigger_sources_stopped', 'error'
             ]
+            self.transitions_cfg = [
+                { 'trigger': 'boot',                 'source': 'none',                    'dest': 'initial'                },
+                { 'trigger': 'conf',                 'source': 'initial',                 'dest': 'configured'             },
+                { 'trigger': 'start',                'source': 'configured',              'dest': 'ready'                  },
+                { 'trigger': 'enable_triggers',      'source': 'ready',                   'dest': 'running'                },
+                { 'trigger': 'disable_triggers',     'source': 'running',                 'dest': 'ready'                  },
+                { 'trigger': 'drain_dataflow',       'source': 'ready',                   'dest': 'dataflow_drained'       },
+                { 'trigger': 'stop_trigger_sources', 'source': 'dataflow_drained',        'dest': 'trigger_sources_stopped'},
+                { 'trigger': 'stop',                 'source': 'trigger_sources_stopped', 'dest': 'configured'             },
+                { 'trigger': 'scrap',                'source': 'configured',              'dest': 'initial'                },
+                { 'trigger': 'terminate',            'source': 'initial',                 'dest': 'none'                   },
+                { 'trigger': 'terminate',            'source': 'error',                   'dest': 'none'                   },
+                { 'trigger': 'abort',                'source': '*',                       'dest': 'none'                   },
+                { 'trigger': 'to_error',             'source': '*',                       'dest': 'error'                  }
+            ]
+            self.command_sequences = {
+                'start_run': [
+                    {'cmd': 'conf',            'optional': True },
+                    {'cmd': 'start',           'optional': False},
+                    {'cmd': 'enable_triggers', 'optional': False}
+                ],
+                'stop_run' : [
+                    {'cmd': 'disable_triggers',     'optional': True },
+                    {'cmd': 'drain_dataflow',       'optional': False},
+                    {'cmd': 'stop_trigger_sources', 'optional': False},
+                    {'cmd': 'stop',                 'optional': False},
+                ],
+                'shutdown' : [
+                    {'cmd': 'disable_triggers',     'optional': True },
+                    {'cmd': 'drain_dataflow',       'optional': True },
+                    {'cmd': 'stop_trigger_sources', 'optional': True },
+                    {'cmd': 'stop',                 'optional': True },
+                    {'cmd': 'scrap',                'optional': True },
+                    {'cmd': 'terminate',            'optional': False},
+                ],
+            }
+
         if verbose:
             print_friendly_transitions = set()
             for tr in self.transitions_cfg:

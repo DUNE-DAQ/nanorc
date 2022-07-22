@@ -19,6 +19,11 @@ def validate_timeout(ctx, param, timeout):
         raise click.BadParameter('Timeout should be >0')
     return timeout
 
+def validate_wait(ctx, param, wait):
+    if wait<0:
+        raise click.BadParameter('Wait should be >=0')
+    return wait
+
 def validate_stop_wait(ctx, param, stop_wait):
     if stop_wait is None:
         return stop_wait
@@ -61,17 +66,17 @@ def validate_conf(ctx, param, top_cfg):
     confurl = urlparse(top_cfg)
     if path.isdir(confurl.path):
         confurl=ParseResult(
-            scheme='dir',
+            scheme='file',
             path=top_cfg,
             netloc='', params='', query='', fragment='')
         return confurl
     if path.exists(confurl.path) and confurl.path[-5:]=='.json':
         confurl=ParseResult(
-            scheme='file',
+            scheme='topjson',
             path=top_cfg,
             netloc='', params='', query='', fragment='')
         return confurl
-    if confurl.scheme == 'confservice':
+    if confurl.scheme == 'db':
         return confurl
 
     raise click.BadParameter(f"TOP_CFG should either be a directory, a json file, or a config service utility with the form confservice://the_conf_name?1 (where the ?1 at the end is optionnal and represents the version). You provided: '{top_cfg}'")

@@ -13,6 +13,8 @@ import os.path
 import os
 import logging
 import importlib.resources as resources
+import threading
+import socket
 
 from . import __version__
 from rich.table import Table
@@ -29,7 +31,10 @@ from nanorc.credmgr import credentials
 from . import confdata
 import nanorc.argval as argval
 
-from .cli import *
+from nanorc.common_commands import add_common_cmds, add_custom_cmds, accept_timeout, accept_wait, check_rc, execute_cmd_sequence
+from nanorc.cli import CONTEXT_SETTINGS, loglevels, updateLogLevel
+from nanorc.nano_context import NanoContext
+
 # ------------------------------------------------------------------------------
 @click_shell.shell(prompt='anonymous@timingrc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 @click.version_option(__version__)
@@ -131,7 +136,7 @@ def timingcli(ctx, obj, traceback, pm, loglevel, log_path, cfg_dumpdir, kerberos
 
     def cleanup_rc():
         if rc.topnode.state != 'none': logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
-        rc.terminate()
+        rc.abort(timeout=120)
         if rc.return_code:
             ctx.exit(rc.return_code)
 
@@ -144,32 +149,58 @@ def timingcli(ctx, obj, traceback, pm, loglevel, log_path, cfg_dumpdir, kerberos
         webui_thread.join()
 
 
+from nanorc.common_commands import status, boot, conf, scrap, wait, terminate, start_shell, stop_run, shutdown
 timingcli.add_command(status, 'status')
 timingcli.add_command(boot, 'boot')
-timingcli.add_command(init, 'init')
 timingcli.add_command(conf, 'conf')
 timingcli.add_command(scrap, 'scrap')
 timingcli.add_command(wait, 'wait')
 timingcli.add_command(terminate, 'terminate')
 timingcli.add_command(start_shell, 'shell')
+timingcli.add_command(stop_run, 'stop_run')
+timingcli.add_command(shutdown, 'shutdown')
 
 @timingcli.command('start')
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
 def start(ctx, obj, timeout:int):
-    obj.rc.start(disable_data_storage=True, run_type="TEST", timeout=timeout)
-    check_rc(ctx,obj)
+    obj.rc.start(disable_data_storage=True, run_type="TEST", timeout=timeout, trigger_rate=None, message="")
+    check_rc(ctx,obj.rc)
     obj.rc.status()
+
+@timingcli.command('start_run')
+@accept_timeout(None)
+@accept_wait()
+@click.pass_obj
+@click.pass_context
+def start_run(ctx, obj, wait:int, timeout):
+
+    execute_cmd_sequence(
+        ctx = ctx,
+        rc = obj.rc,
+        command = 'start_run',
+        wait = wait,
+        force = False,
+        cmd_args = {
+            'node_path':None,
+            'disable_data_storage':True,
+            'run_type':"TEST",
+            'timeout':timeout,
+            'trigger_rate':None,
+            'message':""
+        }
+    )
 
 
 @timingcli.command('stop')
 @accept_timeout(None)
+@click.option('--force', default=False, is_flag=True)
 @click.pass_obj
 @click.pass_context
-def start(ctx, obj, timeout:int):
-    obj.rc.stop(timeout=timeout)
-    check_rc(ctx,obj)
+def start(ctx, obj, timeout:int, force):
+    obj.rc.stop(timeout=timeout, force=force)
+    check_rc(ctx,obj.rc)
     obj.rc.status()
 
 
