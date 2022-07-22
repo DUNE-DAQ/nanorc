@@ -159,26 +159,23 @@ class DBConfigSaver:
         dname=None
 
         with tempfile.TemporaryDirectory() as dir_name:
+            from urllib.parse import ParseResult
             dname = dir_name
-            json_object = json.dumps(self.cfgmgr.top_cfg, indent=4)
+            json_object = self.cfgmgr.top_cfg
+            nice_top = {}
+            for key, value in json_object.items():
+                if isinstance(value, ParseResult):
+                    nice_top[key] = value.geturl()
+                else:
+                    nice_top[key] = value
             with open(dname+"/top_config.json", "w") as outfile:
-                outfile.write(json_object)
+                json.dump(nice_top, outfile, indent=4)
 
-            for node in PreOrderIter(topnode):
-                if isinstance(node, SubsystemNode):
-                    this_path = ""
-                    for parent in node.path:
-                        this_path += "/"+parent.name
-
-                    full_path = dir_name+this_path
-                    os.makedirs(full_path)
-                    copy_tree(node.cfgmgr.cfg_dir, full_path)
-
-                    runtime_data = node.cfgmgr.generate_data_for_module(data)
-
-                    f = open(full_path+"/start_parsed.json", "w")
-                    f.write(json.dumps(runtime_data, indent=2))
-                    f.close()
+            save_conf_to_dir(
+                outdir = dir_name,
+                topnode = topnode,
+                runtime_data = data,
+            )
 
             with tempfile.NamedTemporaryFile(suffix='.tar.gz', delete=False) as f:
                 with tarfile.open(fileobj=f, mode='w:gz') as tar:
