@@ -32,7 +32,7 @@ import nanorc.argval as argval
 from nanorc.rest import RestApi, NanoWebContext, rc_context
 from nanorc.webui import WebServer
 
-from nanorc.common_commands import add_common_cmds, add_custom_cmds, accept_timeout, accept_wait, check_rc, execute_cmd_sequence
+from nanorc.common_commands import add_common_cmds, add_custom_cmds, accept_timeout, accept_wait, check_rc, execute_cmd_sequence, accept_message, add_run_end_parameters
 from nanorc.cli import CONTEXT_SETTINGS, loglevels, updateLogLevel
 from nanorc.nano_context import NanoContext
 
@@ -114,7 +114,7 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
         )
 
         rc.log_path = os.path.abspath(log_path)
-        add_common_cmds(ctx.command)
+        add_common_cmds(ctx.command, end_of_run_cmds=False)
         add_custom_cmds(ctx.command, rc.execute_custom_command, rc.custom_cmd)
 
         if web:
@@ -207,6 +207,12 @@ def start_defaults_overwrite(kwargs):
     kwargs['path'] = None
     return kwargs
 
+def is_authenticated():
+    if not credentials.check_kerberos_credentials():
+        logging.getLogger("cli").error(f'\'{credentials.user}\' doesn\'t have valid kerberos ticket, use \'kinit\', or \'change_user\' to create a ticket (in a shell or in nanorc)')
+        return False
+    return True
+
 
 @np04cli.command('start_run')
 @add_run_start_parameters()
@@ -214,6 +220,7 @@ def start_defaults_overwrite(kwargs):
 @click.pass_obj
 @click.pass_context
 def start_run(ctx, obj, wait:int, **kwargs):
+    if not is_authenticated(): return
 
     kwargs['node_path'] = None
     execute_cmd_sequence(
@@ -231,10 +238,68 @@ def start_run(ctx, obj, wait:int, **kwargs):
 @click.pass_obj
 @click.pass_context
 def start(ctx, obj:NanoContext, **kwargs):
+    if not is_authenticated(): return
 
     obj.rc.start(**start_defaults_overwrite(kwargs))
     check_rc(ctx,obj.rc)
     obj.rc.status()
+
+@np04cli.command('message')
+@accept_message(argument=True)
+@click.pass_obj
+def message(obj, message):
+    if not is_authenticated(): return
+    obj.rc.message(message)
+
+
+@np04cli.command('stop_run')
+@accept_wait()
+@add_run_end_parameters()
+@click.pass_obj
+@click.pass_context
+def stop_run(ctx, obj, wait:int, **kwargs):
+    if not is_authenticated(): return
+
+    execute_cmd_sequence(
+        ctx = ctx,
+        rc = obj.rc,
+        command = 'stop_run',
+        force = kwargs['force'],
+        wait = wait,
+        cmd_args = kwargs
+    )
+
+@np04cli.command('shutdown')
+@accept_wait()
+@add_run_end_parameters()
+@click.pass_obj
+@click.pass_context
+def shutdown(ctx, obj, wait:int, **kwargs):
+    if not is_authenticated(): return
+
+    kwargs['node_path'] = None
+    execute_cmd_sequence(
+        ctx = ctx,
+        rc = obj.rc,
+        wait = wait,
+        command = 'shutdown',
+        force = kwargs['force'],
+        cmd_args = kwargs
+    )
+
+
+@np04cli.command('drain_dataflow')
+@add_run_end_parameters()
+@click.pass_obj
+@click.pass_context
+def drain_dataflow(ctx, obj, **kwargs):
+    if not is_authenticated(): return
+
+    obj.rc.drain_dataflow(**kwargs)
+    check_rc(ctx,obj.rc)
+    obj.rc.status()
+
+
 
 
 def main():
