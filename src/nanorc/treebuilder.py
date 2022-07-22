@@ -74,7 +74,12 @@ class TreeBuilder:
         elif top_cfg.scheme == 'topjson':
             from .argval import validate_conf
             f = open(top_cfg.path)
-            data = json.load(f)
+            data = {}
+            try:
+                data = json.load(f)
+            except Exception as e:
+                self.log.error(f'Couldn\'t parse top json: {str(e)}')
+                exit(1)
             if not 'apparatus_id' in data:
                 self.log.error(f'{top_cfg} doesn\'t have an \'apparatus_id\' entry')
                 exit(1)
