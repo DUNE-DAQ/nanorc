@@ -188,7 +188,6 @@ def shutdown(ctx, obj, wait:int, **kwargs):
 
 @click.command()
 @accept_wait()
-@accept_message()
 @add_run_end_parameters()
 @click.pass_obj
 @click.pass_context
@@ -302,7 +301,7 @@ def start_shell(ctx, obj):
     shell.cmdloop()
 
 
-def add_common_cmds(shell):
+def add_common_cmds(shell, end_of_run_cmds=True):
     shell.add_command(message             , 'message'             )
     shell.add_command(status              , 'status'              )
     shell.add_command(ls                  , 'ls'                  )
@@ -311,19 +310,20 @@ def add_common_cmds(shell):
     shell.add_command(conf                , 'conf'                )
     shell.add_command(enable_triggers     , 'enable_triggers'     )
     shell.add_command(disable_triggers    , 'disable_triggers'    )
-    shell.add_command(drain_dataflow      , 'drain_dataflow'      )
     shell.add_command(stop_trigger_sources, 'stop_trigger_sources')
     shell.add_command(stop                , 'stop'                )
-    shell.add_command(stop_run            , 'stop_run'            )
     shell.add_command(scrap               , 'scrap'               )
     shell.add_command(terminate           , 'terminate'           )
-    shell.add_command(shutdown            , 'shutdown'            )
     shell.add_command(change_rate         , 'change_rate'         )
     shell.add_command(include             , 'include'             )
     shell.add_command(exclude             , 'exclude'             )
     shell.add_command(expert_command      , 'expert_command'      )
     shell.add_command(wait                , 'wait'                )
     shell.add_command(start_shell         , 'start_shell'         )
+    if end_of_run_cmds:
+        shell.add_command(drain_dataflow      , 'drain_dataflow'      )
+        shell.add_command(stop_run            , 'stop_run'            )
+        shell.add_command(shutdown            , 'shutdown'            )
     # shell.add_command(ls_thread       , 'ls_thread'       )
 
 def add_custom_cmds(cli, rc_cmd_exec, cmds):

@@ -120,6 +120,7 @@ class CredentialManager:
         proc = subprocess.run(args, env={ 'LD_LIBRARY_PATH':'/lib64' })
         if proc.returncode != 0:
             self.log.error("CredentialManager: Couldn't get SSO cookie!")
+            self.log.error("You need to 'kinit' or 'change_user' and try again!")
             raise RuntimeError("CredentialManager: Couldn't get SSO cookie!")
         return SSO_COOKIE_PATH
 
