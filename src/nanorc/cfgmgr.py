@@ -73,11 +73,11 @@ class ConfigManager:
                     self.data = config
                 else:
                     raise RuntimeError(f'Couldn\'t get the configuration {conf_name}')
-            except:
+            except Exception as e:
                 if r:
-                    self.log.error(f'Couldn\'t get the configuration from the conf service (http://{self.conf_str})\nService response: {json.loads(r.text).get("message",r.text)}')
+                    self.log.error(f'Couldn\'t get the configuration from the conf service (http://{self.conf_str})\nService response: {json.loads(r.text).get("message",r.text)}\nException: {str(e)}')
                 else:
-                    self.log.error(f'Something went horribly wrong while getting http://{self.conf_str}')
+                    self.log.error(f'Something went horribly wrong while getting http://{self.conf_str}\nException: {str(e)}')
                 exit(1)
             self.custom_commands = self._get_custom_commands_from_dict(self.data)
         else:
