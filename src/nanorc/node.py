@@ -189,7 +189,7 @@ class SubsystemNode(StatefulNode):
             self.pm.boot(
                 boot_info = boot_info,
                 timeout = timeout,
-                conf_loc = self.cfgmgr.get_conf_location()
+                conf_loc = self.cfgmgr.get_conf_location(for_apps=True)
             )
 
         except Exception as e:
@@ -217,7 +217,7 @@ class SubsystemNode(StatefulNode):
             response_host = None
             proxy = None
             if event.kwargs['pm'].use_k8spm():
-                response_host = 'nanorc'
+                response_host = self.pm.nanorc_responder
                 proxy = (event.kwargs['pm'].address, event.kwargs['pm'].port)
 
             child = ApplicationNode(

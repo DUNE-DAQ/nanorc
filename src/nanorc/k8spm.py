@@ -19,6 +19,7 @@ class AppProcessDescriptor(object):
         super(AppProcessDescriptor, self).__init__()
         self.name = name
         self.host = None
+        self.node = None
         self.conf = None
         self.port = None
         self.proc = None
@@ -98,8 +99,12 @@ class K8SProcessManager(object):
 
     # ----
     def create_namespace(self, namespace : str):
-        self.log.info(f"Creating \"{namespace}\" namespace")
+        nslist = [ns.metadata.name for ns in self._core_v1_api.list_namespace().items]
+        if namespace in nslist:
+            self.log.debug(f"Not creating \"{namespace}\" namespace as it already exist")
+            return
 
+        self.log.info(f"Creating \"{namespace}\" namespace")
         ns = client.V1Namespace(
             metadata=client.V1ObjectMeta(name=namespace)
         )
@@ -114,6 +119,10 @@ class K8SProcessManager(object):
 
     # ----
     def delete_namespace(self, namespace: str):
+        nslist = [ns.metadata.name for ns in self._core_v1_api.list_namespace().items]
+        if not namespace in nslist:
+            self.log.debug(f"Not deleting \"{namespace}\" namespace as it already exist")
+            return
         self.log.info(f"Deleting \"{namespace}\" namespace")
         try:
             #
@@ -123,6 +132,13 @@ class K8SProcessManager(object):
         except Exception as e:
             self.log.error(e)
             raise RuntimeError(f"Failed to delete namespace \"{namespace}\"") from e
+
+    def get_pod_node(self, pod_name, partition):
+        pod_list = self._core_v1_api.list_namespaced_pod(partition)
+        for pod in pod_list.items:
+            if pod.metadata.name == pod_name:
+                return pod.spec.node_name
+        return 'unknown'
 
     def get_container_port_list_from_connections(self, app_name:str, connections:list=None, cmd_port:int=3333):
         ret = [
@@ -292,8 +308,8 @@ class K8SProcessManager(object):
         debug_str = "(image: \"{app_boot_info['image']}\""
         if app_boot_info['resources']:
             debug_str += f' resources: {app_boot_info["resources"]}'
-        if app_boot_info['pvcs']:
-            debug_str+=f' PVCs={[pvc["claim_name"] for pvc in app_boot_info["pvcs"]]}'
+        if app_boot_info['mounted_dirs']:
+            debug_str+=f' mounted_dirs (name: inpod->physical)={mount["name"]+": "+mount["in_pod_location"]+"->"+mount["physical_location"] for mount in app_boot_info["mounted_dirs"]}'
         if app_boot_info['node-selection']:
             debug_str+=f' node-selection={app_boot_info["node-selection"]}'
         if app_boot_info['affinity']:
@@ -332,7 +348,7 @@ class K8SProcessManager(object):
                     client.V1Container(
                         name = "daq-application",
                         image = app_boot_info["image"],
-                        image_pull_policy= "IfNotPresent",
+                        image_pull_policy= "Always",
                         security_context = client.V1SecurityContext(
                             privileged = use_felix # HACK
                         ),
@@ -359,10 +375,10 @@ class K8SProcessManager(object):
                             (
                                 [
                                     client.V1VolumeMount(
-                                        mount_path = pvc['mount'],
-                                        name = pvc['claim_name'],
-                                        read_only = pvc['read_only'])
-                                    for pvc in app_boot_info['pvcs']
+                                        mount_path = mount['in_pod_location'],
+                                        name = mount['name'],
+                                        read_only = mount['read_only'])
+                                    for mount in app_boot_info['mounted_dirs']
                                 ]
                             ) + (
                                 [
@@ -404,11 +420,10 @@ class K8SProcessManager(object):
                     (
                         [
                             client.V1Volume(
-                                name = pvc['claim_name'],
-                                persistent_volume_claim = client.V1PersistentVolumeClaimVolumeSource(
-                                    claim_name = pvc['claim_name'],
-                                    read_only = pvc['read_only']))
-                            for pvc in app_boot_info['pvcs']
+                                name = mount['name'],
+                                host_path = client.V1HostPathVolumeSource(
+                                    path = mount['physical_location']))
+                            for mount in app_boot_info['mounted_dirs']
                         ]
                     ) + (
                         [
@@ -478,8 +493,8 @@ class K8SProcessManager(object):
     # ----
     def create_nanorc_responder(self, name: str, namespace: str, ip: str, port: int):
 
+        self.nanorc_responder = name
         self.log.info(f"Creating nanorc responder service \"{namespace}:{name}\" for \"{ip}:{port}\"")
-
         # Creating Service object
         service = client.V1Service(
             metadata=client.V1ObjectMeta(
@@ -595,7 +610,7 @@ class K8SProcessManager(object):
 
 
     #---
-    def boot(self, boot_info, timeout):
+    def boot(self, boot_info, timeout, conf_loc):
 
         if self.apps:
             raise RuntimeError(
@@ -636,21 +651,20 @@ class K8SProcessManager(object):
             'uid': os.getuid(),
             'gid': os.getgid(),
         }
+        # pvcs = {}
+        # for app in apps.values():
+        #     app_pvcs=app['pvcs']
+        #     for pvc in app_pvcs:
+        #         claim_name = pvc['claim_name']
 
-        pvcs = {}
-        for app in apps.values():
-            app_pvcs=app['pvcs']
-            for pvc in app_pvcs:
-                claim_name = pvc['claim_name']
+        #         if claim_name in pvcs and pvc == pvcs[claim_name]:
+        #             raise RuntimeError(f"The same PVC {claim_name} is defined twice in boot.json, but isn't strictly identical!")
 
-                if claim_name in pvcs and pvc == pvcs[claim_name]:
-                    raise RuntimeError(f"The same PVC {claim_name} is defined twice in boot.json, but isn't strictly identical!")
+        #         pvcs[claim_name] = pvc
 
-                pvcs[claim_name] = pvc
-
-        # Create the persistent volume claim
-        for pvc in pvcs.values():
-            self.create_data_pvc(pvc, self.partition)
+        # # Create the persistent volume claim
+        # for pvc in pvcs.values():
+        #     self.create_data_pvc(pvc, self.partition)
 
         for app_name in boot_info['order']:
             app_conf = apps[app_name]
@@ -660,6 +674,7 @@ class K8SProcessManager(object):
                 "APP_NAME": app_name,
                 "APP_HOST": app_name, # For the benefit of TRACE_FILE... Hacky...
                 "APP_PORT": cmd_port,
+                "CONF_LOC": conf_loc,
             }
 
             exec_data = boot_info['exec'][app_conf['exec']]
@@ -693,17 +708,16 @@ class K8SProcessManager(object):
             # then, we want to mount /cvmfs/dunedaq-development....
             # Else we are probably in "full release mode" in which case the name of the version will be v3.0.4, and we don't need to mount it
             image_and_ver = app_img.split(":")
-            mount_cvmfs_dev = False
-            if len(image_and_ver)==1:
-                mount_cvmfs_dev = True
-            elif len(image_and_ver)==2:
-                if image_and_ver[1] or image_and_ver[1] == "latest":
-                    mount_cvmfs_dev = (image_and_ver[1][0] == 'N')
-                else:
-                    raise RuntimeError("Malformed image name in boot.json")
-            else:
-                raise RuntimeError("Malformed image name in boot.json")
-
+            mount_cvmfs_dev = True
+            # if len(image_and_ver)==1:
+            #     mount_cvmfs_dev = True
+            # elif len(image_and_ver)==2:
+            #     if image_and_ver[1] or image_and_ver[1] == "latest":
+            #         mount_cvmfs_dev = (image_and_ver[1][0] == 'N')
+            #     else:
+            #         raise RuntimeError("Malformed image name in boot.json")
+            # else:
+            #     raise RuntimeError("Malformed image name in boot.json")
             app_boot_info = {
                 "env"             : app_env,
                 "command"         : app_cmd,
@@ -711,12 +725,12 @@ class K8SProcessManager(object):
                 "image"           : app_img,
                 "cmd_port"        : cmd_port,
                 "mount_cvmfs_dev" : mount_cvmfs_dev,
-                "pvcs"            : app_conf['pvcs'],
-                "resources"       : app_conf['resources'],
-                "affinity"        : app_conf['affinity'],
-                "anti-affinity"   : app_conf['anti-affinity'],
-                "node-selection"  : app_conf['node-selection'],
-                "connections"     : self.connections[app_name],
+                "mounted_dirs"    : app_conf.get('mounted_dirs', []),
+                "resources"       : app_conf.get('resources',  {}),
+                "affinity"        : app_conf.get('affinity', []),
+                "anti-affinity"   : app_conf.get('anti-affinity', []),
+                "node-selection"  : app_conf.get('node-selection', []),
+                "connections"     : self.connections.get(app_name, []),
             }
 
             if self.cluster_config.is_kind:
@@ -743,6 +757,8 @@ class K8SProcessManager(object):
                 namespace = self.partition,
                 run_as = run_as
             )
+
+            app_desc.node = self.get_pod_node(k8s_name, self.partition)
 
             self.apps[app_name] = app_desc
 
@@ -780,8 +796,13 @@ class K8SProcessManager(object):
 
                 time.sleep(1)
 
+        def rdm_string(N:int=5):
+            import string
+            import random
+            return ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(N))
+
         self.create_nanorc_responder(
-            name = 'nanorc',
+            name = f'nanorc-{rdm_string()}',
             namespace = self.partition,
             ip = self.gateway,
             port = boot_info["response_listener"]["port"])

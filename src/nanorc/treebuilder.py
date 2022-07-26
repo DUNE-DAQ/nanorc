@@ -64,17 +64,22 @@ class TreeBuilder:
         self.subsystem_port_offset = 0
         self.subsystem_port_increment = 50
         
-        if top_cfg.scheme == 'dir':
+        if top_cfg.scheme == 'file':
             apparatus_id = Path(top_cfg.path).name
             data = {
                 "apparatus_id": apparatus_id,
                 apparatus_id: top_cfg
             }
             self.top_cfg = data
-        elif top_cfg.scheme == 'file':
+        elif top_cfg.scheme == 'topjson':
             from .argval import validate_conf
             f = open(top_cfg.path)
-            data = json.load(f)
+            data = {}
+            try:
+                data = json.load(f)
+            except Exception as e:
+                self.log.error(f'Couldn\'t parse top json: {str(e)}')
+                exit(1)
             if not 'apparatus_id' in data:
                 self.log.error(f'{top_cfg} doesn\'t have an \'apparatus_id\' entry')
                 exit(1)
@@ -87,7 +92,7 @@ class TreeBuilder:
                     self.log.error(f'Error parsing the line {key}:{val} of the configuration: {e}')
 
             self.top_cfg = data_cp
-        elif top_cfg.scheme == 'confservice':
+        elif top_cfg.scheme == 'db':
             pretty_name = top_cfg.netloc
             data = {
                 "apparatus_id": pretty_name,

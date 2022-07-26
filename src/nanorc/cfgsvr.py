@@ -19,7 +19,42 @@ from distutils.dir_util import copy_tree
 def make_tarfile(output_filename, source_dir):
     with tarfile.open(output_filename, "w:gz") as tar:
         tar.add(source_dir, arcname=os.path.basename(source_dir))
-        
+
+def save_conf_to_dir(topnode, outdir, runtime_data):
+
+    for node in PreOrderIter(topnode):
+
+        if isinstance(node, SubsystemNode):
+
+            this_path = ""
+            for parent in node.path:
+                this_path += "/"+parent.name
+
+            full_path = outdir+this_path
+            os.makedirs(full_path)
+
+            location = node.cfgmgr.get_conf_location(for_apps=False)
+
+            if os.path.isdir(location):
+                copy_tree(location, full_path)
+
+            else:
+                import requests
+                r = requests.get(location)
+                if r.status_code == 200:
+                    config = r.json()
+                    with open(os.path.join(full_path, 'full_configuration.json'), 'w') as f:
+                        json.dump(config, f, indent=4, sort_keys=True)
+                else:
+                    raise RuntimeError(f'Couldn\'t get the configuration {location}')
+
+
+            rd = node.cfgmgr.generate_data_for_module(runtime_data)
+
+            with open(os.path.join(full_path, "runtime_data.json"), "w") as f:
+                json.dump(rd, f, indent=4, sort_keys=True)
+
+
 class FileConfigSaver:
     """docstring for ConfigManager"""
 
@@ -62,7 +97,7 @@ class FileConfigSaver:
         return filename+postfix+ext
 
     def save_on_start(self,
-                      apps:StatefulNode,
+                      topnode:StatefulNode,
                       run:int,
                       run_type:str,
                       data:dict) -> str:
@@ -87,30 +122,19 @@ class FileConfigSaver:
         except Exception as e:
             raise RuntimeError(str(e))
 
-        for node in PreOrderIter(apps):
-            if isinstance(node, SubsystemNode):
-                this_path = ""
-                for parent in node.path:
-                    this_path += "/"+parent.name
-                    
-                full_path = self.thisrun_outdir+this_path
-                os.makedirs(full_path)
-                copy_tree(node.cfgmgr.cfg_dir, full_path)
-                
-                runtime_data = node.cfgmgr.generate_data_for_module(data)
-
-                f = open(full_path+"/start_parsed.json", "w")
-                f.write(json.dumps(runtime_data, indent=2))
-                f.close()
-        
+        save_conf_to_dir(
+            outdir = self.thisrun_outdir,
+            topnode = topnode,
+            runtime_data = data,
+        )
         return self.thisrun_outdir
 
 
     def save_on_stop(self, run:int):
         pass
-        
 
-        
+
+
 
 class DBConfigSaver:
     def __init__(self, socket:str):
@@ -121,10 +145,10 @@ class DBConfigSaver:
         self.timeout = 2
         self.apparatus_id = None
         self.log = logging.getLogger(self.__class__.__name__)
-        
+
     def save_on_resume(self, topnode, overwrite_data:dict, cfg_method:str) -> str:
         return "not_saving_to_db_on_resume"
-    
+
     def save_on_start(self,
                       topnode,
                       run:int,
@@ -135,27 +159,24 @@ class DBConfigSaver:
         dname=None
 
         with tempfile.TemporaryDirectory() as dir_name:
+            from urllib.parse import ParseResult
             dname = dir_name
-            json_object = json.dumps(self.cfgmgr.top_cfg, indent=4)
+            json_object = self.cfgmgr.top_cfg
+            nice_top = {}
+            for key, value in json_object.items():
+                if isinstance(value, ParseResult):
+                    nice_top[key] = value.geturl()
+                else:
+                    nice_top[key] = value
             with open(dname+"/top_config.json", "w") as outfile:
-                outfile.write(json_object)
-            
-            for node in PreOrderIter(topnode):
-                if isinstance(node, SubsystemNode):
-                    this_path = ""
-                    for parent in node.path:
-                        this_path += "/"+parent.name
-                    
-                    full_path = dir_name+this_path
-                    os.makedirs(full_path)
-                    copy_tree(node.cfgmgr.cfg_dir, full_path)
-                
-                    runtime_data = node.cfgmgr.generate_data_for_module(data)
+                json.dump(nice_top, outfile, indent=4)
 
-                    f = open(full_path+"/start_parsed.json", "w")
-                    f.write(json.dumps(runtime_data, indent=2))
-                    f.close()
-            
+            save_conf_to_dir(
+                outdir = dir_name,
+                topnode = topnode,
+                runtime_data = data,
+            )
+
             with tempfile.NamedTemporaryFile(suffix='.tar.gz', delete=False) as f:
                 with tarfile.open(fileobj=f, mode='w:gz') as tar:
                     tar.add(dname, arcname=os.path.basename(dname))
@@ -193,9 +214,9 @@ class DBConfigSaver:
                     error = f"{__name__}: Connection to {self.API_SOCKET} timed out"
                     self.log.error(error)
                     raise RuntimeError(error) from exc
-        
+
             os.remove(fname)
-            
+
         return "run_registry_db"
 
     def save_on_stop(self, run:str) -> None:
@@ -215,8 +236,8 @@ class DBConfigSaver:
             error = f"{__name__}: Connection to {self.API_SOCKET} timed out"
             self.log.error(error)
             raise RuntimeError(error) from exc
-        
-        
+
+
 
 if __name__ == "__main__":
     import sys

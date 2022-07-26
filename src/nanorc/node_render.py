@@ -22,7 +22,7 @@ def status_data(node, get_children=True) -> dict:
         ret['last_cmd_failed'] = (sup.last_sent_command != sup.last_ok_command)
         ret['name'] = node.name
         ret['state'] = node.state + ("" if node.included else " - excluded")
-        ret['host'] = sup.desc.host,
+        ret['host'] = sup.desc.node if hasattr(sup.desc, 'node') else sup.desc.host,
         ret['last_sent_command'] = sup.last_sent_command
         ret['last_ok_command'] = sup.last_ok_command
     else:
@@ -75,7 +75,7 @@ def print_status(topnode, console, apparatus_id='', partition='') -> int:
             table.add_row(
                 Text(pre)+Text(node.name),
                 state_str,
-                sup.desc.host,
+                sup.desc.node if hasattr(sup.desc, 'node') else sup.desc.host,
                 str(ping),
                 Text(str(sup.last_sent_command), style=('bold red' if last_cmd_failed else '')),
                 str(sup.last_ok_command)
