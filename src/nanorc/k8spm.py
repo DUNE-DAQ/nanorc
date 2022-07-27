@@ -93,7 +93,7 @@ class K8SProcessManager(object):
         pods = self.list_pods()
         for pod in pods:
             resp = stream(
-                api_instance.connect_get_namespaced_pod_exec, pod.metadata.name, self.partition,
+                self._core_v1_api.connect_get_namespaced_pod_exec, pod.metadata.name, self.partition,
                 command=cmd,
                 stderr=True, stdin=False,
                 stdout=True, tty=False
