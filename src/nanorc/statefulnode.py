@@ -117,8 +117,8 @@ class StatefulNode(NodeMixin):
     def on_enter_terminate_ing(self, _) -> NoReturn:
         if self.children:
             for child in self.children:
-                if child.included:
-                    child.terminate()
+                # if child.included:
+                child.terminate()
         self.end_terminate()
 
     def on_enter_abort_ing(self, _) -> NoReturn:
