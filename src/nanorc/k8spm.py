@@ -84,18 +84,38 @@ class K8SProcessManager(object):
         self._apps_v1_api = client.AppsV1Api()
 
 
+    def execute_script(self, script_data):
+        from kubernetes.stream import stream
+
+        env_vars = script_data["env"]
+        cmd =';'.join([ f"export {n}=\"{v}\"" for n,v in env_vars.items()])
+        cmd += ";"+"; ".join(script_data['cmd'])
+        pods = self.list_pods()
+        for pod in pods:
+            resp = stream(
+                api_instance.connect_get_namespaced_pod_exec, pod.metadata.name, self.partition,
+                command=cmd,
+                stderr=True, stdin=False,
+                stdout=True, tty=False
+            )
+            # ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"] + [cmd]
+            # proc = sh.ssh(ssh_args)
+            self.log.info(resp)
+
 
     def list_pods(self):
         self.log.info("Listing pods with their IPs:")
         ret = self._core_v1_api.list_pod_for_all_namespaces(watch=False)
         for i in ret.items:
             self.log.info("%s\t%s\t%s" % (i.status.pod_ip, i.metadata.namespace, i.metadata.name))
+        return ret
 
     def list_endpoints(self):
         self.log.info("Listing endpoints:")
         ret = self._core_v1_api.list_endpoints_for_all_namespaces(watch=False)
         for i in ret.items:
             self.log.info("%s\t%s" % (i.metadata.namespace, i.metadata.name))
+        return ret
 
     # ----
     def create_namespace(self, namespace : str):
