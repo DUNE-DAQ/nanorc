@@ -59,8 +59,10 @@ class SubsystemNode(StatefulNode):
         if not super().can_execute_custom_or_expert(command, check_dead):
             return False
 
+        is_include_exclude = cmd=='include' or cmd=='exclude'
+
         for c in self.children:
-            if not c.included: continue
+            if not c.included and not is_include_exclude: continue
 
             if check_dead and not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
                 self.return_code = ErrorCode.Failed
@@ -74,8 +76,11 @@ class SubsystemNode(StatefulNode):
         if not super().can_execute(command):
             return False
 
+        is_include_exclude = cmd=='include' or cmd=='exclude'
+
         for c in self.children:
-            if not c.included: continue
+            if not c.included and not is_include_exclude: continue
+
             if not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
                 self.return_code = ErrorCode.Failed
                 self.log.error(f'{c.name} is dead, cannot send {command} unless you disable it or --force')
@@ -130,6 +135,7 @@ class SubsystemNode(StatefulNode):
                     for m in cmd_data2['modules']:
                         if m.get("data"):
                             m['data'].update(data)
+
                     ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=cmd_data2, timeout=timeout)
         else:
             for c in self.children:
@@ -324,6 +330,7 @@ class SubsystemNode(StatefulNode):
 
         for n in appset:
             if not n.included:
+                self.log.debug(f'Node {n.name} is excluded! NOT sending {command} to it!')
                 appset.remove(n)
                 continue
 
@@ -345,7 +352,11 @@ class SubsystemNode(StatefulNode):
 
         for child_node in appset:
             data = self.cfgmgr.generate_data_for_module(event.kwargs.get('overwrite_data'))
+            if not child_node.included:
+                self.log.debug(f'Node {child_node.name} is excluded! NOT sending {command} to it!')
+                continue
             self.log.debug(f'Sending {command} to {child_node.name}')
+
 
             entry_state = child_node.state.upper()
 

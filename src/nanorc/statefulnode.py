@@ -41,8 +41,10 @@ class StatefulNode(NodeMixin):
             self.log.error(f"Cannot send '{command}' to '{self.name}' as it should at least be initialised")
             return False
 
+        is_include_exclude = cmd=='include' or cmd=='exclude'
+
         for c in self.children:
-            if not c.included: continue
+            if not c.included and not is_include_exclude: continue
 
             if not c.can_execute_custom_or_expert(command, check_dead):
                 self.return_code = ErrorCode.Failed
