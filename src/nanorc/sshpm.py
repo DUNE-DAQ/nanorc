@@ -146,6 +146,7 @@ class SSHProcessManager(object):
         cmd += ";"+"; ".join(script_data['cmd'])
         hosts = set(self.boot_info["hosts"].values())
         for host in hosts:
+            self.log.info(f'Executing {script_data["cmd"]} on {host}.')
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"] + [cmd]
             proc = sh.ssh(ssh_args)
             self.log.info(proc)
