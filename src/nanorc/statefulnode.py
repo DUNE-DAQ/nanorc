@@ -15,6 +15,12 @@ class ErrorCode(Enum):
     InvalidTransition=30
     Aborted=40
 
+class CanExecuteReturnVal(Enum):
+    CanExecute=0
+    InvalidTransition=1
+    NotInitialised=2
+    Dead=3
+
 class StatefulNode(NodeMixin):
     def __init__(self, name:str, console, log, fsm_conf, parent=None, children=None, order=None, verbose=False):
         self.console = console
@@ -39,19 +45,20 @@ class StatefulNode(NodeMixin):
         disallowed_state = ['booted', 'none']
         if self.state in disallowed_state:
             self.log.error(f"Cannot send '{command}' to '{self.name}' as it should at least be initialised")
-            return False
+            return CanExecuteReturnVal.NotInitialised
 
-        is_include_exclude = cmd=='include' or cmd=='exclude'
+        is_include_exclude = command=='include' or command=='exclude'
 
         for c in self.children:
             if not c.included and not is_include_exclude: continue
 
-            if not c.can_execute_custom_or_expert(command, check_dead):
+            ret = c.can_execute_custom_or_expert(command, check_dead)
+            if  ret!=CanExecuteReturnVal.CanExecute:
                 self.return_code = ErrorCode.Failed
-                return False
+                return ret
 
         self.return_code = ErrorCode.Success
-        return True
+        return CanExecuteReturnVal.CanExecute
 
 
     def can_execute(self, command, quiet=False):
@@ -63,17 +70,20 @@ class StatefulNode(NodeMixin):
                 if not quiet:
                     self.log.error(f"'{self.name}' cannot '{command}' as it is '{self.state}'")
                     self.return_code = ErrorCode.InvalidTransition
-                return False
+                return CanExecuteReturnVal.InvalidTransition
+
+        is_include_exclude = command=='include' or command=='exclude'
 
         for c in self.children:
-            if not c.included: continue
+            if not c.included and not is_include_exclude: continue
 
-            if not c.can_execute(command):
+            ret = c.can_execute(command)
+            if ret != CanExecuteReturnVal.CanExecute:
                 self.return_code = ErrorCode.Failed
-                return False
+                return ret
 
         self.return_code = ErrorCode.Success
-        return True
+        return CanExecuteReturnVal.CanExecute
 
 
     def exclude(self):
@@ -117,9 +127,12 @@ class StatefulNode(NodeMixin):
     def on_enter_terminate_ing(self, _) -> NoReturn:
         if self.children:
             for child in self.children:
-                # if child.included:
-                child.terminate()
+                if child.can_terminate() == CanExecuteReturnVal.CanExecute:
+                    child.terminate()
+                else:
+                    child.to_terminate_ing()
         self.end_terminate()
+        self.included = True
 
     def on_enter_abort_ing(self, _) -> NoReturn:
         if self.children:

@@ -1,6 +1,7 @@
 import nanorc.argval as argval
 from nanorc.nano_context import NanoContext
 import click
+from .statefulnode import CanExecuteReturnVal
 
 def check_rc(ctx, rc):
     if not ctx.parent: return
@@ -361,13 +362,13 @@ def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool, cmd_args:di
     for seq_cmd in sequence:
         cmd = seq_cmd['cmd']
         optional = seq_cmd['optional']
+        canexec = rc.can_execute(cmd, quiet=True)
 
-        if not rc.can_execute(cmd, quiet=True):
-            if optional:
-                continue
-            elif not force:
-                rc.log.error(f"Cannot execute '{cmd}' in the '{command}' sequence as the root node is '{rc.topnode.state}'!")
-                break
+        if canexec == CanExecuteReturnVal.InvalidTransition and optional:
+            continue
+        elif canexec == CanExecuteReturnVal.Dead and not force:
+            rc.log.error(f"Cannot execute '{cmd}' in the '{command}' because an app is dead")
+            break
 
         rc.console.rule(f'Executing \'{cmd}\'')
         seq_func = getattr(rc, cmd, None)

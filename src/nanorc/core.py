@@ -8,7 +8,7 @@ import copy as cp
 from rich.console import Console
 from rich.style import Style
 from rich.pretty import Pretty
-from .statefulnode import StatefulNode
+from .statefulnode import StatefulNode, CanExecuteReturnVal
 from .treebuilder import TreeBuilder
 from .cfgsvr import FileConfigSaver, DBConfigSaver
 from .credmgr import credentials
@@ -122,7 +122,8 @@ class NanoRC:
             self.log.info(f'Sending {command} to {node_path.name}')
             node_to_send = node_path
 
-        if not node_to_send.can_execute_custom_or_expert(command, check_dead):
+        canexec = node_to_send.can_execute_custom_or_expert(command, check_dead)
+        if canexec == CanExecuteReturnVal.CanExecute:
             self.return_code = node_to_send.return_code
             return
 
@@ -133,7 +134,9 @@ class NanoRC:
         if not timeout:
             timeout = self.timeout
 
-        if not node_path.can_execute_custom_or_expert("expert", check_dead=True):
+        canexec = node_path.can_execute_custom_or_expert("expert", check_dead=True)
+
+        if canexec != CanExecuteReturnVal.CanExecute:
             self.return_code = node_path.return_code
             return
 
@@ -172,9 +175,12 @@ class NanoRC:
         if not node_path:
             node_path=self.topnode
 
-        if not force and not node_path.can_execute(command):
-            self.return_code = node_path.return_code.value
-            return
+        if not force:
+            canexec = node_path.can_execute(command, quiet=True)
+            if canexec != CanExecuteReturnVal.CanExecute:
+                self.return_code = node_path.return_code.value
+                self.log.info(f"Cannot execute {command}, Reason: {canexec}")
+                return
 
         kwargs['timeout'] = kwargs['timeout'] if kwargs.get('timeout') else self.timeout
 
@@ -264,7 +270,7 @@ class NanoRC:
         """
 
 
-        if not self.topnode.can_execute("start"):
+        if self.topnode.can_execute("start") != CanExecuteReturnVal.CanExecute:
             self.return_code = self.topnode.return_code
             return
 
@@ -400,7 +406,7 @@ class NanoRC:
         Stop the triggers
         """
 
-        if not force and not self.topnode.can_execute("drain_dataflow"):
+        if not force and self.topnode.can_execute("drain_dataflow") != CanExecuteReturnVal.CanExecute:
             self.return_code = self.topnode.return_code
             return
 
@@ -449,7 +455,7 @@ class NanoRC:
 
     def exclude(self, node_path, timeout, resource_name) -> NoReturn:
 
-        if not node_path.can_execute_custom_or_expert("exclude", False):
+        if node_path.can_execute_custom_or_expert("exclude", False) != CanExecuteReturnVal.CanExecute:
             self.return_code = node_path.return_code
             return
 
@@ -468,7 +474,7 @@ class NanoRC:
 
     def include(self, node_path, timeout, resource_name) -> NoReturn:
 
-        if not node_path.can_execute_custom_or_expert("include", True):
+        if node_path.can_execute_custom_or_expert("include", True) != CanExecuteReturnVal.CanExecute:
             self.return_code = node_path.return_code
             return
 

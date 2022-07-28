@@ -15,7 +15,7 @@ from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoRespons
 from typing import Union, NoReturn
 from .fsm import FSM
 import os.path
-from .statefulnode import StatefulNode, ErrorCode
+from .statefulnode import StatefulNode, ErrorCode, CanExecuteReturnVal
 from rich.progress import *
 
 log = logging.getLogger("transitions")
@@ -41,6 +41,7 @@ class ApplicationNode(StatefulNode):
     def on_enter_terminate_ing(self, _):
         self.sup.terminate()
         self.end_terminate()
+        self.included = False
 
     def on_enter_abort_ing(self, _):
         self.sup.terminate()
@@ -56,10 +57,11 @@ class SubsystemNode(StatefulNode):
         self.listener = None
 
     def can_execute_custom_or_expert(self, command, check_dead=True):
-        if not super().can_execute_custom_or_expert(command, check_dead):
-            return False
+        ret = super().can_execute_custom_or_expert(command, check_dead)
+        if ret != CanExecuteReturnVal.CanExecute:
+            return ret
 
-        is_include_exclude = cmd=='include' or cmd=='exclude'
+        is_include_exclude = command=='include' or command=='exclude'
 
         for c in self.children:
             if not c.included and not is_include_exclude: continue
@@ -67,16 +69,17 @@ class SubsystemNode(StatefulNode):
             if check_dead and not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
                 self.return_code = ErrorCode.Failed
                 self.log.error(f'{c.name} is dead, cannot send {command}')
-                return False
+                return CanExecuteReturnVal.Dead
 
         self.return_code = ErrorCode.Success
-        return True
+        return CanExecuteReturnVal.CanExecute
 
-    def can_execute(self, command):
-        if not super().can_execute(command):
-            return False
+    def can_execute(self, command, quiet=True):
+        ret = super().can_execute(command, quiet=quiet)
+        if ret != CanExecuteReturnVal.CanExecute:
+            return ret
 
-        is_include_exclude = cmd=='include' or cmd=='exclude'
+        is_include_exclude = command=='include' or command=='exclude'
 
         for c in self.children:
             if not c.included and not is_include_exclude: continue
@@ -84,10 +87,10 @@ class SubsystemNode(StatefulNode):
             if not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
                 self.return_code = ErrorCode.Failed
                 self.log.error(f'{c.name} is dead, cannot send {command} unless you disable it or --force')
-                return False
+                return CanExecuteReturnVal.Dead
 
         self.return_code = ErrorCode.Success
-        return True
+        return CanExecuteReturnVal.CanExecute
 
     def send_custom_command(self, cmd, data, timeout, app=None) -> dict:
         ret = {}
@@ -290,12 +293,16 @@ class SubsystemNode(StatefulNode):
         self.log.debug(f"Terminating {self.name}")
         if self.children:
             for child in self.children:
-                child.terminate()
+                if child.can_terminate():
+                    child.terminate()
+                else:
+                    child.to_terminate_ing()
                 if child.parent.listener:
                     child.parent.listener.unregister(child.name)
                 child.parent = None
         self.terminate_logic()
         self.end_terminate()
+        self.included = True
 
     def on_enter_abort_ing(self, _) -> NoReturn:
         self.log.debug(f"Aborting {self.name}")
@@ -307,6 +314,7 @@ class SubsystemNode(StatefulNode):
                 child.parent = None # abandon your child
         self.terminate_logic()
         self.end_abort()
+        self.included = True
         self.log.debug(f"DONE Aborting {self.name}")
 
     def _on_enter_callback(self, event):
@@ -328,17 +336,18 @@ class SubsystemNode(StatefulNode):
             self.log.error('Response listener is not alive, trying to respawn it!!')
             self.listener.flask_manager = self.listener.create_manager()
 
-        for n in appset:
+        to_chuck = []
+        for i, n in enumerate(appset):
             if not n.included:
-                self.log.debug(f'Node {n.name} is excluded! NOT sending {command} to it!')
-                appset.remove(n)
+                self.log.info(f'Node {n.name} is excluded! NOT sending {command} to it!')
+                to_chuck.append(n.name)
                 continue
 
             if not n.sup.desc.proc.is_alive() or not n.sup.commander.ping():
                 text = f"'{n.name}' seems to be dead. So I cannot initiate transition '{command}'"
                 if force:
                     self.log.error(text+f"\nBut! '--force' was specified, so I'll ignore '{n.name}'!")
-                    appset.remove(n)
+                    to_chuck.append(n.name)
                     # if sequence and n.name in sequence: sequence.remove(n.name)
                 else:
                     self.log.error(text+"\nYou may be able to use '--force' if you want to 'stop' or 'scrap' the run.")
@@ -350,10 +359,15 @@ class SubsystemNode(StatefulNode):
                     self.trigger("to_"+origin, response=response)
                     return
 
+        for chuck in to_chuck:
+            for i, app in enumerate(appset):
+                if chuck == app.name:
+                    del appset[i]
+
         for child_node in appset:
             data = self.cfgmgr.generate_data_for_module(event.kwargs.get('overwrite_data'))
             if not child_node.included:
-                self.log.debug(f'Node {child_node.name} is excluded! NOT sending {command} to it!')
+                self.log.info(f'Node {child_node.name} is excluded! NOT sending {command} to it!')
                 continue
             self.log.debug(f'Sending {command} to {child_node.name}')
 
