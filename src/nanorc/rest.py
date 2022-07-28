@@ -114,7 +114,7 @@ def parse_argument(form, ctx):
         ### <hack>
         if param.name == 'timeout':
             value = argval.validate_timeout(None, None, value)
-        elif param.name == 'path':
+        elif param.name == 'node_path':
             value = argval.validate_node_path(rc_context, None, value)
         elif param.name == 'stop_wait':
             value = argval.validate_stop_wait(None, None, value)
