@@ -22,6 +22,14 @@ class CanExecuteReturnVal(IntEnum):
     Dead=3
     InError=4
 
+    def __str__(self):
+        if   self.value == CanExecuteReturnVal.CanExecute       : return "CanExecute"
+        elif self.value == CanExecuteReturnVal.InvalidTransition: return "InvalidTransition"
+        elif self.value == CanExecuteReturnVal.NotInitialised   : return "NotInitialised"
+        elif self.value == CanExecuteReturnVal.Dead             : return "Dead"
+        elif self.value == CanExecuteReturnVal.InError          : return "InError"
+
+
 class StatefulNode(NodeMixin):
     def __init__(self, name:str, console, log, fsm_conf, parent=None, children=None, order=None, verbose=False):
         self.console = console
@@ -63,7 +71,7 @@ class StatefulNode(NodeMixin):
                 check_inerror = check_inerror,
                 only_included = only_included,
             )
-            if  ret!=CanExecuteReturnVal.CanExecute:
+            if ret!=CanExecuteReturnVal.CanExecute:
                 self.return_code = ErrorCode.Failed
                 return ret
 
@@ -150,9 +158,10 @@ class StatefulNode(NodeMixin):
     def on_enter_terminate_ing(self, _) -> NoReturn:
         if self.children:
             for child in self.children:
-                if child.can_terminate() == CanExecuteReturnVal.CanExecute:
+                if child.can_execute('terminate', quiet=True) == CanExecuteReturnVal.CanExecute:
                     child.terminate()
                 else:
+                    self.log.info(f'Force terminating on {child.name}')
                     child.to_terminate_ing()
         self.resolve_error()
         self.end_terminate()
@@ -243,7 +252,6 @@ class StatefulNode(NodeMixin):
                     self.log.error(f'Failed to send \'{command}\' to \'{child.name}\', --force was specified so continuing anyway')
                     continue
                 status = ErrorCode.Failed
-                break
 
         response = {
             "status_code" : status,
