@@ -1,21 +1,21 @@
 from anytree import NodeMixin, RenderTree, PreOrderIter
 from typing import Union, NoReturn
 import logging
-from enum import Enum
+from enum import IntEnum
 import threading
 from queue import Queue
 from transitions.core import MachineError
 import time
 from .fsm import FSM
 
-class ErrorCode(Enum):
+class ErrorCode(IntEnum):
     Success=0
     Timeout=10
     Failed=20
     InvalidTransition=30
     Aborted=40
 
-class CanExecuteReturnVal(Enum):
+class CanExecuteReturnVal(IntEnum):
     CanExecute=0
     InvalidTransition=1
     NotInitialised=2
