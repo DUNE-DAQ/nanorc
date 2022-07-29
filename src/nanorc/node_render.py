@@ -27,7 +27,7 @@ def status_data(node, get_children=True) -> dict:
         ret['last_ok_command'] = sup.last_ok_command
     else:
         ret['name'] = node.name
-        ret['state'] = node.state
+        ret['state'] = ("error " if node.errored else "") + node.state
         if get_children:
             ret['children'] = [status_data(child) for child in node.children]
     return ret
