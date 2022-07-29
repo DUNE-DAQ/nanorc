@@ -361,7 +361,6 @@ class K8SProcessManager(object):
 
         ## Need to mount /dev and be privileged in this case...
         use_felix = ("felix.cern/flx" in app_boot_info['resources']) # HACK
-        use_felix_no_resource_lock = 'flxcard' in app_label # even more hack (use flx, but don't tell k8s about it)
 
         pod = client.V1Pod(
             # Run the pod with same user id and group id as the current user
@@ -390,7 +389,7 @@ class K8SProcessManager(object):
                         image = app_boot_info["image"],
                         image_pull_policy= "Always",
                         security_context = client.V1SecurityContext(
-                            privileged = use_felix or use_felix_no_resource_lock # HACK
+                            privileged = use_felix # HACK
                         ),
                         resources = (
                             client.V1ResourceRequirements(
@@ -451,7 +450,7 @@ class K8SProcessManager(object):
                                         name = "devfs",
                                         read_only = False)
                                 ]
-                                if use_felix or use_felix_no_resource_lock else []
+                                if use_felix else []
                             )
                         )
                     )
@@ -496,7 +495,7 @@ class K8SProcessManager(object):
                                 host_path = client.V1HostPathVolumeSource(
                                     path = '/dev'))
                         ]
-                        if use_felix or use_felix_no_resource_lock else []
+                        if use_felix else []
                     )
                 )
             )
