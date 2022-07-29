@@ -321,9 +321,10 @@ class SubsystemNode(StatefulNode):
         self.log.debug(f"Terminating {self.name}")
         if self.children:
             for child in self.children:
-                if child.can_terminate():
+                if child.can_execute('terminate', quiet=True) == CanExecuteReturnVal.CanExecute:
                     child.terminate()
                 else:
+                    self.log.info(f'Force terminating on {child.name}')
                     child.to_terminate_ing()
                 if child.parent.listener:
                     child.parent.listener.unregister(child.name)
@@ -421,6 +422,15 @@ class SubsystemNode(StatefulNode):
             done = []
             for child_node in appset:
                 if not child_node.included: continue
+
+                if not child_node.sup.desc.proc.is_alive() or not child_node.sup.commander.ping():
+                    failed.append(child_node.name)
+                    child_node.to_error(
+                        command = command,
+                    )
+                    done += [child_node]
+                    break
+
                 try:
                     r = child_node.sup.check_response()
                 except NoResponse:
