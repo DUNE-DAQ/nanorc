@@ -227,7 +227,7 @@ class command(Resource):
 
             resp_data = {
                 "command"    : form,
-                "return_code": rc_context.rc.return_code,
+                "return_code": int(rc_context.rc.return_code),
                 "logs"       : logs
             }
             resp = make_response(resp_data)
