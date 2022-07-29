@@ -122,8 +122,8 @@ class NanoRC:
             self.log.info(f'Sending {command} to {node_path.name}')
             node_to_send = node_path
 
-        canexec = node_to_send.can_execute_custom_or_expert(command, check_dead)
-        if canexec == CanExecuteReturnVal.CanExecute:
+        canexec = node_to_send.can_execute_custom_or_expert(command, quiet=False, check_dead=check_dead)
+        if canexec != CanExecuteReturnVal.CanExecute:
             self.return_code = node_to_send.return_code
             return
 
