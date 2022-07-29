@@ -364,8 +364,11 @@ def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool, cmd_args:di
         optional = seq_cmd['optional']
         canexec = rc.can_execute(cmd, quiet=True)
 
-        if canexec == CanExecuteReturnVal.InvalidTransition and optional:
-            continue
+        if canexec == CanExecuteReturnVal.InvalidTransition:
+            if optional:
+                continue
+            else:
+                break
         elif canexec == CanExecuteReturnVal.Dead and not force:
             rc.log.error(f"Cannot execute '{cmd}' in the '{command}' because an app is dead")
             break
