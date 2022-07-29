@@ -269,8 +269,9 @@ class NanoRC:
             message (str): some free text to describe the run
         """
 
-
-        if self.topnode.can_execute("start") != CanExecuteReturnVal.CanExecute:
+        canexec = self.topnode.can_execute("start")
+        if canexec != CanExecuteReturnVal.CanExecute:
+            self.log.error(f'Cannot execute start! Reason: {canexec}')
             self.return_code = self.topnode.return_code
             return
 
@@ -406,9 +407,12 @@ class NanoRC:
         Stop the triggers
         """
 
-        if not force and self.topnode.can_execute("drain_dataflow") != CanExecuteReturnVal.CanExecute:
-            self.return_code = self.topnode.return_code
-            return
+        if not force:
+            canexec = self.topnode.can_execute("drain_dataflow")
+            if canexec != CanExecuteReturnVal.CanExecute:
+                self.log.error(f'Cannot execute drain_dataflow! Reason: {canexec}')
+                self.return_code = self.topnode.return_code
+                return
 
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
@@ -455,7 +459,15 @@ class NanoRC:
 
     def exclude(self, node_path, timeout, resource_name) -> NoReturn:
 
-        if node_path.can_execute_custom_or_expert("exclude", False) != CanExecuteReturnVal.CanExecute:
+        canexec = node_path.can_execute_custom_or_expert(
+            command = "exclude",
+            quiet = False,
+            only_included = False,
+            check_dead = False,
+            check_inerror = False,
+        )
+        if canexec != CanExecuteReturnVal.CanExecute:
+            self.log.error(f'Cannot execute exclude! Reason: {canexec}')
             self.return_code = node_path.return_code
             return
 
@@ -467,14 +479,25 @@ class NanoRC:
             "exclude",
             data={'resource_name': resource_name if resource_name else node_path.name},
             timeout=timeout,
-            node_path=node_path,
+            node_path=None,
             check_dead=False
         )
+
+        self.topnode.resolve_error()
+
 
 
     def include(self, node_path, timeout, resource_name) -> NoReturn:
 
-        if node_path.can_execute_custom_or_expert("include", True) != CanExecuteReturnVal.CanExecute:
+        canexec = node_path.can_execute_custom_or_expert(
+            command = "include",
+            quiet = False,
+            only_included = False,
+            check_dead = False,
+            check_inerror = False,
+        )
+        if canexec != CanExecuteReturnVal.CanExecute:
+            self.log.error(f'Cannot execute include! Reason: {canexec}')
             self.return_code = node_path.return_code
             return
 
@@ -486,5 +509,7 @@ class NanoRC:
             "include",
             data={'resource_name': resource_name if resource_name else node_paht.name},
             timeout=timeout,
-            node_path=node_path
+            node_path=None
         )
+
+        self.topnode.resolve_error()

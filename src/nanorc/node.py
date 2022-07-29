@@ -38,6 +38,10 @@ class ApplicationNode(StatefulNode):
     def _on_exit_callback(self, event):
         pass
 
+    def resolve_error(self):
+        # Since app node doesn't have children, statefulnode's resolve_error always gives error free...
+        pass
+
     def on_enter_terminate_ing(self, _):
         self.sup.terminate()
         self.end_terminate()
@@ -56,15 +60,19 @@ class SubsystemNode(StatefulNode):
         self.pm = None
         self.listener = None
 
-    def can_execute_custom_or_expert(self, command, check_dead=True):
-        ret = super().can_execute_custom_or_expert(command, check_dead)
+    def can_execute_custom_or_expert(self, command, quiet=False, check_dead=True, check_inerror=True, only_included=True):
+        ret = super().can_execute_custom_or_expert(
+            command = command,
+            quiet = quiet,
+            check_dead = check_dead,
+            check_inerror = check_inerror,
+            only_included = only_included,
+        )
         if ret != CanExecuteReturnVal.CanExecute:
             return ret
 
-        is_include_exclude = command=='include' or command=='exclude'
-
         for c in self.children:
-            if not c.included and not is_include_exclude: continue
+            if not c.included and only_included: continue
 
             if check_dead and not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
                 self.return_code = ErrorCode.Failed
@@ -74,15 +82,20 @@ class SubsystemNode(StatefulNode):
         self.return_code = ErrorCode.Success
         return CanExecuteReturnVal.CanExecute
 
-    def can_execute(self, command, quiet=True):
-        ret = super().can_execute(command, quiet=quiet)
+    def can_execute(self, command, quiet=False, check_dead=True, check_inerror=True, only_included=True):
+        ret = super().can_execute(
+            command = command,
+            quiet = quiet,
+            check_dead = check_dead,
+            check_inerror = check_inerror,
+            only_included = only_included,
+        )
+
         if ret != CanExecuteReturnVal.CanExecute:
             return ret
 
-        is_include_exclude = command=='include' or command=='exclude'
-
         for c in self.children:
-            if not c.included and not is_include_exclude: continue
+            if not c.included and only_included: continue
 
             if not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
                 self.return_code = ErrorCode.Failed
@@ -202,21 +215,24 @@ class SubsystemNode(StatefulNode):
             )
 
         except Exception as e:
-            self.log.error(f'Couldn\'t boot {self.name}')
+            # self.log.error(f'Couldn\'t boot {self.name}')
             self.log.exception(e)
-            response['status_code'] = ErrorCode.Failed
-            response['error'] = str(e)
-            self.to_error(event=event, response=response)
+            self.to_error(
+                text=f'Couldn\'t boot {self.name}',
+                command='boot',
+                exception=e,
+            )
             return
 
         try:
             self.listener = ResponseListener(self.cfgmgr.boot["response_listener"]["port"])
         except Exception as e:
-            self.log.error(f'Couldn\'t create a response listener for {self.name}')
-            self.log.error(str(e))
-            response['error'] = str(e)
-            response['status_code'] = ErrorCode.Failed
-            self.to_error(event=event, response=response)
+            self.log.exception(str(e))
+            self.to_error(
+                text=f'Couldn\'t create a response listener for {self.name}',
+                command='boot',
+                exception=e,
+            )
             return
 
         children = []
@@ -250,7 +266,16 @@ class SubsystemNode(StatefulNode):
                     "command": "boot",
                     "error": "Not bootable",
                 })
-                child.to_error(event=event, command='boot')
+                etext=''
+                if not child.sup.desc.proc.is_alive():
+                    etext='Process isn\'t alive! '
+                if not child.sup.commander.ping():
+                    etext='Cannot ping the app!'
+                child.to_error(
+                    text=etext,
+                    command='boot'
+                )
+
             children.append(child)
 
         self.children = children
@@ -264,9 +289,12 @@ class SubsystemNode(StatefulNode):
         response["error"] =  failed
 
         if response['status_code'] != ErrorCode.Success:
-            self.to_error(event=event, response=response)
-        else:
-            self.end_boot(response=response)
+            etext = f"children node {[f['node'] for f in failed]} failed to boot"
+            self.to_error(
+                text=etext,
+                command='boot'
+            )
+        self.end_boot(response=response)
 
 
     def on_exit_conf_ing(self, event) -> NoReturn:
@@ -302,6 +330,7 @@ class SubsystemNode(StatefulNode):
                 child.parent = None
         self.terminate_logic()
         self.end_terminate()
+        self.errored = False
         self.included = True
 
     def on_enter_abort_ing(self, _) -> NoReturn:
@@ -315,6 +344,7 @@ class SubsystemNode(StatefulNode):
         self.terminate_logic()
         self.end_abort()
         self.included = True
+        self.errored = False
         self.log.debug(f"DONE Aborting {self.name}")
 
     def _on_enter_callback(self, event):
@@ -407,24 +437,31 @@ class SubsystemNode(StatefulNode):
                         "command": command,
                         "error": r,
                     }
-                    failed.append(response)
-                    child_node.to_error(event=event)
+                    failed.append(child_node.name)
+                    child_node.to_error(
+                        command=command,
+                        text=r['result']
+                    )
 
             for d in done:
                 appset.remove(d)
 
             time.sleep(0.1)
 
+        response= {}
         if failed:
             response = {
                 "node":self.name,
                 "status_code" : ErrorCode.Failed,
                 "state": self.state,
                 "command": command,
-                "failed": [r['node'] for r in failed],
+                "failed": [r for r in failed],
                 "error": failed,
             }
-            self.to_error(response=response, event=event)
+            self.to_error(
+                text=f"Children nodes{[r for r in failed]} failed to {command}",
+                command=command
+            )
         else:
             response = {
                 "node":self.name,
@@ -432,4 +469,6 @@ class SubsystemNode(StatefulNode):
                 "state": self.state,
                 "command": command,
             }
-            self.trigger("end_"+command, response=response)
+
+        self.resolve_error()
+        self.trigger("end_"+command, response=response)
