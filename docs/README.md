@@ -65,7 +65,12 @@ shonky rc> help
 
 Documented commands (type help <topic>):
 ========================================
-boot  conf   pause  resume  scrap  start  status  stop  terminate  wait
+boot              exclude         scrap        stop                
+change_rate       expert_command  shutdown     stop_run            
+conf              include         start        stop_trigger_sources
+disable_triggers  ls              start_run    terminate           
+drain_dataflow    message         start_shell  wait                
+enable_triggers   pin_threads     status
 
 Undocumented commands:
 ======================
