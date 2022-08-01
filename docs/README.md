@@ -386,7 +386,7 @@ It is worth mentioning that the `dbt-workarea-env` command will set up `spack`, 
 ```sh
 cd ../../../../runarea
 daqconf_multiru_gen --use-k8s --image np04docker.cern.ch/dunedaq-local/image-name --host-ru np04-srv-026 --ers-impl cern --opmon-impl cern daq
-upload_conf daq username-configuration # name it something better!
+upload-conf daq username-configuration # name it something better!
 ```
 This will create an entry in the configuration service containing all the configuration data. In this example, it will be called `username-configuration`, so you probably want to name it better.
 
