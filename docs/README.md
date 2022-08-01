@@ -449,11 +449,11 @@ $ kubectl logs dataflow0 -n partition-name --previous
 Go to http://np04-srv-009:3000/ and select your partition on the left.
 
 ### "Feature" list:
- - `daq_apps` live in pods (not deployments), with k8s pod restart policy of "Never".
+ - `daq_applications` live in pods (not deployments), with k8s pod restart policy of "Never".
  - mounts `cvmfs` in the pod (`dunedaq` and `dunedaq-development`).
  - ... Many more to discover...
  
-## How to build a `daq_app` image and distribute it
+## How to build a `daq_application` image and distribute it
 NOTE: You need to be on `np04-srv-{015,016,026}` for this to work, if you are not, setup the daqenv above from above in the usual way (the first 4 commented out instructions):
 ```sh
 # cd dunedaq-k8s/swdir
