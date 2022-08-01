@@ -77,7 +77,7 @@ Undocumented commands:
 exit  help  quit
 ```
 
-`boot` will start your applications. In the case of the example, a trigger application to supply triggers, a hardware signal interface (HSI) application, and a readout and dataflow application which receives the triggers.
+`boot` will start your applications. In the case of the example, a trigger application to supply triggers, a hardware signal interface (HSI) application, a readout application and a dataflow application which receives the triggers.
 ```
 shonky rc> boot
 
@@ -131,7 +131,7 @@ Nanorc commands can be autocompleted with TAB, for example, TAB will autocomplet
 You can also control nanorc in "batch mode", e.g.:
 ```
 run_number=999
-nanorc daq_fake partition-name boot conf start_run --disable-data-storage $run_number wait 2 shutdown
+nanorc fake_daq partition-name boot conf start_run --disable-data-storage $run_number wait 2 shutdown
 ```
 Notice the ability to control the time via transitions from the command line via the `wait` argument. 
 
@@ -139,7 +139,7 @@ Notice the ability to control the time via transitions from the command line via
 If you want to execute command and be dropped in a shell, you can use `start_shell`:
 ```
 run_number=999
-nanorc daq_fake partition-name boot conf start_run --disable-data-storage $run_number start_shell
+nanorc fake_daq partition-name boot conf start_run --disable-data-storage $run_number start_shell
 ```
 
 ### Viewing logs and output
