@@ -34,6 +34,7 @@ Next (if you want to), you can create a file called `top_level.json` which conta
   "minidaq": "fake_daq"
 }
 ```
+More lines can be added later, each corresponding to a different config. This allows several sets of apps to be run in the same nanorc instance.
 
 Now you're ready to run.
 
