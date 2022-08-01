@@ -41,7 +41,7 @@ Now you're ready to run.
 
 There are 3 nanorc commands:
  - `nanorc`: for normal development,
- - `nano04rc`: for production environement at NP04,
+ - `nano04rc`: for production environment at NP04,
  - `nanotimingrc`: to run the timing global partition.
 
 To see a list of options you can pass `nanorc` in order to control things such as the amount of information it prints and the timeouts for transitions, run `nanorc -h`. We'll skip those for now in the following demo:
@@ -50,7 +50,7 @@ nanorc top_level.json partition-name# or "nanorc fake_daq partition-name" if you
 
 ╭──────────────────────────────────────────────────────────────────────────╮
 │                              Shonky NanoRC                               │
-│  This is an admittedly shonky nanp RC to control DUNE-DAQ applications.  │
+│  This is an admittedly shonky nano RC to control DUNE-DAQ applications.  │
 │    Give it a command and it will do your biddings,                       │
 │    but trust it and it will betray you!                                  │
 │  Use it with care!                                                       │
@@ -96,7 +96,7 @@ shonky rc> boot
 You can then send the `start_run`command to get things going. `start_run` requires a run number as argument. It also optionally takes booleans to toggle data storage (`--disable-data-storage` and `--enable-data-storage`) and an integer to control trigger separation in ticks (`--trigger-interval-ticks <num ticks>`).
 
 
-The Final State Machine (FSM) is illustrated below. It shows all the transitions available for a normal DAQ application.
+The Finite State Machine (FSM) is illustrated below. It shows all the transitions available for a normal DAQ application.
 
 ![FSM](DUNE_FSM.drawio.png)
 
@@ -119,9 +119,9 @@ shonky rc> status
 └──────────┴───────────┴───────┴───────┴──────────┴────────────────┘
 ```
 
-When you've seen enough use `stop_run` or `shutdown` commands. In case you experience timeout problems booting applications or sending commands, consider changing the `hosts` values from `localhost` to the hostname of your machine. This has to do with SSH authentication.
+When you've seen enough use the `stop_run` or `shutdown` commands. In case you experience timeout problems booting applications or sending commands, consider changing the `hosts` values from `localhost` to the hostname of your machine. This has to do with SSH authentication.
 
-nanorc commands can be autocompleted with TAB, for example, TAB will autocomplete `ter` to `terminate`. Options like `--disable-data-storage` will be completed with TAB after typing `start_run --d`.
+Nanorc commands can be autocompleted with TAB, for example, TAB will autocomplete `ter` to `terminate`. Options like `--disable-data-storage` will be completed with TAB after typing `start_run --d`.
 
 You can also control nanorc in "batch mode", e.g.:
 ```
@@ -384,9 +384,9 @@ upload_conf daq username-configuration # name it something better!
 ```
 This will create an entry in the configuration service containing all the configuration data. In this example, it will be called `username-configuration`, so you probably want to name it better.
 
-In the example above, you should rename `np04docker.cern.ch/dunedaq-local/image-name` is the image you want to run on. To know which one you want to run on:
+In the example above, you should rename `np04docker.cern.ch/dunedaq-local/image-name` to whatever image you want to run on. To know which one you want to run on:
  - `dunedaq-v3.1.0` will use the release `v3.1.0`
- - `dunedaq-N22-07-15` will run on a the nightly `N22-07-15`
+ - `dunedaq-N22-07-15` will run on the nightly `N22-07-15`
  - `dunedaq-rc1-v3.1.0` will use the first release candidate for `v3.1.0`
 
 All the images should be listed, at some point to a place which will be linked here when up.
@@ -405,14 +405,14 @@ nanorc> [...]
 
 ### K8s dashboard, logs and monitoring
 #### K8s dashboard
-Hop on http://np04-srv-015:31001/ (after setting up web SOCKS proxy to `lxplus` if you are not physically at CERN) to check the status of the cluster. Note you will need to select the partition you fed at `boot`. You'll be able to see if the pods are running or not, and where.
+Hop on http://np04-srv-015:31001/ (after setting up a web SOCKS proxy to `lxplus` if you are not physically at CERN) to check the status of the cluster. Note you will need to select the partition you fed at `boot`. You'll be able to see if the pods are running or not, and where.
 
 #### Log on a node
 From `np04-srv-015` do:
 ```
 kubectl exec -n partition-name --stdin --tty dataflow0 -- /bin/bash
 ```
-to log on the pod which run the dataflow app. The app runs in `/dunedaq/run` (which is where the data file will be too in this particular example).
+to log on the pod which runs the dataflow app. The app runs in `/dunedaq/run` (which is where the data file will be too in this particular example).
 
 #### Logs
 To get the log, open a new terminal window on `np04-srv-015`, on which k8s is already installed, and do:
@@ -446,7 +446,7 @@ Go to http://np04-srv-009:3000/ and select your partition on the left.
  - labelling/affinity to assign pod: readout app is assigned to the node supplied by daqconf (unless that host is `localhost`); other apps have anti-affinity with readout app, which means they won't run on the same node.
 
 ### "Feature" list:
- - `daq_apps` live in pod (not deployment), with k8s pod restart policy of "Never".
+ - `daq_apps` live in pods (not deployments), with k8s pod restart policy of "Never".
  - mounts `cvmfs` in the pod (`dunedaq` and `dunedaq-development`).
  - ... Many more to discover...
  
