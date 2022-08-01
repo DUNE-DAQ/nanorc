@@ -487,9 +487,8 @@ You need to then push the image to the NP04 local images repo:
 ```
 
 And that's it!
-<details>
 
-  <summary>Note: if the instructions after <code>docker login</code> didn't work, you can always do it manually (instructions in the drop down).</summary>
+Note: if the instructions after <code>docker login</code> didn't work, you can always do it manually:
 
   ```sh
 docker save --output username-image-name-N22-06-27.tar username-image-name:N22-06-27
@@ -509,6 +508,3 @@ REPOSITORY                 TAG         IMAGE ID       CREATED        SIZE
 username-image-name        N22-06-27   3e53688480dc   9 hours ago    1.79GB
 ...
   ```
-
-</details>
-
