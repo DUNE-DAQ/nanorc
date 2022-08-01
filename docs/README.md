@@ -448,9 +448,6 @@ $ kubectl logs dataflow0 -n partition-name --previous
 #### Monitoring and Grafana
 Go to http://np04-srv-009:3000/ and select your partition on the left.
 
-### Caveat list by decreasing order of importance:
- - labelling/affinity to assign pod: readout app is assigned to the node supplied by daqconf (unless that host is `localhost`); other apps have anti-affinity with readout app, which means they won't run on the same node.
-
 ### "Feature" list:
  - `daq_apps` live in pods (not deployments), with k8s pod restart policy of "Never".
  - mounts `cvmfs` in the pod (`dunedaq` and `dunedaq-development`).
