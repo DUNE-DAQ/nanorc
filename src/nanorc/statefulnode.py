@@ -97,6 +97,10 @@ class StatefulNode(NodeMixin):
         for c in self.children:
             if not c.included and only_included: continue
 
+            # How do I get rid of this enormity?
+            if command=='terminate' and c.state=='none':
+                continue
+
             ret = c.can_execute(
                 command = command,
                 quiet = quiet,
