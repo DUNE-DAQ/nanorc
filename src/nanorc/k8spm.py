@@ -356,11 +356,19 @@ class K8SProcessManager(object):
         if app_boot_info['anti-affinity']:
             debug_str+=f' anti-affinity={app_boot_info["anti-affinity"]}'
         debug_str+=')'
+
+        use_felix = False
+        for k in app_boot_info['resources']:
+            if "felix.cern/flx" in k: # HACK
+                use_felix = True
+                break
+        if use_felix:
+            info_str += ", which uses [bold]FELIX[/bold]"
+
         self.log.info(info_str)
         self.log.debug(debug_str)
 
         ## Need to mount /dev and be privileged in this case...
-        use_felix = ("felix.cern/flx" in app_boot_info['resources']) # HACK
 
         pod = client.V1Pod(
             # Run the pod with same user id and group id as the current user
