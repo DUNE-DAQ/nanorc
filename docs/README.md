@@ -147,21 +147,17 @@ nanorc fake_daq partition-name boot conf start_run --disable-data-storage $run_n
 
 Logs are kept in the working directory at the time you started nanorc, named `log_<application name>_<port>.txt`.
 
-You can peek at the output hdf5 file using:
+You can look at the header and the value of attributes in the hdf5 file using:
 
 ```bash
-h5dump -H swtest_run000666_0000_tapper_20210513T133527.hdf5
+h5dump-shared -H -A swtest_run000103_0000_*.hdf5
 ```
 (your file will be named something else, of course).
 
-For TriggerRecordHeaders:
+To get the TriggerRecordHeaders and FragmentHeaders:
 
 ```bash
-python3 $DFMODULES_FQ_DIR/dfmodules/bin/hdf5dump/hdf5_dump.py -p trigger -f swtest_run000666_0000_tapper_20210513T133527.hdf5
-```
-For FragmentHeaders:
-```bash
-python3 $DFMODULES_FQ_DIR/dfmodules/bin/hdf5dump/hdf5_dump.py -p fragment swtest_run000666_0000_tapper_20210513T133527.hdf5
+hdf5_dump.py -p both -f swtest_run000103_0000_*.hdf5
 ```
 
 ## More on boot
