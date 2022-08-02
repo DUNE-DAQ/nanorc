@@ -284,7 +284,7 @@ All of this is available on the NP04 cluster.
 
 ### Overview
 
-The Kubernetes prototype process manager in nanorc knows about three types of DUNE DAQ applications: readout applications, dataflow applications and other applications. Applications are booted in the order above, with anti-affinity between readout applications and all other applications (they cannot be started on the same host).
+The Kubernetes prototype process manager in nanorc knows about 2 types of DUNE DAQ applications: applications that require access to FELIX card, and other applications. Applications are booted in the order provided by `boot.json`. There is no affinity set, if the user wants to run an application on different node, he/she will have to specify during the configuration.
 
 Applications are run in `pods` with a restart policy of never, so failing applications are not restarted.
 
