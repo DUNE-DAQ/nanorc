@@ -465,23 +465,24 @@ You need to then push the image to the NP04 local images repo:
 
 And that's it!
 
-Note: if the instructions after <code>docker login</code> didn't work, you can always do it manually:
+### Distributing "manually" the `daq_application` image
+If the instructions after `docker login` didn't work, you can always do it manually:
 
-  ```sh
+```sh
 docker save --output username-image-name-N22-06-27.tar username-image-name:N22-06-27
-  ```
+```
 
-  That command will create a tar file with the image. Next, you need to `ssh` on `np04-srv-016` and `np04-srv-026` (and `np04-srv-015` if you are not already on it) and `cd` where the tar file is and do:
+That command will create a tar file with the image. Next, you need to `ssh` on each of the node of the cluster, `cd` where the tar file is and do:
 
-  ```sh
+```sh
 docker load --input username-image-name-N22-06-27.tar
-  ```
+```
 
-  and check that docker images is correct (you can check size, and, I've just realised, the `IMAGE ID`):
+and check that docker images is correct (you can check that the size and the `IMAGE ID` are the same as the one on host you generated the image):
 
-  ```sh
+```sh
 docker images
 REPOSITORY                 TAG         IMAGE ID       CREATED        SIZE
 username-image-name        N22-06-27   3e53688480dc   9 hours ago    1.79GB
 ...
-  ```
+```
