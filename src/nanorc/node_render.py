@@ -13,10 +13,13 @@ def status_data(node, get_children=True) -> dict:
         if sup.desc.proc.is_alive():
             ret['process_state'] = 'alive'
         else:
-            try:
-                exit_code = sup.desc.proc.exit_code
-            except sh.ErrorReturnCode as e:
-                exit_code = e.exit_code
+            if isinstance(sup.desc.proc, K8sProcess): # hacky way to check the pm
+                exit_code = sup.desc.proc.status()
+            else:
+                try:
+                    exit_code = sup.desc.proc.exit_code
+                except sh.ErrorReturnCode as e:
+                    exit_code = e.exit_code
             ret['process_state'] = f'dead[{exit_code}]'
         ret['ping'] = sup.commander.ping()
         ret['last_cmd_failed'] = (sup.last_sent_command != sup.last_ok_command)
