@@ -1,0 +1,11 @@
+{
+    "apps": {
+        "dataflow0": "data/dataflow0_conf",
+        "dfo": "data/dfo_conf",
+        "dqm0-df": "data/dqm0-df_conf",
+        "dqm0-ru": "data/dqm0-ru_conf",
+        "hsi": "data/hsi_conf",
+        "ruemu0": "data/ruemu0_conf",
+        "trigger": "data/trigger_conf"
+    }
+}

@@ -1,0 +1,62 @@
+{
+    "connections": [
+        {
+            "data_type": "",
+            "service_type": "kNetReceiver",
+            "topics": [],
+            "uid": "td_to_dfo",
+            "uri": "tcp://0.0.0.0:12348"
+        },
+        {
+            "data_type": "",
+            "service_type": "kNetSender",
+            "topics": [],
+            "uid": "df_busy_signal",
+            "uri": "tcp://trigger:12349"
+        },
+        {
+            "data_type": "",
+            "service_type": "kNetReceiver",
+            "topics": [],
+            "uid": "triginh",
+            "uri": "tcp://0.0.0.0:12353"
+        },
+        {
+            "data_type": "",
+            "service_type": "kNetSender",
+            "topics": [],
+            "uid": "trigger_decision_0",
+            "uri": "tcp://dataflow0:12354"
+        }
+    ],
+    "modules": [
+        {
+            "data": {
+                "conn_refs": [
+                    {
+                        "dir": "kInput",
+                        "name": "td_connection",
+                        "uid": "td_to_dfo"
+                    },
+                    {
+                        "dir": "kInput",
+                        "name": "token_connection",
+                        "uid": "triginh"
+                    },
+                    {
+                        "dir": "kOutput",
+                        "name": "busy_connection",
+                        "uid": "df_busy_signal"
+                    },
+                    {
+                        "dir": "kOutput",
+                        "name": "trigger_0_connection",
+                        "uid": "trigger_decision_0"
+                    }
+                ]
+            },
+            "inst": "dfo",
+            "plugin": "DataFlowOrchestrator"
+        }
+    ]
+}
