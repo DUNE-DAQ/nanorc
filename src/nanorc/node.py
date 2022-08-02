@@ -143,9 +143,8 @@ class SubsystemNode(StatefulNode):
                         if not is_include_exclude and not c.included: continue
 
                     if not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
-                        if not is_include_exclude:
-                            self.log.error(f'{c.name} is dead, cannot send {cmd} to the app')
-                        return False
+                        self.log.error(f'{c.name} is dead, cannot send {cmd} to the app')
+                        continue
 
                     cmd_data2 = cp.deepcopy(cmd_data)
                     for m in cmd_data2['modules']:
@@ -161,9 +160,8 @@ class SubsystemNode(StatefulNode):
                     if not is_include_exclude and not c.included: continue
 
                 if not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
-                    if not is_include_exclude:
-                        self.log.error(f'{c.name} is dead, cannot send {cmd} to the app')
-                    return False
+                    self.log.error(f'{c.name} is dead, cannot send {cmd} to the app')
+                    continue
                 cmd_data = {
                     "modules": [{
                         "data": data,
@@ -215,7 +213,6 @@ class SubsystemNode(StatefulNode):
             )
 
         except Exception as e:
-            # self.log.error(f'Couldn\'t boot {self.name}')
             self.log.exception(e)
             self.to_error(
                 text=f'Couldn\'t boot {self.name}',

@@ -152,9 +152,12 @@ class StatefulNode(NodeMixin):
 
     def send_custom_command(self, cmd, data, timeout) -> dict:
         ret = {}
+        is_include_exclude = cmd=='include' or cmd=='exclude'
+
         for c in self.children:
-            if c.included:
-                ret[c.name] = c.send_custom_command(cmd, data, timeout)
+            if not is_include_exclude and not c.included: continue
+            self.console.log(f"Sending {cmd} to {c.name}")
+            ret[c.name] = c.send_custom_command(cmd, data, timeout)
         self.resolve_error()
         return ret
 
