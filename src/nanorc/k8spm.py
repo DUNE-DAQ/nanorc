@@ -363,7 +363,7 @@ class K8SProcessManager(object):
                 use_felix = True
                 break
         if use_felix:
-            info_str += ", which uses [bold]FELIX[/bold]"
+            info_str += ", which uses FELIX"
 
         self.log.info(info_str)
         self.log.debug(debug_str)
