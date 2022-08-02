@@ -358,25 +358,7 @@ cp -i /nfs/home/np04daq/np04-kubernetes/config $HOME/.kube/config
 ```
 
 #### Setup the nightly/release
-Following this information at this [link](https://github.com/DUNE-DAQ/daqconf/wiki/Instructions-for-setting-up-a-development-software-area) for nightly, or this [link](https://github.com/DUNE-DAQ/daqconf/wiki/Instructions-for-setting-up-a-v3.1.0-software-area) for v3.1.0 software area.
-These look like:
-```sh
-mkdir -p dunedaq-k8s/runarea
-cd dunedaq-k8s
-source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
-setup_dbt latest
-dbt-create -c -n N22-06-27 swdir # or a later nightly, or whatever the link abov
-source ~np04daq/bin/web_proxy.sh -p
-cd swdir/sourcecode
-# git clone https://github.com/DUNE-DAQ/daqconf.git
-# ...
-# git clone the other repos listed on step 2 of the https://github.com/DUNE-DAQ/daqconf/wiki/Instructions-for-setting-up-a-development-software-area>daqconf instructions
-cd ../
-dbt-workarea-env
-dbt-build
-```
-
-It is worth mentioning that the `dbt-workarea-env` command will set up `spack`, which is the DAQ build system. This makes some alterations to a low-level library in `LD_LIBRARY_PATH`, which can cause some utilities like `ssh`, `nano` and `htop` to not work (you would get a segfault when running them). To fix this, run `LD_LIBRARY_PATH=/lib64 [PROGRAM_NAME]`: this will manually reset the path to what it was before spack was set up. However, this should not be required in order to run any of the commands on this page.
+Using the instructions at either this [link](https://github.com/DUNE-DAQ/daqconf/wiki/Instructions-for-setting-up-a-development-software-area) for a nightly, or this [link](https://github.com/DUNE-DAQ/daqconf/wiki/Instructions-for-setting-up-a-v3.1.0-software-area) for a v3.1.0 software area, set up the work area. It is worth mentioning that the `dbt-workarea-env` command will set up `spack`, which is the DAQ build system. This makes some alterations to a low-level library in `LD_LIBRARY_PATH`, which can cause some utilities like `ssh`, `nano` and `htop` to not work (you would get a segfault when running them). To fix this, run `LD_LIBRARY_PATH=/lib64 [PROGRAM_NAME]`: this will manually reset the path to what it was before spack was set up. However, this should not be required in order to run any of the commands on this page.
 
 #### Generate a configuration and upload it on the configuration service
 ```sh
