@@ -296,14 +296,14 @@ The following `nanorc` microservices are supported and can be used inside the k8
 
 #### Debugging
 
-In addition to the usual `ERS` and `Opmon` output to access the pod of a corresponding application from the control plane host
+In addition to the usual `ERS` and `Opmon` output, to access the pods corresponding to applications you can use
 ```
 $ kubectl get pods -n partition-name
 NAME        READY   STATUS    RESTARTS   AGE
 dataflow0   1/1     Running   0          66s
 ...
 ```
-where `partition-name` is the name given when starting the test.
+where `partition-name` is the name given when starting the test. This should be run from the node that hosts the control plane. (The control plane is a collection of top level components that manage the whole kubernetes cluster, including the API server and a data store that keeps track of current/desired state.)
 
 To log into the pod which runs the application e.g. dataflow0
 
