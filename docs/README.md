@@ -314,37 +314,37 @@ The following nanorc microservices are supported and can be used inside the k8s 
 
 * It is currently not possible to address more than one Felix card on the same host (not a problem at NP04)
 
-### Testing
+### NP04 cluster
 
-Documentation on the k8s test cluster at NP04 is here: https://twiki.cern.ch/twiki/bin/view/CENF/NP04k8s
+Up to date documentation on the k8s test cluster at NP04 is [here](https://twiki.cern.ch/twiki/bin/view/CENF/NP04k8s), and the node assignment is [here](https://twiki.cern.ch/twiki/bin/view/CENF/ComputerAssignments)
 
-Current config:
+Current config (on the 2nd Aug 2022):
 
-| Node | Purpose/notes  |
+| node | Purpose/notes  |
 --- | --- |
-|np04-srv-015|Control plane| 
-|np04-srv-026|Felix card host| 
-|np04-srv-029|Felix card host|
-|np04-srv-016||
-|np04-srv-025||
-|np04-srv-004|Storage|
-|many more to come...|
+| np04-srv-001 | Storage          |
+| np04-srv-002 | Storage          |
+| np04-srv-003 | Storage          |
+| np04-srv-004 | Storage          |
+| np04-srv-010 | Generic DAQ host |
+| np04-srv-011 | Generic DAQ host |
+| np04-srv-012 | Generic DAQ host |
+| np04-srv-013 | Generic DAQ host |
+| np04-srv-015 | Control plane    |
+| np04-srv-016 | Generic DAQ host |
+| np04-srv-025 | Generic DAQ host |
+| np04-srv-026 | Felix card host  |
+| np04-srv-028 | Felix card host  |
+| np04-srv-029 | Felix card host  |
+| np04-srv-030 | Felix card host  |
 
-
-#### Tested configurations
-
-* Config: readout=srv-026, trigger, DFO, dataflow, hsi, dqm=localhost (tested on srv-015) 
-
-`daqconf_multiru_gen --image  np04docker.cern.ch/dunedaq-local/pocket-daq-area-cvmfs:N22-05-25-cs8 --host-ru np04-srv-026 --ers-impl cern --opmon-impl cern daq`
-
-## Walkthrough to run your app on k8s:
+## Walkthrough to run your app on k8s at NP04:
 
 ### Getting started
-Log on to the np04 cluster and run:
-```
-mkdir -p $HOME/.kube
-cp -i /nfs/home/np04daq/np04-kubernetes/config $HOME/.kube/config
-```
+Log on to the np04 cluster and follow the instructions in [here](https://twiki.cern.ch/twiki/bin/view/CENF/NP04k8s).
+2 important notes:
+ - You **do not** need to be on `np04-srv-015` to use nanorc and K8s. But you will need to have the correct `KUBECONFIG** properly set as described in the previous link.
+ - You **do not** need to create your namespace. That is handled automatically by nanorc.
 
 #### Setup the nightly/release
 Using the instructions at either this [link](https://github.com/DUNE-DAQ/daqconf/wiki/Instructions-for-setting-up-a-development-software-area) for a nightly, or this [link](https://github.com/DUNE-DAQ/daqconf/wiki/Instructions-for-setting-up-a-v3.1.0-software-area) for a v3.1.0 software area, set up the work area. It is worth mentioning that the `dbt-workarea-env` command will set up `spack`, which is the DAQ build system. This makes some alterations to a low-level library in `LD_LIBRARY_PATH`, which can cause some utilities like `ssh`, `nano` and `htop` to not work (you would get a segfault when running them). To fix this, run `LD_LIBRARY_PATH=/lib64 [PROGRAM_NAME]`: this will manually reset the path to what it was before spack was set up. However, this should not be required in order to run any of the commands on this page.
