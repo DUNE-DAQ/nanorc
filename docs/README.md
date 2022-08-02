@@ -357,6 +357,8 @@ upload-conf daq username-configuration # name it something better!
 ```
 This will create an entry in the configuration service containing all the configuration data. In this example, it will be called `username-configuration`, so you probably want to name it better.
 
+Note that the `upload-conf` utility will fails if you have proxy.
+
 In the example above, you should rename `np04docker.cern.ch/dunedaq-local/image-name` to whatever image you want to run on. To know which one you want to run on:
  - `dunedaq-v3.1.0` will use the release `v3.1.0`
  - `dunedaq-N22-07-15` will run on the nightly `N22-07-15`
