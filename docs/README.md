@@ -294,31 +294,6 @@ The following nanorc microservices are supported and can be used inside the k8s 
 |Configuration|Interface to MongoDB service to provide configuration|
 |Felix Plugin|Registers detected Felix cards with k8s as a custom resource|
 
-#### Debugging
-
-In addition to the usual `ERS` and `Opmon` output, to access the pods corresponding to applications you can use
-```
-$ kubectl get pods -n partition-name
-NAME        READY   STATUS    RESTARTS   AGE
-dataflow0   1/1     Running   0          66s
-...
-```
-where `partition-name` is the name given when starting the test. This should be run from the node that hosts the control plane. (The control plane is a collection of top level components that manage the whole kubernetes cluster, including the API server and a data store that keeps track of current/desired state.)
-
-To log into the pod which runs the application e.g. dataflow0
-
-```
-kubectl exec -n partition-name --stdin --tty dataflow0 -- /bin/bash
-```
-
-To get the log, open a new terminal
-
-```sh
-$ kubectl logs dataflow0 -n partition-name
-```
-
-If the application crashed you can still get the log by adding `--previous` to the end of the command.
-
 ### Known missing functionality
 
 * The output files are written on folders that are directly mounted in the host.
@@ -391,8 +366,17 @@ nanorc> [...]
 #### K8s dashboard
 Hop on http://np04-srv-015:31001/ (after setting up a web SOCKS proxy to `lxplus` if you are not physically at CERN) to check the status of the cluster. Note you will need to select the partition you fed at `boot`. You'll be able to see if the pods are running or not, and where.
 
-#### Log on a node
-From `np04-srv-015` do:
+#### Log on a pod
+First, do 
+```
+$ kubectl get pods -n partition-name
+NAME        READY   STATUS    RESTARTS   AGE
+dataflow0   1/1     Running   0          66s
+...
+```
+to get a list of pods corresponding to DAQ applications. This should be run from the node that hosts the control plane, which is `np04-srv-015`. (The control plane is a collection of top level components that manage the whole kubernetes cluster, including the API server and a data store that keeps track of current/desired state.)
+
+Now do:
 ```
 kubectl exec -n partition-name --stdin --tty dataflow0 -- /bin/bash
 ```
