@@ -270,21 +270,21 @@ All of this is available on the NP04 cluster.
  
 ### Overview
 
-The Kubernetes prototype process manager in `nanorc` knows about three types of DUNE DAQ applications: readout applications, dataflow applications and other applications. Applications are booted in the order above, with anti-affinity between readout applications and all other applications (they cannot be started on the same host).
+The Kubernetes prototype process manager in nanorc knows about three types of DUNE DAQ applications: readout applications, dataflow applications and other applications. Applications are booted in the order above, with anti-affinity between readout applications and all other applications (they cannot be started on the same host).
 
 Applications are run in `pods` with a restart policy of never, so failing applications are not restarted.
 
-`nanorc` makes use of a set of `microservices` either outside the k8s cluster or inside, in addition to the other services running on the NP04 cluster.
+Nanorc makes use of a set of `microservices` either outside the k8s cluster or inside, in addition to the other services running on the NP04 cluster.
 
 #### Partitions and resource management
 
-Partitions are supported to the same level that they are in the ssh process manager version of `nanorc`, that is two or more instances of `nanorc` may be run concurrently.
+Partitions are supported to the same level that they are in the ssh process manager version of nanorc, that is two or more instances of nanorc may be run concurrently.
 
 The `k8s` version implements a first version of resource management: Felix cards and data storage (?) cannot be claimed by more than one partition. Readout apps start on the hosts specified in the configuration, all other apps have anti-affinity with readout apps, so start on other hosts.
 
 #### Microservices
 
-The following `nanorc` microservices are supported and can be used inside the k8s cluster or outside.
+The following nanorc microservices are supported and can be used inside the k8s cluster or outside.
 
 |Service | Notes |
 --- | --- |
@@ -423,7 +423,7 @@ To get the log, open a new terminal window on `np04-srv-015`, on which k8s is al
 $ kubectl get pods -n partition-name
 ```
 
-Note: `partition-name` is given as a parameter to the nanorc command.
+Note: `partition-name` is given as a parameter to the `nanorc` command.
 ```sh
 $ kubectl get pods -n partition-name
 NAME        READY   STATUS    RESTARTS   AGE
