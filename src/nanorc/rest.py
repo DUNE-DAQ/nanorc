@@ -157,8 +157,8 @@ class command(Resource):
             state_allowed_transitions += list(rc_context.rc.custom_cmd.keys()) + ["include", "exclude"]
         if state == 'running':
             state_allowed_transitions += ["change_rate"]
-        if state in ['configured', 'running']:
-            state_allowed_transitions += ["pin-threads"]
+        if state in ['configured', 'running', 'ready']:
+            state_allowed_transitions += ["pin_threads"]
 
         if 'shell'          in state_allowed_transitions: state_allowed_transitions.remove('shell'         )
         if 'wait'           in state_allowed_transitions: state_allowed_transitions.remove('wait'          )
