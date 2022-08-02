@@ -162,63 +162,69 @@ hdf5_dump.py -p both -f swtest_run000103_0000_*.hdf5
 
 ## More on boot
 
-It can be instructive to take a closer look at how we can tell nanorc to `boot` the DAQ's applications. Let's take a look at a relatively simple example file in the nanorc repo, `examples/mdapp_fake/boot.json`:
+It can be instructive to take a closer look at how we can tell nanorc to `boot` the DAQ's applications. Let's take a look at a relatively simple example file in the nanorc repo, `examples/ruemu_conf/boot.json`:
 ```
 {
     "apps": {
-        "ruemu_df": {
-            "exec": "daq_application",
-            "host": "host_rudf",
-            "port": 3334
+        "dataflow0": {
+            "exec": "daq_application_ssh",
+            "host": "dataflow0",
+            "port": 3338
         },
-        "trgemu": {
-            "exec": "daq_application",
-            "host": "host_trg",
-            "port": 3333
+        "dfo": {
+            "exec": "daq_application_ssh",
+            "host": "dfo",
+            "port": 3335
+        },
+        [...]
+    },
+    "env": {
+        "DUNEDAQ_ERS_DEBUG_LEVEL": "getenv_ifset",
+        "DUNEDAQ_ERS_ERROR": "erstrace,throttle,lstdout",
+        "DUNEDAQ_ERS_FATAL": "erstrace,lstdout",
+        "DUNEDAQ_ERS_INFO": "erstrace,throttle,lstdout",
+        "DUNEDAQ_ERS_VERBOSITY_LEVEL": "getenv:1",
+        "DUNEDAQ_ERS_WARNING": "erstrace,throttle,lstdout"
+    },
+    "exec": {
+        "daq_application_ssh": {
+            "args": [
+                "--name",
+                "{APP_NAME}",
+                "-c",
+                "{CMD_FAC}",
+                "-i",
+                "{INFO_SVC}",
+                "--configurationService",
+                "{CONF_LOC}"
+            ],
+            "cmd": "daq_application",
+            "comment": "Application profile using PATH variables (lower start time)",
+            "env": {
+                "CET_PLUGIN_PATH": "getenv",
+                "CMD_FAC": "rest://localhost:{APP_PORT}",
+                "DETCHANNELMAPS_SHARE": "getenv",
+                "DUNEDAQ_SHARE_PATH": "getenv",
+                "INFO_SVC": "file://info_{APP_NAME}_{APP_PORT}.json",
+                "LD_LIBRARY_PATH": "getenv",
+                "PATH": "getenv",
+                "TIMING_SHARE": "getenv",
+                "TRACE_FILE": "getenv:/tmp/trace_buffer_{APP_HOST}_{DUNEDAQ_PARTITION}"
+            }
         }
+    },
+    "external_connections": [],
+    "hosts": {
+        "dataflow0": "localhost",
+        "dfo": "localhost",
+        "dqm0-df": "localhost",
+        "dqm0-ru": "localhost",
+        "hsi": "localhost",
+        "ruemu0": "localhost",
+        "trigger": "localhost"
     },
     "response_listener": {
         "port": 56789
-    },
-    "env": {
-        "DUNEDAQ_ERS_VERBOSITY_LEVEL": 1
-    },
-    "hosts": {
-        "host_rudf": "localhost",
-        "host_trg": "localhost"
-    },
-    "exec": {
-        "daq_application_ups" : {
-            "comment": "Application profile using dbt-setup to setup environment",
-            "env": {
-               "DBT_AREA_ROOT": "getenv"
-            },
-            "cmd": [
-                "CMD_FAC=rest://localhost:${APP_PORT}",
-                "INFO_SVC=file://info_${APP_ID}_${APP_PORT}.json",
-                "cd ${DBT_AREA_ROOT}",
-                "source dbt-setup-env.sh",
-                "dbt-setup-runtime-environment",
-                "cd ${APP_WD}",
-                "daq_application --name ${APP_ID} -c ${CMD_FAC} -i ${INFO_SVC}"
-            ]
-        },
-        "daq_application" : {
-            "comment": "Application profile using basic PATH variables (more efficient)",
-            "env":{
-                "CET_PLUGIN_PATH": "getenv",
-                "DUNEDAQ_SHARE_PATH": "getenv",
-                "LD_LIBRARY_PATH": "getenv",
-                "PATH": "getenv",
-                "TRACE_FILE": "getenv:/tmp/trace_buffer_${HOSTNAME}_${USER}"
-            },
-            "cmd": [
-                "CMD_FAC=rest://localhost:${APP_PORT}",
-                "INFO_SVC=file://info_${APP_NAME}_${APP_PORT}.json",
-                "cd ${APP_WD}",
-                "daq_application --name ${APP_NAME} -c ${CMD_FAC} -i ${INFO_SVC}"
-            ]
-        }
     }
 }
 ```
@@ -228,12 +234,19 @@ It can be instructive to take a closer look at how we can tell nanorc to `boot` 
 * `env` contains a list of environment variables which can control the applications
 * `hosts` is the cheatsheet whereby `apps` maps the labels of hosts to their actual names
 * `exec` defines the exact procedure by which an application will be launched
+* `external_connections` is a list of external connections
+* `response_listener` shows on which port of localhost nanorc should expect the responses from the applications when commands are sent.
 
 It should be pointed out that some substitutions are made when nanorc uses a file such as this to boot the processes. Specifically:
 
 * `"getenv"` is replaced with the actual value of the environment variable, throwing a Python exception if it is unset
 * `"getenv:<default value>"` is replaced with the actual value of the environment variable if it is set, with `<default value>` used if it is unset
+* `"getenv_ifset"` is replaced with the actual value of the environment variable if it is set, otherwise doesn't set this variable
 * If a host is provided as `localhost` or `127.0.0.1`, the result of the Python call `socket.gethostname` is used in its place
+* `{APP_NAME}` is replaced by the app key name by nanorc
+* `{CMD_FAC}` and `{INFO_SVC}` are replaced by their corresponding environment value
+* `{CONF_LOC}` is replaced by a path to a local directory containing the configuration data that the application must be able to see.
+
 
 ## How to run WebUI
 
