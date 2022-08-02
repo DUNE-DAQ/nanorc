@@ -114,7 +114,7 @@ def parse_argument(form, ctx):
         ### <hack>
         if param.name == 'timeout':
             value = argval.validate_timeout(None, None, value)
-        elif param.name == 'path':
+        elif param.name == 'node_path':
             value = argval.validate_node_path(rc_context, None, value)
         elif param.name == 'stop_wait':
             value = argval.validate_stop_wait(None, None, value)
@@ -157,8 +157,8 @@ class command(Resource):
             state_allowed_transitions += list(rc_context.rc.custom_cmd.keys()) + ["include", "exclude"]
         if state == 'running':
             state_allowed_transitions += ["change_rate"]
-        if state in ['configured', 'running']:
-            state_allowed_transitions += ["pin-threads"]
+        if state in ['configured', 'running', 'ready']:
+            state_allowed_transitions += ["pin_threads"]
 
         if 'shell'          in state_allowed_transitions: state_allowed_transitions.remove('shell'         )
         if 'wait'           in state_allowed_transitions: state_allowed_transitions.remove('wait'          )
@@ -227,7 +227,7 @@ class command(Resource):
 
             resp_data = {
                 "command"    : form,
-                "return_code": rc_context.rc.return_code,
+                "return_code": int(rc_context.rc.return_code),
                 "logs"       : logs
             }
             resp = make_response(resp_data)

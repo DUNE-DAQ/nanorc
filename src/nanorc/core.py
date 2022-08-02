@@ -8,7 +8,7 @@ import copy as cp
 from rich.console import Console
 from rich.style import Style
 from rich.pretty import Pretty
-from .statefulnode import StatefulNode
+from .statefulnode import StatefulNode, CanExecuteReturnVal
 from .treebuilder import TreeBuilder
 from .cfgsvr import FileConfigSaver, DBConfigSaver
 from .credmgr import credentials
@@ -104,7 +104,7 @@ class NanoRC:
     def can_execute(self, command:str, quiet=False):
         return self.topnode.can_execute(command, quiet=quiet)
 
-    def execute_custom_command(self, command, data, timeout, node_path=None, check_dead=True):
+    def execute_custom_command(self, command, data, timeout, node_path=None, check_dead=True, check_inerror=True, only_included=True):
         if not timeout:
             timeout = self.timeout
 
@@ -122,7 +122,15 @@ class NanoRC:
             self.log.info(f'Sending {command} to {node_path.name}')
             node_to_send = node_path
 
-        if not node_to_send.can_execute_custom_or_expert(command, check_dead):
+        canexec = node_to_send.can_execute_custom_or_expert(
+            command,
+            quiet=False,
+            check_dead=check_dead,
+            check_inerror=check_inerror,
+            only_included=only_included,
+        )
+        if canexec != CanExecuteReturnVal.CanExecute:
+            self.log.error(f'Cannot execute {command}, reason: {str(canexec)}')
             self.return_code = node_to_send.return_code
             return
 
@@ -133,7 +141,9 @@ class NanoRC:
         if not timeout:
             timeout = self.timeout
 
-        if not node_path.can_execute_custom_or_expert("expert", check_dead=True):
+        canexec = node_path.can_execute_custom_or_expert("expert", check_dead=True)
+
+        if canexec != CanExecuteReturnVal.CanExecute:
             self.return_code = node_path.return_code
             return
 
@@ -172,9 +182,21 @@ class NanoRC:
         if not node_path:
             node_path=self.topnode
 
-        if not force and not node_path.can_execute(command):
+        canexec = node_path.can_execute(
+            command,
+            quiet=True,
+            check_dead=not force,
+            check_inerror=not force,
+            only_included=True,
+        )
+        if canexec == CanExecuteReturnVal.InvalidTransition:
             self.return_code = node_path.return_code.value
+            self.log.info(f"Cannot execute {command}, reason: {str(canexec)}")
             return
+        elif canexec != CanExecuteReturnVal.CanExecute:
+            if not force:
+                self.log.info(f"Cannot execute {command}, reason: {str(canexec)}, you may be able to --force")
+                return
 
         kwargs['timeout'] = kwargs['timeout'] if kwargs.get('timeout') else self.timeout
 
@@ -263,8 +285,9 @@ class NanoRC:
             message (str): some free text to describe the run
         """
 
-
-        if not self.topnode.can_execute("start"):
+        canexec = self.topnode.can_execute("start")
+        if canexec != CanExecuteReturnVal.CanExecute:
+            self.log.error(f'Cannot execute start, reason: {str(canexec)}')
             self.return_code = self.topnode.return_code
             return
 
@@ -400,9 +423,12 @@ class NanoRC:
         Stop the triggers
         """
 
-        if not force and not self.topnode.can_execute("drain_dataflow"):
-            self.return_code = self.topnode.return_code
-            return
+        if not force:
+            canexec = self.topnode.can_execute("drain_dataflow")
+            if canexec != CanExecuteReturnVal.CanExecute:
+                self.log.error(f'Cannot execute drain_dataflow, reason: {str(canexec)}')
+                self.return_code = self.topnode.return_code
+                return
 
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
@@ -449,7 +475,15 @@ class NanoRC:
 
     def exclude(self, node_path, timeout, resource_name) -> NoReturn:
 
-        if not node_path.can_execute_custom_or_expert("exclude", False):
+        canexec = node_path.can_execute_custom_or_expert(
+            command = "exclude",
+            quiet = False,
+            only_included = False,
+            check_dead = False,
+            check_inerror = False,
+        )
+        if canexec != CanExecuteReturnVal.CanExecute:
+            self.log.error(f'Cannot execute exclude, reason: {str(canexec)}')
             self.return_code = node_path.return_code
             return
 
@@ -459,16 +493,29 @@ class NanoRC:
 
         self.execute_custom_command(
             "exclude",
-            data={'resource_name': resource_name if resource_name else node_path.name},
-            timeout=timeout,
-            node_path=node_path,
-            check_dead=False
+            data = {'resource_name': resource_name if resource_name else node_path.name},
+            timeout = timeout,
+            node_path = None,
+            only_included = False,
+            check_dead = False,
+            check_inerror = False,
         )
+
+        self.topnode.resolve_error()
+
 
 
     def include(self, node_path, timeout, resource_name) -> NoReturn:
 
-        if not node_path.can_execute_custom_or_expert("include", True):
+        canexec = node_path.can_execute_custom_or_expert(
+            command = "include",
+            quiet = False,
+            only_included = False,
+            check_dead = False,
+            check_inerror = False,
+        )
+        if canexec != CanExecuteReturnVal.CanExecute:
+            self.log.error(f'Cannot execute include, reason: {str(canexec)}')
             self.return_code = node_path.return_code
             return
 
@@ -478,7 +525,12 @@ class NanoRC:
 
         self.execute_custom_command(
             "include",
-            data={'resource_name': resource_name if resource_name else node_paht.name},
-            timeout=timeout,
-            node_path=node_path
+            data = {'resource_name': resource_name if resource_name else node_paht.name},
+            timeout = timeout,
+            node_path = None,
+            only_included = False,
+            check_dead = False,
+            check_inerror = False,
         )
+
+        self.topnode.resolve_error()

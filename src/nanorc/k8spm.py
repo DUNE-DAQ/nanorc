@@ -84,18 +84,56 @@ class K8SProcessManager(object):
         self._apps_v1_api = client.AppsV1Api()
 
 
+    def execute_script(self, script_data):
+        ## This beauty can't be used because the pin thread file can be anywhere in the bloody filesystem
+        ## When did we say we needed assets manager?
 
-    def list_pods(self):
-        self.log.info("Listing pods with their IPs:")
-        ret = self._core_v1_api.list_pod_for_all_namespaces(watch=False)
-        for i in ret.items:
-            self.log.info("%s\t%s\t%s" % (i.status.pod_ip, i.metadata.namespace, i.metadata.name))
+        # from kubernetes.stream import stream
+
+        # env_vars = script_data["env"]
+        # cmd =';'.join([ f"export {n}=\"{v}\"" for n,v in env_vars.items()])
+        # cmd += ";"+"; ".join(script_data['cmd'])
+        # pods = self.list_pods(self.partition)
+        # for pod in pods.items:
+        #     resp = stream(
+        #         self._core_v1_api.connect_get_namespaced_pod_exec, pod.metadata.name, self.partition,
+        #         command=cmd,
+        #         stderr=True, stdin=False,
+        #         stdout=True, tty=False
+        #     )
+        #     # ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"] + [cmd]
+        #     # proc = sh.ssh(ssh_args)
+        #     self.log.info(resp)
+
+        ## Instead we revert to ssh
+        ## @E$%^RT^&$%^&*!!!
+        env_vars = script_data["env"]
+        cmd =';'.join([ f"export {n}=\"{v}\"" for n,v in env_vars.items()])
+        cmd += ";"+"; ".join(script_data['cmd'])
+        pods = self.list_pods(self.partition)
+        hosts = set([self.get_pod_node(pod.metadata.name, self.partition) for pod in pods.items])
+
+        for host in hosts:
+            self.log.info(f'Executing {script_data["cmd"]} on {host}.')
+            ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"] + [cmd]
+            import sh
+            proc = sh.ssh(ssh_args)
+            self.log.info(proc)
+
+
+
+    def list_pods(self, namespace):
+        ret = self._core_v1_api.list_namespaced_pod(namespace)
+        # for i in ret.items:
+        # self.log.info("%s\t%s\t%s" % (i.status.pod_ip, i.metadata.namespace, i.metadata.name))
+        return ret
 
     def list_endpoints(self):
         self.log.info("Listing endpoints:")
         ret = self._core_v1_api.list_endpoints_for_all_namespaces(watch=False)
         for i in ret.items:
             self.log.info("%s\t%s" % (i.metadata.namespace, i.metadata.name))
+        return ret
 
     # ----
     def create_namespace(self, namespace : str):
@@ -304,6 +342,7 @@ class K8SProcessManager(object):
             app_boot_info:dict,
             namespace: str,
             run_as: dict = None):
+
         info_str  = f"Creating \"{namespace}:{name}\" daq application"
         debug_str = "(image: \"{app_boot_info['image']}\""
         if app_boot_info['resources']:
@@ -317,11 +356,19 @@ class K8SProcessManager(object):
         if app_boot_info['anti-affinity']:
             debug_str+=f' anti-affinity={app_boot_info["anti-affinity"]}'
         debug_str+=')'
+
+        use_felix = False
+        for k in app_boot_info['resources']:
+            if "felix.cern/flx" in k: # HACK
+                use_felix = True
+                break
+        if use_felix:
+            info_str += ", which uses FELIX"
+
         self.log.info(info_str)
         self.log.debug(debug_str)
 
         ## Need to mount /dev and be privileged in this case...
-        use_felix = ("felix.cern/flx" in app_boot_info['resources']) # HACK
 
         pod = client.V1Pod(
             # Run the pod with same user id and group id as the current user
@@ -748,7 +795,7 @@ class K8SProcessManager(object):
             app_desc.port = cmd_port
             app_desc.proc = K8sProcess(self, app_name, self.partition)
 
-            k8s_name = app_name.replace("_", "-").replace(".", "")
+            k8s_name = app_name#.replace("_", "-").replace(".", "")
 
             self.create_daqapp_pod(
                 name = k8s_name, # better kwargs all this...

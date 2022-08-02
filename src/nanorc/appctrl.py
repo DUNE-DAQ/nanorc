@@ -276,7 +276,7 @@ class AppCommander:
         )
 
 
-        self.log.info(f"Ack: {ack}")
+        self.log.info(f"Ack to {self.app}: {ack.status_code}")
         self.sent_cmd = cmd_id
 
 
