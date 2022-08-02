@@ -1,0 +1,16 @@
+{
+    "build_info": {
+        "build time": "Mon  1 Aug 13:14:10 CEST 2022",
+        "git branch": "plasorak/felix-resources",
+        "git commit author": "Pierre Lasorak",
+        "git commit description": "use Enrico's flx resources properly",
+        "git commit hash": "e0edba640819c8d291e4552697e4c0dec331f660",
+        "git commit time": "Mon Aug 1 10:36:34 2022 +0200",
+        "hostname for build": "np04-srv-019",
+        "local repo dir": "/nfs/home/plasorak/dunedaq-v3.1.0/swdir/sourcecode/daqconf",
+        "uncommitted changes": "",
+        "user for build": "plasorak"
+    },
+    "command_line": "/nfs/home/plasorak/dunedaq-v3.1.0/swdir/install/daqconf/bin/daqconf_multiru_gen --frontend-type wib2 -e --enable-dqm ruemu_conf",
+    "daqconf_exe_dir": "/nfs/home/plasorak/dunedaq-v3.1.0/swdir/install/daqconf/bin"
+}

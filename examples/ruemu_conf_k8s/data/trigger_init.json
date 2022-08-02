@@ -1,0 +1,161 @@
+{
+    "connections": [
+        {
+            "data_type": "",
+            "service_type": "kQueue",
+            "topics": [],
+            "uid": "ttcm_input",
+            "uri": "queue://FollySPSC:1000"
+        },
+        {
+            "data_type": "",
+            "service_type": "kQueue",
+            "topics": [],
+            "uid": "tcs_to_mlt",
+            "uri": "queue://FollySPSC:1000"
+        },
+        {
+            "data_type": "",
+            "service_type": "kQueue",
+            "topics": [],
+            "uid": "tcs_to_buf",
+            "uri": "queue://FollySPSC:1000"
+        },
+        {
+            "data_type": "",
+            "service_type": "kQueue",
+            "topics": [],
+            "uid": "data_request_q_for_geoidDataSelection_20000_0",
+            "uri": "queue://FollySPSC:10"
+        },
+        {
+            "data_type": "",
+            "service_type": "kNetReceiver",
+            "topics": [],
+            "uid": "hsievents",
+            "uri": "tcp://0.0.0.0:12347"
+        },
+        {
+            "data_type": "",
+            "service_type": "kNetSender",
+            "topics": [],
+            "uid": "td_to_dfo",
+            "uri": "tcp://dfo:12348"
+        },
+        {
+            "data_type": "",
+            "service_type": "kNetReceiver",
+            "topics": [],
+            "uid": "df_busy_signal",
+            "uri": "tcp://0.0.0.0:12349"
+        },
+        {
+            "data_type": "",
+            "service_type": "kNetReceiver",
+            "topics": [],
+            "uid": "data_requests_for_trigger",
+            "uri": "tcp://0.0.0.0:12350"
+        },
+        {
+            "data_type": "",
+            "service_type": "kNetSender",
+            "topics": [],
+            "uid": "fragments_to_dataflow0",
+            "uri": "tcp://dataflow0:12351"
+        },
+        {
+            "data_type": "",
+            "service_type": "kNetSender",
+            "topics": [],
+            "uid": "fragments_to_dqm0-ru",
+            "uri": "tcp://dqm0-ru:12352"
+        }
+    ],
+    "modules": [
+        {
+            "data": {
+                "conn_refs": [
+                    {
+                        "dir": "kInput",
+                        "name": "tc_source",
+                        "uid": "tcs_to_buf"
+                    },
+                    {
+                        "dir": "kInput",
+                        "name": "data_request_source",
+                        "uid": "data_request_q_for_geoidDataSelection_20000_0"
+                    }
+                ]
+            },
+            "inst": "tc_buf",
+            "plugin": "TCBuffer"
+        },
+        {
+            "data": {
+                "conn_refs": [
+                    {
+                        "dir": "kInput",
+                        "name": "input",
+                        "uid": "ttcm_input"
+                    },
+                    {
+                        "dir": "kOutput",
+                        "name": "output1",
+                        "uid": "tcs_to_mlt"
+                    },
+                    {
+                        "dir": "kOutput",
+                        "name": "output2",
+                        "uid": "tcs_to_buf"
+                    }
+                ]
+            },
+            "inst": "tctee_ttcm",
+            "plugin": "TCTee"
+        },
+        {
+            "data": {
+                "conn_refs": [
+                    {
+                        "dir": "kOutput",
+                        "name": "output",
+                        "uid": "ttcm_input"
+                    }
+                ]
+            },
+            "inst": "ttcm",
+            "plugin": "TimingTriggerCandidateMaker"
+        },
+        {
+            "data": {
+                "conn_refs": [
+                    {
+                        "dir": "kInput",
+                        "name": "trigger_candidate_source",
+                        "uid": "tcs_to_mlt"
+                    }
+                ]
+            },
+            "inst": "mlt",
+            "plugin": "ModuleLevelTrigger"
+        },
+        {
+            "data": {
+                "conn_refs": [
+                    {
+                        "dir": "kInput",
+                        "name": "input",
+                        "uid": "data_requests_for_trigger"
+                    },
+                    {
+                        "dir": "kOutput",
+                        "name": "data_request_geoidDataSelection_20000_0",
+                        "uid": "data_request_q_for_geoidDataSelection_20000_0"
+                    }
+                ]
+            },
+            "inst": "request_receiver",
+            "plugin": "RequestReceiver"
+        }
+    ]
+}
