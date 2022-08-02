@@ -275,12 +275,13 @@ This page describes the functionality which is supported within Kubernetes in v3
 
 ### Requirements
 Before you go off and try this, you at least need to have:
- - a k8s cluster with all the nodes being able to access `/cvmfs`,
- - the configuration service running in the cluster,
- - the dunedaq images on which you want to run available from all the nodes
+ - A k8s cluster running. To check that this is the case, you can head to the dashboard (on the NP04 cluster, that's [here](http://np04-srv-015:31001/#/workloads?namespace=default), after you have setup a SOCKS proxy to lxplus).
+ - All the nodes being able to access `/cvmfs`.
+ - The configuration service running in the cluster. To check that, you can head to the configuration service URL (at NP04, it's [here](http://np04-srv-015:31011/)) and making sure that you see text "DAQLing Configuration Management Service v1.0.0".
+ - The dunedaq images on which you want to run available from all the nodes. The simplest way to do that is to have your image on dockerhub (at NP04, we have a repository [here](np04docker.cern.ch), but at the time this is being written, on the 2nd Aug 2022, it doesn't work).
 
 All of this is available on the NP04 cluster.
- 
+
 ### Overview
 
 The Kubernetes prototype process manager in nanorc knows about three types of DUNE DAQ applications: readout applications, dataflow applications and other applications. Applications are booted in the order above, with anti-affinity between readout applications and all other applications (they cannot be started on the same host).
