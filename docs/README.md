@@ -241,7 +241,7 @@ It should be pointed out that some substitutions are made when nanorc uses a fil
 
 * `"getenv"` is replaced with the actual value of the environment variable, throwing a Python exception if it is unset
 * `"getenv:<default value>"` is replaced with the actual value of the environment variable if it is set, with `<default value>` used if it is unset
-* `"getenv_ifset"` is replaced with the actual value of the environment variable if it is set, otherwise doesn't set this variable
+* `"getenv_ifset"` is replaced with the actual value of the environment variable if it is set, otherwise nanorc doesn't set this variable
 * If a host is provided as `localhost` or `127.0.0.1`, the result of the Python call `socket.gethostname` is used in its place
 * `{APP_NAME}` is replaced by the app key name by nanorc
 * `{CMD_FAC}` and `{INFO_SVC}` are replaced by their corresponding environment value
@@ -300,7 +300,7 @@ The `k8s` version implements a first version of resource management: Felix cards
 
 The following nanorc microservices are supported and can be used inside the k8s cluster or outside.
 
-|Service | Notes |
+| Service | Notes |
 --- | --- |
 |Run Number|Provides the run number from Oracle DB|
 |Run Registry|Archives configuration data (zip) and metadata to Oracle/Postgres|
@@ -318,7 +318,7 @@ The following nanorc microservices are supported and can be used inside the k8s 
 
 Up to date documentation on the k8s test cluster at NP04 is [here](https://twiki.cern.ch/twiki/bin/view/CENF/NP04k8s), and the node assignment is [here](https://twiki.cern.ch/twiki/bin/view/CENF/ComputerAssignments)
 
-Current config (on the 2nd Aug 2022):
+Current nodes list (on the 2nd Aug 2022):
 
 | node | Purpose/notes  |
 --- | --- |
@@ -343,7 +343,7 @@ Current config (on the 2nd Aug 2022):
 ### Getting started
 Log on to the np04 cluster and follow the instructions in [here](https://twiki.cern.ch/twiki/bin/view/CENF/NP04k8s).
 2 important notes:
- - You **do not** need to be on `np04-srv-015` to use nanorc and K8s. But you will need to have the correct `KUBECONFIG** properly set as described in the previous link.
+ - You **do not** need to be on `np04-srv-015` to use nanorc and K8s. But you will need to have the correct `KUBECONFIG` properly set as described in the previous link.
  - You **do not** need to create your namespace. That is handled automatically by nanorc.
 
 #### Setup the nightly/release
@@ -376,7 +376,6 @@ nanorc> boot
 nanorc> start_run 12345
 nanorc> [...]
 ```
-
 
 ### K8s dashboard, logs and monitoring
 #### K8s dashboard
