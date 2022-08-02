@@ -1,0 +1,47 @@
+{
+    "modules": [
+        {
+            "data": {
+                "channel_map": "HD",
+                "channel_mask": {
+                    "how_often": 0.0,
+                    "num_frames": 0
+                },
+                "clock_frequency": 50000000,
+                "df2dqm_connection_name": "tr_df2dqm_0",
+                "df_algs": 11,
+                "df_num_frames": 80,
+                "df_offset": 0.0,
+                "df_seconds": 10.0,
+                "dqm2df_connection_name": "trmon_dqm2df_0",
+                "fourier": {
+                    "how_often": 0.0,
+                    "num_frames": 0
+                },
+                "fourier_sum": {
+                    "how_often": 0.0,
+                    "num_frames": 0
+                },
+                "frontend_type": "wib2",
+                "hist": {
+                    "how_often": 0.0,
+                    "num_frames": 0
+                },
+                "kafka_address": "",
+                "link_idx": [
+                    0,
+                    1
+                ],
+                "mean_rms": {
+                    "how_often": 0.0,
+                    "num_frames": 0
+                },
+                "mode": "df",
+                "readout_window_offset": 10000000,
+                "region": 0,
+                "timesync_topic_name": "Timesync"
+            },
+            "match": "dqmprocessor"
+        }
+    ]
+}
