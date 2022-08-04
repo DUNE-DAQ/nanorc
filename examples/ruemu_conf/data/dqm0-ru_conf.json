@@ -1,0 +1,76 @@
+{
+    "modules": [
+        {
+            "data": {
+                "general_queue_timeout": 100,
+                "map": [
+                    {
+                        "connection_uid": "data_requests_for_trigger",
+                        "element": 0,
+                        "region": 20000,
+                        "system": "DataSelection"
+                    },
+                    {
+                        "connection_uid": "data_requests_for_ruemu0",
+                        "element": 0,
+                        "region": 0,
+                        "system": "TPC"
+                    },
+                    {
+                        "connection_uid": "data_requests_for_ruemu0",
+                        "element": 1,
+                        "region": 0,
+                        "system": "TPC"
+                    }
+                ],
+                "max_time_window": 0,
+                "reply_connection_name": "fragments_to_dqm0-ru",
+                "trigger_record_timeout_ms": 0
+            },
+            "match": "trb_dqm"
+        },
+        {
+            "data": {
+                "channel_map": "HD",
+                "channel_mask": {
+                    "how_often": 60.0,
+                    "num_frames": 1
+                },
+                "clock_frequency": 50000000,
+                "df2dqm_connection_name": "tr_df2dqm_0",
+                "df_algs": 11,
+                "df_num_frames": 0,
+                "df_offset": 0.0,
+                "df_seconds": 0.0,
+                "dqm2df_connection_name": "trmon_dqm2df_0",
+                "fourier": {
+                    "how_often": 0.0,
+                    "num_frames": 0
+                },
+                "fourier_sum": {
+                    "how_often": 600.0,
+                    "num_frames": 1000
+                },
+                "frontend_type": "wib2",
+                "hist": {
+                    "how_often": 60.0,
+                    "num_frames": 50
+                },
+                "kafka_address": "",
+                "link_idx": [
+                    0,
+                    1
+                ],
+                "mean_rms": {
+                    "how_often": 10.0,
+                    "num_frames": 100
+                },
+                "mode": "readout",
+                "readout_window_offset": 10000000,
+                "region": 0,
+                "timesync_topic_name": "Timesync"
+            },
+            "match": "dqmprocessor"
+        }
+    ]
+}

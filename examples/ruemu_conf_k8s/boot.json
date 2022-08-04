@@ -1,0 +1,125 @@
+{
+    "apps": {
+        "dataflow0": {
+            "affinity": [],
+            "anti-affinity": [],
+            "exec": "daq_application_k8s",
+            "mounted_dirs": [
+                {
+                    "in_pod_location": "/nfs/home/plasorak/dunedaq-v3.1.0/swdir/nanorc/examples",
+                    "name": "raw-data",
+                    "physical_location": "/nfs/home/plasorak/dunedaq-v3.1.0/swdir/nanorc/examples",
+                    "read_only": false
+                }
+            ],
+            "node-selection": [],
+            "port": 3333,
+            "resources": {}
+        },
+        "dfo": {
+            "affinity": [],
+            "anti-affinity": [],
+            "exec": "daq_application_k8s",
+            "mounted_dirs": [],
+            "node-selection": [],
+            "port": 3333,
+            "resources": {}
+        },
+        "dqm0-df": {
+            "affinity": [],
+            "anti-affinity": [],
+            "exec": "daq_application_k8s",
+            "mounted_dirs": [],
+            "node-selection": [],
+            "port": 3333,
+            "resources": {}
+        },
+        "dqm0-ru": {
+            "affinity": [],
+            "anti-affinity": [],
+            "exec": "daq_application_k8s",
+            "mounted_dirs": [],
+            "node-selection": [],
+            "port": 3333,
+            "resources": {}
+        },
+        "hsi": {
+            "affinity": [],
+            "anti-affinity": [],
+            "exec": "daq_application_k8s",
+            "mounted_dirs": [],
+            "node-selection": [],
+            "port": 3333,
+            "resources": {}
+        },
+        "ruemu0": {
+            "affinity": [],
+            "anti-affinity": [],
+            "exec": "daq_application_k8s",
+            "mounted_dirs": [],
+            "node-selection": [],
+            "port": 3333,
+            "resources": {}
+        },
+        "trigger": {
+            "affinity": [],
+            "anti-affinity": [],
+            "exec": "daq_application_k8s",
+            "mounted_dirs": [],
+            "node-selection": [],
+            "port": 3333,
+            "resources": {}
+        }
+    },
+    "env": {
+        "DUNEDAQ_ERS_DEBUG_LEVEL": "getenv_ifset",
+        "DUNEDAQ_ERS_ERROR": "erstrace,throttle,lstdout",
+        "DUNEDAQ_ERS_FATAL": "erstrace,lstdout",
+        "DUNEDAQ_ERS_INFO": "erstrace,throttle,lstdout",
+        "DUNEDAQ_ERS_VERBOSITY_LEVEL": "getenv:1",
+        "DUNEDAQ_ERS_WARNING": "erstrace,throttle,lstdout"
+    },
+    "exec": {
+        "daq_application_k8s": {
+            "args": [
+                "--name",
+                "{APP_NAME}",
+                "-c",
+                "{CMD_FAC}",
+                "-i",
+                "{INFO_SVC}",
+                "--configurationService",
+                "{CONF_LOC}"
+            ],
+            "cmd": [
+                "/dunedaq/run/app-entrypoint.sh"
+            ],
+            "comment": "Application profile using PATH variables (lower start time)",
+            "env": {
+                "CET_PLUGIN_PATH": "getenv",
+                "CMD_FAC": "rest://localhost:{APP_PORT}",
+                "DETCHANNELMAPS_SHARE": "getenv",
+                "DUNEDAQ_SHARE_PATH": "getenv",
+                "INFO_SVC": "file://info_{APP_NAME}_{APP_PORT}.json",
+                "LD_LIBRARY_PATH": "getenv",
+                "PATH": "getenv",
+                "TIMING_SHARE": "getenv",
+                "TRACE_FILE": "getenv:/tmp/trace_buffer_{APP_HOST}_{DUNEDAQ_PARTITION}"
+            },
+            "image": "np04docker.cern.ch/dunedaq-local/dunedaq-v3.1.0--22-07-26"
+        }
+    },
+    "external_connections": [],
+    "order": [
+        "ruemu0",
+        "dataflow0",
+        "hsi",
+        "trigger",
+        "dfo",
+        "dqm0-ru",
+        "dqm0-df"
+    ],
+    "response_listener": {
+        "port": 56789
+    }
+}

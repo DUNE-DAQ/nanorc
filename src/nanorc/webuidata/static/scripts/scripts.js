@@ -1,9 +1,11 @@
 var commands = {};
 var root = "";
 var state = "";
+var previous_data = "";
 var statusTmp = {};
 var statusTick;
-var selectedNode = null;
+// var selectedNode = null;
+var alertedOnDead = []
 var icons = {"none":"/static/pics/question.png",
              "booted":"/static/pics/gray.png",
              "initialised":"/static/pics/orange.png",
@@ -53,7 +55,6 @@ function getTree(){
         type: 'GET',
         dataType: "text",
         success: function (d) {
-            //d = JSON.stringify(d);
             d = d.replace(/name/g, "text");
             d = JSON.parse(d)
             if (d.hasOwnProperty('children')) {
@@ -68,6 +69,7 @@ function getTree(){
                 })
             }
             $('#controlTree').jstree(true).refresh();
+            $('#controlTree').jstree(true).open_all();
         },
         error: function(e){
             alert(JSON.stringify(e));
@@ -128,7 +130,54 @@ function sendComm(command){
         data: dataload,
         success: function (d) {
             //alert(JSON.stringify(d));
-            $('#json-renderer').jsonViewer(d,{collapsed: true});
+            data = d
+            $('#response-render').empty()
+            if (data.hasOwnProperty('command')) {
+                if (data['return_code'] != 0) {
+                    $('#response-render').append('<h4>Last command sent: '+data['command']['command']+' <font color:red>Unsuccessful!</font></h4>')
+                }else{
+                    $('#response-render').append("<h4>Last command sent: "+data['command']['command']+"</h4>")
+                }
+                if (data['command'].length>1) {
+                    $('#response-render').append("Arguments:")
+                    $.each(data, function(key, value) {
+                        if (key!="command") {
+                            $('#response-render').append(key+": "+value)
+                        }
+                    });
+                }
+            } else {
+                $('#response-render').append("<h4>Last command sent:</h4>")
+            }
+            if (data.hasOwnProperty('logs')) {
+                var log_string = '<div class="accordion" id="accordionLogs" role="tablist" aria-multiselectable="true">' +
+                    '<div class="card">' +
+                    '<div class="card-header" id="headingOne">' +
+                    '<a data-toggle="collapse" data-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">' +
+                    '<h6 class="mb-0">'+
+                    'Logs' +
+                    '<i class="fas fa-angle-down rotate-icon"></i>'+
+                    '</h6>' +
+                    '</a>' +
+                    '</h2>' +
+                    '</div>' +
+                    '<div id="collapseOne" class="collapse" aria-labelledby="headingOne" data-parent="#accordionLogs">' +
+                    '<div class="card-body">' +
+                    '<pre>'+
+                    data['logs'] +
+                    '</pre>'+
+                    '</div>'+
+                    '</div>'+
+                    '</div>'
+
+                $('#response-render').append(log_string)
+
+                // $('#response-render').append('<div id="collapse1" class="panel-collapse collapse">')
+                // $('#response-render').append('<div class="panel-body">'+data['logs']+ '</div>')
+                // $('#response-render').append('</div>')
+                // $('#response-render').append('</div>')
+                // $('#response-render').append('</div>')
+            }
             //getTree()
             $(".control").attr("disabled", false);
             $("#state:text").val(state)
@@ -208,22 +257,41 @@ function populateArgs(command){
         sendComm(command);
     });
 }
+
+function alertOnDead(data, root_path){
+    if (data.hasOwnProperty('children')) {
+        $.each(data['children'], function (index, child){
+            alertOnDead(child, root_path+data['name']+'/')
+        });
+    }else if (data.hasOwnProperty('process_state')) {
+        var name = data['name']
+
+        if (data['process_state'].includes('dead')) {
+            if (!alertedOnDead.includes(name)){
+                alert(root_path+name+' died :(')
+                alertedOnDead.push(name)
+            }
+        }
+    }
+}
+
+
 function getStatus(regCheck=false){
     if (regCheck == true){
         url = "http://"+serverhost+"/nanorcrest/status"
     }else{
-        if(selectedNode==null){
+        // if(selectedNode==null){
             url = "http://"+serverhost+"/nanorcrest/status"
-        }else{
-            if(selectedNode.text==root){
-                url = "http://"+serverhost+"/nanorcrest/status"
-            }else{
-                selText= selectedNode
-                path=$('#controlTree').jstree(true).get_path(selText,".")
-                path = path.replace(root+".", "");
-                url = "http://"+serverhost+"/nanorcrest/node/"+path
-            }
-        }
+        // }else{
+        //     // if(selectedNode.text==root){
+        //     url = "http://"+serverhost+"/nanorcrest/status"
+        //     // }else{
+        //     //     selText= selectedNode
+        //     //     path=$('#controlTree').jstree(true).get_path(selText,".")
+        //     //     path = path.replace(root+".", "");
+        //     //     url = "http://"+serverhost+"/nanorcrest/node/"+path
+        //     // }
+        // }
     }
     $.ajax({
         url: url,
@@ -233,23 +301,27 @@ function getStatus(regCheck=false){
         type: 'GET',
         dataType: "text",
         success: function (d) {
-            d = JSON.parse(d);
-            if(d=="I'm busy!"){
+            data = JSON.parse(d);
+            if(data=="I'm busy!"){
+                // console.log("busy answer")
                 $("#state:text").val('Executing...')
                 $(".control").attr("disabled", true);
-            }
-            else{
-                if(d.state!=state){
-                    $("#state:text").val(d.state)
-                    state = d.state
-                    if(url=="http://"+serverhost+"/nanorcrest/status"){
-                        refreshTree(d)
+            }else{
+                if(d != previous_data){
+                    // console.log("new state")
+                    $("#state:text").val(data.state)
+                    previous_data = d
+                    if(url=="http://"+serverhost+"/nanorcrest/status" && state!=data.state){
+                        refreshTree(data)
                     }
-                    //populateButtons()
+                    state = data.state
+                    alertOnDead(data, "/")
                     fetchCommands()
                     $("#statustable").empty()
-                    statusTable({d}, 0)
-                }
+                    statusTable({data}, 0)
+                }// else{
+                // console.log("nothing changed")
+                // }
             }
 
             statusTmp = d;
@@ -261,16 +333,17 @@ function getStatus(regCheck=false){
 }
 
 
-$('#controlTree').on('changed.jstree', function () {
-    selectedNode = $("#controlTree").jstree("get_selected",true)[0]
-    getStatus()
-    if(selectedNode != null){
-        $("#selected").text('Selected: '+selectedNode.text)
-    }else{
-        $("#selected").text('Selected: '+root)
-    }
+// $('#controlTree').on('changed.jstree', function () {
+//     // selected
+//     Node = $("#controlTree").jstree("get_selected",true)[0]
+//     getStatus()
+//     // if(selectedNode != null){
+//     //     $("#selected").text('Selected: '+selectedNode.text)
+//     // }else{
+//     // $("#selected").text('Selected: '+root)
+//     // }
 
-})
+// })
 $(window).resize(function () {
     var h = Math.max($(window).height() - 0, 420);
     // $('#container, #data, #tree').height(h).filter('.default').css('height', h + 'px');
@@ -323,5 +396,5 @@ $(document).ready(function() {
             alert(JSON.stringify(e));
         }
     });
-    $("#selected").text('Selected: '+root)
+    // $("#selected").text('Selected: '+root)
 })

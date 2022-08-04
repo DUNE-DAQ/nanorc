@@ -15,7 +15,7 @@ from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoRespons
 from typing import Union, NoReturn
 from .fsm import FSM
 import os.path
-from .statefulnode import StatefulNode, ErrorCode
+from .statefulnode import StatefulNode, ErrorCode, CanExecuteReturnVal
 from rich.progress import *
 
 log = logging.getLogger("transitions")
@@ -38,9 +38,14 @@ class ApplicationNode(StatefulNode):
     def _on_exit_callback(self, event):
         pass
 
+    def resolve_error(self):
+        # Since app node doesn't have children, statefulnode's resolve_error always gives error free...
+        pass
+
     def on_enter_terminate_ing(self, _):
         self.sup.terminate()
         self.end_terminate()
+        self.included = False
 
     def on_enter_abort_ing(self, _):
         self.sup.terminate()
@@ -55,37 +60,56 @@ class SubsystemNode(StatefulNode):
         self.pm = None
         self.listener = None
 
-    def can_execute_custom_or_expert(self, command, check_dead=True):
-        if not super().can_execute_custom_or_expert(command, check_dead):
-            return False
+    def can_execute_custom_or_expert(self, command, quiet=False, check_dead=True, check_inerror=True, only_included=True):
+        ret = super().can_execute_custom_or_expert(
+            command = command,
+            quiet = quiet,
+            check_dead = check_dead,
+            check_inerror = check_inerror,
+            only_included = only_included,
+        )
+        if ret != CanExecuteReturnVal.CanExecute:
+            return ret
 
         for c in self.children:
-            if not c.included: continue
+            if not c.included and only_included: continue
 
             if check_dead and not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
                 self.return_code = ErrorCode.Failed
                 self.log.error(f'{c.name} is dead, cannot send {command}')
-                return False
+                return CanExecuteReturnVal.Dead
 
         self.return_code = ErrorCode.Success
-        return True
+        return CanExecuteReturnVal.CanExecute
 
-    def can_execute(self, command):
-        if not super().can_execute(command):
-            return False
+    def can_execute(self, command, quiet=False, check_dead=True, check_inerror=True, only_included=True):
+        ret = super().can_execute(
+            command = command,
+            quiet = quiet,
+            check_dead = check_dead,
+            check_inerror = check_inerror,
+            only_included = only_included,
+        )
+
+        if ret != CanExecuteReturnVal.CanExecute:
+            return ret
 
         for c in self.children:
-            if not c.included: continue
+            if not c.included and only_included: continue
+
             if not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
                 self.return_code = ErrorCode.Failed
                 self.log.error(f'{c.name} is dead, cannot send {command} unless you disable it or --force')
-                return False
+                return CanExecuteReturnVal.Dead
 
         self.return_code = ErrorCode.Success
-        return True
+        return CanExecuteReturnVal.CanExecute
 
     def send_custom_command(self, cmd, data, timeout, app=None) -> dict:
         ret = {}
+        if not self.listener.flask_manager.is_alive():
+            self.log.error('Response listener is not alive, trying to respawn it!!')
+            self.listener.flask_manager = self.listener.create_manager()
 
         if cmd == 'scripts': # unfortunately I don't see how else to do this
             scripts = self.cfgmgr.boot.get('scripts')
@@ -122,14 +146,14 @@ class SubsystemNode(StatefulNode):
                         if not is_include_exclude and not c.included: continue
 
                     if not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
-                        if not is_include_exclude:
-                            self.log.error(f'{c.name} is dead, cannot send {cmd} to the app')
-                        return False
+                        self.log.error(f'{c.name} is dead, cannot send {cmd} to the app')
+                        continue
 
                     cmd_data2 = cp.deepcopy(cmd_data)
                     for m in cmd_data2['modules']:
                         if m.get("data"):
                             m['data'].update(data)
+
                     ret[c.name] = c.sup.send_command_and_wait(cmd, cmd_data=cmd_data2, timeout=timeout)
         else:
             for c in self.children:
@@ -139,9 +163,8 @@ class SubsystemNode(StatefulNode):
                     if not is_include_exclude and not c.included: continue
 
                 if not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
-                    if not is_include_exclude:
-                        self.log.error(f'{c.name} is dead, cannot send {cmd} to the app')
-                    return False
+                    self.log.error(f'{c.name} is dead, cannot send {cmd} to the app')
+                    continue
                 cmd_data = {
                     "modules": [{
                         "data": data,
@@ -152,6 +175,10 @@ class SubsystemNode(StatefulNode):
         return ret
 
     def send_expert_command(self, app, cmd, timeout) -> dict:
+        if not self.listener.flask_manager.is_alive():
+            self.log.error('Response listener is not alive, trying to respawn it!!')
+            self.listener.flask_manager = self.listener.create_manager()
+
         cmd_name = cmd['id']
         cmd_payload = cmd['data']
         cmd_entry_state = cmd['entry_state']
@@ -193,21 +220,23 @@ class SubsystemNode(StatefulNode):
             )
 
         except Exception as e:
-            self.log.error(f'Couldn\'t boot {self.name}')
             self.log.exception(e)
-            response['status_code'] = ErrorCode.Failed
-            response['error'] = str(e)
-            self.to_error(event=event, response=response)
+            self.to_error(
+                text=f'Couldn\'t boot {self.name}',
+                command='boot',
+                exception=e,
+            )
             return
 
         try:
             self.listener = ResponseListener(self.cfgmgr.boot["response_listener"]["port"])
         except Exception as e:
-            self.log.error(f'Couldn\'t create a response listener for {self.name}')
-            self.log.error(str(e))
-            response['error'] = str(e)
-            response['status_code'] = ErrorCode.Failed
-            self.to_error(event=event, response=response)
+            self.log.exception(str(e))
+            self.to_error(
+                text=f'Couldn\'t create a response listener for {self.name}',
+                command='boot',
+                exception=e,
+            )
             return
 
         children = []
@@ -241,7 +270,16 @@ class SubsystemNode(StatefulNode):
                     "command": "boot",
                     "error": "Not bootable",
                 })
-                child.to_error(event=event, command='boot')
+                etext=''
+                if not child.sup.desc.proc.is_alive():
+                    etext='Process isn\'t alive! '
+                if not child.sup.commander.ping():
+                    etext='Cannot ping the app!'
+                child.to_error(
+                    text=etext,
+                    command='boot'
+                )
+
             children.append(child)
 
         self.children = children
@@ -255,9 +293,12 @@ class SubsystemNode(StatefulNode):
         response["error"] =  failed
 
         if response['status_code'] != ErrorCode.Success:
-            self.to_error(event=event, response=response)
-        else:
-            self.end_boot(response=response)
+            etext = f"children node {[f['node'] for f in failed]} failed to boot"
+            self.to_error(
+                text=etext,
+                command='boot'
+            )
+        self.end_boot(response=response)
 
 
     def on_exit_conf_ing(self, event) -> NoReturn:
@@ -284,12 +325,18 @@ class SubsystemNode(StatefulNode):
         self.log.debug(f"Terminating {self.name}")
         if self.children:
             for child in self.children:
-                child.terminate()
+                if child.can_execute('terminate', quiet=True) == CanExecuteReturnVal.CanExecute:
+                    child.terminate()
+                else:
+                    self.log.info(f'Force terminating on {child.name}')
+                    child.to_terminate_ing()
                 if child.parent.listener:
                     child.parent.listener.unregister(child.name)
                 child.parent = None
         self.terminate_logic()
         self.end_terminate()
+        self.errored = False
+        self.included = True
 
     def on_enter_abort_ing(self, _) -> NoReturn:
         self.log.debug(f"Aborting {self.name}")
@@ -301,6 +348,8 @@ class SubsystemNode(StatefulNode):
                 child.parent = None # abandon your child
         self.terminate_logic()
         self.end_abort()
+        self.included = True
+        self.errored = False
         self.log.debug(f"DONE Aborting {self.name}")
 
     def _on_enter_callback(self, event):
@@ -322,16 +371,18 @@ class SubsystemNode(StatefulNode):
             self.log.error('Response listener is not alive, trying to respawn it!!')
             self.listener.flask_manager = self.listener.create_manager()
 
-        for n in appset:
+        to_chuck = []
+        for i, n in enumerate(appset):
             if not n.included:
-                appset.remove(n)
+                self.log.info(f'Node {n.name} is excluded! NOT sending {command} to it!')
+                to_chuck.append(n.name)
                 continue
 
             if not n.sup.desc.proc.is_alive() or not n.sup.commander.ping():
                 text = f"'{n.name}' seems to be dead. So I cannot initiate transition '{command}'"
                 if force:
                     self.log.error(text+f"\nBut! '--force' was specified, so I'll ignore '{n.name}'!")
-                    appset.remove(n)
+                    to_chuck.append(n.name)
                     # if sequence and n.name in sequence: sequence.remove(n.name)
                 else:
                     self.log.error(text+"\nYou may be able to use '--force' if you want to 'stop' or 'scrap' the run.")
@@ -343,9 +394,18 @@ class SubsystemNode(StatefulNode):
                     self.trigger("to_"+origin, response=response)
                     return
 
+        for chuck in to_chuck:
+            for i, app in enumerate(appset):
+                if chuck == app.name:
+                    del appset[i]
+
         for child_node in appset:
             data = self.cfgmgr.generate_data_for_module(event.kwargs.get('overwrite_data'))
+            if not child_node.included:
+                self.log.info(f'Node {child_node.name} is excluded! NOT sending {command} to it!')
+                continue
             self.log.debug(f'Sending {command} to {child_node.name}')
+
 
             entry_state = child_node.state.upper()
 
@@ -366,6 +426,15 @@ class SubsystemNode(StatefulNode):
             done = []
             for child_node in appset:
                 if not child_node.included: continue
+
+                if not child_node.sup.desc.proc.is_alive() or not child_node.sup.commander.ping():
+                    failed.append(child_node.name)
+                    child_node.to_error(
+                        command = command,
+                    )
+                    done += [child_node]
+                    break
+
                 try:
                     r = child_node.sup.check_response()
                 except NoResponse:
@@ -382,24 +451,31 @@ class SubsystemNode(StatefulNode):
                         "command": command,
                         "error": r,
                     }
-                    failed.append(response)
-                    child_node.to_error(event=event)
+                    failed.append(child_node.name)
+                    child_node.to_error(
+                        command=command,
+                        text=r['result']
+                    )
 
             for d in done:
                 appset.remove(d)
 
             time.sleep(0.1)
 
+        response= {}
         if failed:
             response = {
                 "node":self.name,
                 "status_code" : ErrorCode.Failed,
                 "state": self.state,
                 "command": command,
-                "failed": [r['node'] for r in failed],
+                "failed": [r for r in failed],
                 "error": failed,
             }
-            self.to_error(response=response, event=event)
+            self.to_error(
+                text=f"Children nodes{[r for r in failed]} failed to {command}",
+                command=command
+            )
         else:
             response = {
                 "node":self.name,
@@ -407,4 +483,6 @@ class SubsystemNode(StatefulNode):
                 "state": self.state,
                 "command": command,
             }
-            self.trigger("end_"+command, response=response)
+
+        self.resolve_error()
+        self.trigger("end_"+command, response=response)

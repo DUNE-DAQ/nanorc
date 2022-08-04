@@ -13,21 +13,24 @@ def status_data(node, get_children=True) -> dict:
         if sup.desc.proc.is_alive():
             ret['process_state'] = 'alive'
         else:
-            try:
-                exit_code = sup.desc.proc.exit_code
-            except sh.ErrorReturnCode as e:
-                exit_code = e.exit_code
+            if isinstance(sup.desc.proc, K8sProcess): # hacky way to check the pm
+                exit_code = sup.desc.proc.status()
+            else:
+                try:
+                    exit_code = sup.desc.proc.exit_code
+                except sh.ErrorReturnCode as e:
+                    exit_code = e.exit_code
             ret['process_state'] = f'dead[{exit_code}]'
         ret['ping'] = sup.commander.ping()
         ret['last_cmd_failed'] = (sup.last_sent_command != sup.last_ok_command)
         ret['name'] = node.name
-        ret['state'] = node.state + ("" if node.included else " - excluded")
+        ret['state'] = ("error " if node.errored else "") + node.state + ("" if node.included else " - excluded")
         ret['host'] = sup.desc.node if hasattr(sup.desc, 'node') else sup.desc.host,
         ret['last_sent_command'] = sup.last_sent_command
         ret['last_ok_command'] = sup.last_ok_command
     else:
         ret['name'] = node.name
-        ret['state'] = node.state
+        ret['state'] = ("error " if node.errored else "") + node.state
         if get_children:
             ret['children'] = [status_data(child) for child in node.children]
     return ret
@@ -64,17 +67,21 @@ def print_status(topnode, console, apparatus_id='', partition='') -> int:
             ping = sup.commander.ping()
             last_cmd_failed = (sup.last_sent_command != sup.last_ok_command)
 
-            state_str = Text()
+            state_str = ''
+            style = ''
+            if node.errored:
+                state_str += "ERROR - "
+                style = 'bold red'
+            state_str += f"{node.state} - {alive}"
             if not node.included:
-                state_str = Text(f"{node.state} - {alive} - excluded")
-            elif node.is_error():
-                state_str = Text(f"{node.state} - {alive}", style=('bold red'))
-            else:
-                state_str = Text(f"{node.state} - {alive}")
+                state_str += " - excluded"
+                style = 'bright_black' # bright_black?
+
+            state_txt = Text(state_str, style=(style))
 
             table.add_row(
                 Text(pre)+Text(node.name),
-                state_str,
+                state_txt,
                 sup.desc.node if hasattr(sup.desc, 'node') else sup.desc.host,
                 str(ping),
                 Text(str(sup.last_sent_command), style=('bold red' if last_cmd_failed else '')),
@@ -82,11 +89,22 @@ def print_status(topnode, console, apparatus_id='', partition='') -> int:
             )
 
         else:
-            state_str = node.state
+            state_str = ''
+            style = ''
+            if node.errored:
+                state_str += "ERROR - "
+                style = 'bold red'
+            state_str += f"{node.state}"
             if not node.included:
-                state_str = Text(f"{node.state} - excluded")
-            table.add_row(Text(pre)+Text(node.name),
-                          Text(f"{state_str}", style=('bold red' if node.is_error() else "")))
+                state_str += " - excluded"
+                style = 'bright_black'
+
+            state_txt = Text(state_str, style=(style))
+
+            table.add_row(
+                Text(pre)+Text(node.name),
+                state_txt
+            )
 
     console.print(table)
 

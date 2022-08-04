@@ -1,0 +1,160 @@
+{
+    "connections": [
+        {
+            "data_type": "",
+            "service_type": "kQueue",
+            "topics": [],
+            "uid": "wib2_link_0",
+            "uri": "queue://FollySPSC:100000"
+        },
+        {
+            "data_type": "",
+            "service_type": "kQueue",
+            "topics": [],
+            "uid": "wib2_link_1",
+            "uri": "queue://FollySPSC:100000"
+        },
+        {
+            "data_type": "",
+            "service_type": "kQueue",
+            "topics": [],
+            "uid": "data_request_q_for_geoidTPC_0_0",
+            "uri": "queue://FollySPSC:10"
+        },
+        {
+            "data_type": "",
+            "service_type": "kQueue",
+            "topics": [],
+            "uid": "data_request_q_for_geoidTPC_0_1",
+            "uri": "queue://FollySPSC:10"
+        },
+        {
+            "data_type": "",
+            "service_type": "kNetSender",
+            "topics": [],
+            "uid": "fragments_to_dataflow0",
+            "uri": "tcp://dataflow0:12351"
+        },
+        {
+            "data_type": "",
+            "service_type": "kNetSender",
+            "topics": [],
+            "uid": "fragments_to_dqm0-ru",
+            "uri": "tcp://dqm0-ru:12352"
+        },
+        {
+            "data_type": "",
+            "service_type": "kNetReceiver",
+            "topics": [],
+            "uid": "data_requests_for_ruemu0",
+            "uri": "tcp://0.0.0.0:12355"
+        },
+        {
+            "data_type": "",
+            "service_type": "kPublisher",
+            "topics": [
+                "Timesync"
+            ],
+            "uid": "timesync_ru0_0",
+            "uri": "tcp://0.0.0.0:12358"
+        },
+        {
+            "data_type": "",
+            "service_type": "kPublisher",
+            "topics": [
+                "Timesync"
+            ],
+            "uid": "timesync_ru0_1",
+            "uri": "tcp://0.0.0.0:12359"
+        }
+    ],
+    "modules": [
+        {
+            "data": {
+                "conn_refs": [
+                    {
+                        "dir": "kOutput",
+                        "name": "timesync_output",
+                        "uid": "timesync_ru0_0"
+                    },
+                    {
+                        "dir": "kInput",
+                        "name": "raw_input",
+                        "uid": "wib2_link_0"
+                    },
+                    {
+                        "dir": "kInput",
+                        "name": "request_input",
+                        "uid": "data_request_q_for_geoidTPC_0_0"
+                    }
+                ]
+            },
+            "inst": "datahandler_0",
+            "plugin": "DataLinkHandler"
+        },
+        {
+            "data": {
+                "conn_refs": [
+                    {
+                        "dir": "kOutput",
+                        "name": "timesync_output",
+                        "uid": "timesync_ru0_1"
+                    },
+                    {
+                        "dir": "kInput",
+                        "name": "raw_input",
+                        "uid": "wib2_link_1"
+                    },
+                    {
+                        "dir": "kInput",
+                        "name": "request_input",
+                        "uid": "data_request_q_for_geoidTPC_0_1"
+                    }
+                ]
+            },
+            "inst": "datahandler_1",
+            "plugin": "DataLinkHandler"
+        },
+        {
+            "data": {
+                "conn_refs": [
+                    {
+                        "dir": "kOutput",
+                        "name": "output_0",
+                        "uid": "wib2_link_0"
+                    },
+                    {
+                        "dir": "kOutput",
+                        "name": "output_1",
+                        "uid": "wib2_link_1"
+                    }
+                ]
+            },
+            "inst": "fake_source",
+            "plugin": "FakeCardReader"
+        },
+        {
+            "data": {
+                "conn_refs": [
+                    {
+                        "dir": "kInput",
+                        "name": "input",
+                        "uid": "data_requests_for_ruemu0"
+                    },
+                    {
+                        "dir": "kOutput",
+                        "name": "data_request_geoidTPC_0_0",
+                        "uid": "data_request_q_for_geoidTPC_0_0"
+                    },
+                    {
+                        "dir": "kOutput",
+                        "name": "data_request_geoidTPC_0_1",
+                        "uid": "data_request_q_for_geoidTPC_0_1"
+                    }
+                ]
+            },
+            "inst": "request_receiver",
+            "plugin": "RequestReceiver"
+        }
+    ]
+}

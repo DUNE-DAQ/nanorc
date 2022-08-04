@@ -14,7 +14,7 @@ class FSM(Machine):
                 { 'trigger': 'terminate', 'source': 'initial',     'dest': 'none'       },
                 { 'trigger': 'terminate', 'source': 'error',       'dest': 'none'       },
                 { 'trigger': 'abort',     'source': '*',           'dest': 'none'       },
-                { 'trigger': 'to_error',  'source': '*',           'dest': 'error'      }
+                # { 'trigger': 'to_error',  'source': '*',           'dest': 'error'      }
             ]
             self.command_sequences = {
                 'start_run': [
@@ -49,7 +49,7 @@ class FSM(Machine):
                 { 'trigger': 'terminate',            'source': 'initial',                 'dest': 'none'                   },
                 { 'trigger': 'terminate',            'source': 'error',                   'dest': 'none'                   },
                 { 'trigger': 'abort',                'source': '*',                       'dest': 'none'                   },
-                { 'trigger': 'to_error',             'source': '*',                       'dest': 'error'                  }
+                # { 'trigger': 'to_error',             'source': '*',                       'dest': 'error'                  }
             ]
             self.command_sequences = {
                 'start_run': [

@@ -1,0 +1,18 @@
+{
+    "modules": [
+        {
+            "data": {
+                "clock_frequency": 50000000,
+                "enabled_signals": 1,
+                "hsi_device_id": 1,
+                "hsievent_connection_name": "hsievents",
+                "mean_signal_multiplicity": 1,
+                "signal_emulation_mode": 0,
+                "timestamp_offset": 0,
+                "timesync_topic": "Timesync",
+                "trigger_rate": 1.0
+            },
+            "match": "fhsig"
+        }
+    ]
+}
