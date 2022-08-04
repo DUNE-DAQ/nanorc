@@ -107,6 +107,9 @@ class SubsystemNode(StatefulNode):
 
     def send_custom_command(self, cmd, data, timeout, app=None) -> dict:
         ret = {}
+        if not self.listener.flask_manager.is_alive():
+            self.log.error('Response listener is not alive, trying to respawn it!!')
+            self.listener.flask_manager = self.listener.create_manager()
 
         if cmd == 'scripts': # unfortunately I don't see how else to do this
             scripts = self.cfgmgr.boot.get('scripts')
@@ -143,9 +146,8 @@ class SubsystemNode(StatefulNode):
                         if not is_include_exclude and not c.included: continue
 
                     if not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
-                        if not is_include_exclude:
-                            self.log.error(f'{c.name} is dead, cannot send {cmd} to the app')
-                        return False
+                        self.log.error(f'{c.name} is dead, cannot send {cmd} to the app')
+                        continue
 
                     cmd_data2 = cp.deepcopy(cmd_data)
                     for m in cmd_data2['modules']:
@@ -161,9 +163,8 @@ class SubsystemNode(StatefulNode):
                     if not is_include_exclude and not c.included: continue
 
                 if not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
-                    if not is_include_exclude:
-                        self.log.error(f'{c.name} is dead, cannot send {cmd} to the app')
-                    return False
+                    self.log.error(f'{c.name} is dead, cannot send {cmd} to the app')
+                    continue
                 cmd_data = {
                     "modules": [{
                         "data": data,
@@ -174,6 +175,10 @@ class SubsystemNode(StatefulNode):
         return ret
 
     def send_expert_command(self, app, cmd, timeout) -> dict:
+        if not self.listener.flask_manager.is_alive():
+            self.log.error('Response listener is not alive, trying to respawn it!!')
+            self.listener.flask_manager = self.listener.create_manager()
+
         cmd_name = cmd['id']
         cmd_payload = cmd['data']
         cmd_entry_state = cmd['entry_state']
@@ -215,7 +220,6 @@ class SubsystemNode(StatefulNode):
             )
 
         except Exception as e:
-            # self.log.error(f'Couldn\'t boot {self.name}')
             self.log.exception(e)
             self.to_error(
                 text=f'Couldn\'t boot {self.name}',
