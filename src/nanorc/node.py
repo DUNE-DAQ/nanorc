@@ -107,6 +107,9 @@ class SubsystemNode(StatefulNode):
 
     def send_custom_command(self, cmd, data, timeout, app=None) -> dict:
         ret = {}
+        if not self.listener.flask_manager.is_alive():
+            self.log.error('Response listener is not alive, trying to respawn it!!')
+            self.listener.flask_manager = self.listener.create_manager()
 
         if cmd == 'scripts': # unfortunately I don't see how else to do this
             scripts = self.cfgmgr.boot.get('scripts')
@@ -172,6 +175,10 @@ class SubsystemNode(StatefulNode):
         return ret
 
     def send_expert_command(self, app, cmd, timeout) -> dict:
+        if not self.listener.flask_manager.is_alive():
+            self.log.error('Response listener is not alive, trying to respawn it!!')
+            self.listener.flask_manager = self.listener.create_manager()
+
         cmd_name = cmd['id']
         cmd_payload = cmd['data']
         cmd_entry_state = cmd['entry_state']
