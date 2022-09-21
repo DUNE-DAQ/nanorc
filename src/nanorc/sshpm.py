@@ -56,6 +56,9 @@ def file_logger(logfile, echo=False):
     log = open(logfile, "w")
 
     def interact(line, stdin):
+        if type(line) != str:
+            return
+
         log.write(line)
         log.flush()
         if echo:
