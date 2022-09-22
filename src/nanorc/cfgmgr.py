@@ -106,7 +106,7 @@ class ConfigManager:
             try:
                 return json.load(jf)
             except json.decoder.JSONDecodeError as e:
-                raise RuntimeError(f"ERROR: failed to load {fpath}") from e
+                raise RuntimeError(f"ERROR: failed to load {cfg_path}") from e
 
     def _get_custom_commands_from_dict(self, data:dict):
         from collections import defaultdict
