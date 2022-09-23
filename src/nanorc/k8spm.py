@@ -688,6 +688,10 @@ class K8SProcessManager(object):
 
         apps = boot_info["apps"].copy()
         env_vars = boot_info["env"]
+        rte_script = boot_info.get('rte_script')
+
+        if rte_script:
+            self.log.info(f'Using the Runtime environment script "{rte_script}"')
 
         self.partition = boot_info['env']['DUNEDAQ_PARTITION']
 
@@ -779,6 +783,10 @@ class K8SProcessManager(object):
                 "node-selection"  : app_conf.get('node-selection', []),
                 "connections"     : self.connections.get(app_name, []),
             }
+            if rte_script:
+                # pffff
+                app_boot_info['command'] = ['/bin/bash', '-c']
+                app_boot_info['args'] = [f'source {rte_script} && {app_cmd[0]} {" ".join(app_args)}']
 
             if self.cluster_config.is_kind:
                 # discard most of the nice features of k8s if we use kind

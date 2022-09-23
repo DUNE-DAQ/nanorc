@@ -165,7 +165,11 @@ class SSHProcessManager(object):
         self.boot_info = boot_info
         apps = boot_info["apps"]
         hosts = boot_info["hosts"]
+        rte_script = boot_info.get('rte_script')
         env_vars = boot_info["env"]
+
+        if rte_script:
+            self.log.info(f'Using the Runtime environment script "{rte_script}"')
 
         for app_name, app_conf in apps.items():
 
@@ -194,10 +198,14 @@ class SSHProcessManager(object):
             log_file = f'log_{app_name}_{app_conf["port"]}.txt'
             env_var = [f'export {n}=\"{v}\"' for n, v in app_vars.items()]
             cmd=';'.join(
-                env_var +
                 [f"cd {env_formatter['APP_WD']}"] +
                 [boot_info['exec'][app_conf['exec']]['cmd']+" "+args]
             )
+
+            if rte_script:
+                cmd = f'source {rte_script};{cmd}'
+            else:
+                cmd = ';'.join(env_var)+';'+cmd
 
             if self.log_path:
                 now = datetime.now() # current date and time
