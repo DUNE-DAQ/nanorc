@@ -203,7 +203,8 @@ class SSHProcessManager(object):
             )
 
             if rte_script:
-                cmd = f'source {rte_script};{cmd}'
+                cmd = ';'.join(env_var)+f';source {rte_script};{cmd}'
+                
             else:
                 cmd = ';'.join(env_var)+';'+cmd
 
