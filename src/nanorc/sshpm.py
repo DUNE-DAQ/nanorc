@@ -204,15 +204,19 @@ class SSHProcessManager(object):
 
             if rte_script:
                 cmd = ';'.join(env_var)+f';source {rte_script};{cmd}'
-                
+
             else:
                 cmd = ';'.join(env_var)+';'+cmd
 
             if self.log_path:
                 now = datetime.now() # current date and time
-                date_time = now.strftime("%Y-%m-%d_%H:%M:%S")
+                date_time = now.strftime("%Y-%m-%d_%H%M%S")
                 log_file_localhost = f'log_{date_time}_{app_name}_{app_conf["port"]}.txt'
                 cmd = "{ "+cmd+"; } &> "+ self.log_path+"/"+log_file_localhost
+                self.console.print(f'\'{app_name}\' logs are in \'{host}:{self.log_path}/{log_file_localhost}\'')
+            else:
+                import socket
+                self.console.print(f'\'{app_name}\' logs are in \'{socket.gethostname()}:{os.getcwd()}/{log_file}\'')
 
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"]
             # if not self.can_use_kerb:
@@ -248,7 +252,7 @@ class SSHProcessManager(object):
         for name, desc in self.apps.items():
             proc = sh.ssh(
                 *desc.ssh_args,
-                _out=file_logger(desc.logfile),
+                _out=file_logger(desc.logfile) if not self.log_path else None,
                 _bg=True,
                 _bg_exc=False,
                 _new_session=True,
