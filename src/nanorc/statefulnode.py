@@ -94,23 +94,23 @@ class StatefulNode(NodeMixin):
                     self.return_code = ErrorCode.InvalidTransition
                 return CanExecuteReturnVal.InvalidTransition
 
-        for c in self.children:
-            if not c.included and only_included: continue
+        # for c in self.children:
+        #     if not c.included and only_included: continue
 
-            # How do I get rid of this enormity?
-            if command=='terminate' and c.state=='none':
-                continue
+        #     # How do I get rid of this enormity?
+        #     if command=='terminate' and c.state=='none':
+        #         continue
 
-            ret = c.can_execute(
-                command = command,
-                quiet = quiet,
-                check_dead = check_dead,
-                check_inerror = check_inerror,
-                only_included = only_included,
-            )
-            if ret != CanExecuteReturnVal.CanExecute:
-                self.return_code = ErrorCode.Failed
-                return ret
+        #     ret = c.can_execute(
+        #         command = command,
+        #         quiet = quiet,
+        #         check_dead = check_dead,
+        #         check_inerror = check_inerror,
+        #         only_included = only_included,
+        #     )
+        #     if ret != CanExecuteReturnVal.CanExecute:
+        #         self.return_code = ErrorCode.Failed
+        #         return ret
 
         self.return_code = ErrorCode.Success
         return CanExecuteReturnVal.CanExecute
@@ -239,7 +239,7 @@ class StatefulNode(NodeMixin):
         for cn in self.order[command]:
             child = [c for c in self.children if c.name == cn][0]
             if not child.included: continue
-
+            self.log.info(f'Sending {command} to {child.name}')
             try:
                 child.trigger(command, **event.kwargs)
                 for _ in range(event.kwargs["timeout"]):
@@ -256,7 +256,7 @@ class StatefulNode(NodeMixin):
 
             except Exception as e:
                 if force:
-                    self.log.error(f'Failed to send \'{command}\' to \'{child.name}\', --force was specified so continuing anyway')
+                    self.log.error(f'Failed to send \'{command}\' to \'{child.name}\', --force was specified so continuing anyway, {str(e)}')
                     continue
                 status = ErrorCode.Failed
 

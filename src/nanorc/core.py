@@ -101,8 +101,8 @@ class NanoRC:
         seq_cmd = self.topnode.fsm.command_sequences.get(command)
         return seq_cmd if seq_cmd else [command]
 
-    def can_execute(self, command:str, quiet=False):
-        return self.topnode.can_execute(command, quiet=quiet)
+    def can_execute(self, command:str, quiet=False, check_dead=True, check_inerror=True):
+        return self.topnode.can_execute(command, quiet=quiet, check_dead=check_dead, check_inerror=check_inerror)
 
     def execute_custom_command(self, command, data, timeout, node_path=None, check_dead=True, check_inerror=True, only_included=True):
         if not timeout:

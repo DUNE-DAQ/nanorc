@@ -358,7 +358,6 @@ class SubsystemNode(StatefulNode):
         cfg_method = event.kwargs.get("cfg_method")
         timeout = event.kwargs["timeout"]
         force = event.kwargs.get('force')
-
         exit_state = self.get_destination(command).upper()
 
         log = f"Sending {command} to the subsystem {self.name}"
@@ -399,6 +398,7 @@ class SubsystemNode(StatefulNode):
                 if chuck == app.name:
                     del appset[i]
 
+        ignore = []
         for child_node in appset:
             data = self.cfgmgr.generate_data_for_module(event.kwargs.get('overwrite_data'))
             if not child_node.included:
@@ -406,19 +406,29 @@ class SubsystemNode(StatefulNode):
                 continue
             self.log.debug(f'Sending {command} to {child_node.name}')
 
-
             entry_state = child_node.state.upper()
+            try:
+                child_node.trigger(command)
+                ## APP now in *_ing
+                child_node.sup.send_command(
+                    cmd_id = command,
+                    cmd_data = data,
+                    entry_state=entry_state,
+                    exit_state=exit_state
+                )
+            except Exception as e:
+                if force:
+                    self.log.error(f'Failed to send \'{command}\' to \'{child_node.name}\', --force was specified so continuing anyway')
+                    ignore+=[child_node.name]
+                else:
+                    self.log.error(f'Failed to send \'{command}\' to \'{child_node.name}\'')
+                    raise e
 
-            child_node.trigger(command)
-            ## APP now in *_ing
 
-            child_node.sup.send_command(
-                cmd_id = command,
-                cmd_data = data,
-                entry_state=entry_state,
-                exit_state=exit_state
-            )
-
+        for chuck in ignore:
+            for i, app in enumerate(appset):
+                if chuck == app.name:
+                    del appset[i]
         start = datetime.now()
 
         for _ in range(timeout*10):
