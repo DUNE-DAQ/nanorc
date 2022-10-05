@@ -349,7 +349,7 @@ Log on to the np04 cluster and follow the instructions in [here](https://twiki.c
 #### Setup the nightly/release
 Using the instructions at this [link](https://dune-daq-sw.readthedocs.io/en/latest/packages/daq-buildtools/#setup-of-daq-buildtools), set up a work area or a release.
 
-*An important point is that if you want to run K8s with custom code inside the `sourcecode` directory you will need to create a docker image yourself* (see instructions at the end of this README _How to build a `daq_application` image and distribute it_).
+**An important point is that if you want to run K8s with custom code inside the `sourcecode` directory you will need to create a docker image yourself** (see instructions at the end of this README _How to build a `daq_application` image and distribute it_).
 
 It is worth mentioning that the `dbt-workarea-env` command will set up `spack`, which is the DAQ build system. This makes some alterations to a low-level library in `LD_LIBRARY_PATH`, which can cause some utilities like `ssh`, `nano` and `htop` to not work (you would get a segfault when running them). To fix this, run `LD_LIBRARY_PATH=/lib64 [PROGRAM_NAME]`: this will manually reset the path to what it was before spack was set up. However, this should not be required in order to run any of the commands on this page.
 
@@ -369,7 +369,7 @@ Next, you need to generate the configuration:
 ```sh
 daqconf_multiru_gen -c config.json daq-config
 ```
-And upload it on the MongoDB, the first argument is the directory you have just generated with `daqconf_multiru_gen` and the second is the key in the configuration on the MongoDB, *it cannot have underscores in it* since it's accessed via HTTP requests:
+And upload it on the MongoDB, the first argument is the directory you have just generated with `daqconf_multiru_gen` and the second is the key in the configuration on the MongoDB, **it cannot have underscores in it** since it's accessed via HTTP requests:
 ```sh
 upload-conf daq-config ${USER}-configuration # name it something better!
 ```
