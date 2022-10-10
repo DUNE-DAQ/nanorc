@@ -145,7 +145,7 @@ nanorc fake_daq partition-name boot conf start_run --disable-data-storage $run_n
 
 ### Viewing logs and output
 
-Logs are kept in the working directory at the time you started nanorc, named `log_<application name>_<port>.txt`.
+Logs are kept in the working directory at the time you started nanorc, named `log_<application name>_<port>.txt`, or, if you are running `nano04rc` in `/log/` on the host in which the application is running;..
 
 You can look at the header and the value of attributes in the hdf5 file using:
 
@@ -347,24 +347,35 @@ Log on to the np04 cluster and follow the instructions in [here](https://twiki.c
  - You **do not** need to create your namespace. That is handled automatically by nanorc.
 
 #### Setup the nightly/release
-Using the instructions at either this [link](https://github.com/DUNE-DAQ/daqconf/wiki/Instructions-for-setting-up-a-development-software-area) for a nightly, or this [link](https://github.com/DUNE-DAQ/daqconf/wiki/Instructions-for-setting-up-a-v3.1.0-software-area) for a v3.1.0 software area, set up the work area. It is worth mentioning that the `dbt-workarea-env` command will set up `spack`, which is the DAQ build system. This makes some alterations to a low-level library in `LD_LIBRARY_PATH`, which can cause some utilities like `ssh`, `nano` and `htop` to not work (you would get a segfault when running them). To fix this, run `LD_LIBRARY_PATH=/lib64 [PROGRAM_NAME]`: this will manually reset the path to what it was before spack was set up. However, this should not be required in order to run any of the commands on this page.
+Using the instructions at this [link](https://dune-daq-sw.readthedocs.io/en/latest/packages/daq-buildtools/#setup-of-daq-buildtools), set up a work area or a release.
+
+**An important point is that if you want to run K8s with custom code inside the `sourcecode` directory you will need to create a docker image yourself** (see instructions at the end of this README _How to build a `daq_application` image and distribute it_).
+
+It is worth mentioning that the `dbt-workarea-env` command will set up `spack`, which is the DAQ build system. This makes some alterations to a low-level library in `LD_LIBRARY_PATH`, which can cause some utilities like `ssh`, `nano` and `htop` to not work (you would get a segfault when running them). To fix this, run `LD_LIBRARY_PATH=/lib64 [PROGRAM_NAME]`: this will manually reset the path to what it was before spack was set up. However, this should not be required in order to run any of the commands on this page.
 
 #### Generate a configuration and upload it on the configuration service
-```sh
-cd ../../../../runarea # "image-name" on the next line is just a default: look below for what you should change it to.
-daqconf_multiru_gen --use-k8s --image np04docker.cern.ch/dunedaq-local/image-name --host-ru np04-srv-026 --ers-impl cern --opmon-impl cern daq
-upload-conf daq username-configuration # name it something better!
+Create a daqconf file as such (named `config.json` in the rest of the instructions):
+```json
+{
+  "boot": {
+    "ers_impl": "cern",
+    "opmon_impl": "cern",
+    "use_k8s": true,
+    "image": "np04docker.cern.ch/ghcr/dune-daq/c8-spack:latest"
+  }
+}
 ```
-This will create an entry in the configuration service containing all the configuration data. In this example, it will be called `username-configuration`, so you probably want to name it better.
+Next, you need to generate the configuration:
+```sh
+daqconf_multiru_gen -c config.json daq-config
+```
+And upload it on the MongoDB, the first argument is the directory you have just generated with `daqconf_multiru_gen` and the second is the key in the configuration on the MongoDB, **it cannot have underscores in it** since it's accessed via HTTP requests:
+```sh
+upload-conf daq-config ${USER}-configuration # name it something better!
+```
+This will create an entry in the configuration service containing all the configuration data. In this example, it will be called `${USER}-configuration`, so you probably want to name it better.
 
 Note that the `upload-conf` utility will fails if you have proxy.
-
-In the example above, you should rename `np04docker.cern.ch/dunedaq-local/image-name` to whatever image you want to run on. To know which one you want to run on:
- - `dunedaq-v3.1.0` will use the release `v3.1.0`
- - `dunedaq-N22-07-15` will run on the nightly `N22-07-15`
- - `dunedaq-rc1-v3.1.0` will use the first release candidate for `v3.1.0`
-
-All the images should be listed, at some point to a place which will be linked here when up.
 
 #### Run nanorc
 ... **after** unsetting the proxy.
