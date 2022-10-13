@@ -275,10 +275,10 @@ This page describes the functionality which is supported within Kubernetes in v3
 
 ### Requirements
 Before you go off and try this, you at least need to have:
- - A k8s cluster running. To check that this is the case, you can head to the dashboard (on the NP04 cluster, that's [here](http://np04-srv-015:31001/#/workloads?namespace=default), after you have setup a SOCKS proxy to lxplus).
- - All the nodes being able to access `/cvmfs`.
- - The configuration service running in the cluster. To check that, you can head to the configuration service URL (at NP04, it's [here](http://np04-srv-015:31011/)) and making sure that you see text "DAQLing Configuration Management Service v1.0.0".
- - The dunedaq images on which you want to run available from all the nodes. The simplest way to do that is to have your image on dockerhub (at NP04, we have a repository [here](np04docker.cern.ch), but at the time this is being written, on the 2nd Aug 2022, it doesn't work).
+* A k8s cluster running. To check that this is the case, you can head to the dashboard (on the NP04 cluster, that's [here](http://np04-srv-015:31001/#/workloads?namespace=default), after you have setup a SOCKS proxy to lxplus).
+* All the nodes being able to access `/cvmfs`.
+* The configuration service running in the cluster. To check that, you can head to the configuration service URL (at NP04, it's [here](http://np04-srv-015:31011/)) and making sure that you see text "DAQLing Configuration Management Service v1.0.0".
+* The dunedaq images on which you want to run available from all the nodes. The simplest way to do that is to have your image on dockerhub (at NP04, we have a repository [here](np04docker.cern.ch), but at the time this is being written, on the 2nd Aug 2022, it doesn't work).
 
 All of this is available on the NP04 cluster.
 
@@ -343,8 +343,8 @@ Current nodes list (on the 2nd Aug 2022):
 ### Getting started
 Log on to the np04 cluster and follow the instructions in [here](https://twiki.cern.ch/twiki/bin/view/CENF/NP04k8s).
 2 important notes:
- - You **do not** need to be on `np04-srv-015` to use nanorc and K8s. But you will need to have the correct `KUBECONFIG` properly set as described in the previous link.
- - You **do not** need to create your namespace. That is handled automatically by nanorc.
+* You **do not** need to be on `np04-srv-015` to use nanorc and K8s. But you will need to have the correct `KUBECONFIG` properly set as described in the previous link.
+* You **do not** need to create your namespace. That is handled automatically by nanorc.
 
 #### Setup the nightly/release
 Using the instructions at this [link](https://dune-daq-sw.readthedocs.io/en/latest/packages/daq-buildtools/#setup-of-daq-buildtools), set up a work area or a release.

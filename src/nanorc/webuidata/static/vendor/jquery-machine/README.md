@@ -1,10 +1,10 @@
-jQuery-Machine, finite state machines that rock
+# jQuery-Machine, finite state machines that rock
 ===============================================
 
 The jQuery plugin `jquery-machine` implements a simple and clean DSL to attach finite state machines to DOM elements. You can use it to build awesome multy-state UI elements and widgets with ease.
 
 
-Motivation
+## Motivation
 ==========
 
 As Web developers striving to build beautiful and usable apps, we are often confronted with the design of fairly complex client-side UI widgets, transitioning between different states in response to various events. Often that leads to spaghetti JavaScript code which is difficult to maintain, and sometimes we even find ourselves surrending to second-best but more manageable solutions.
@@ -14,7 +14,7 @@ Surrender no more to complexity! Here is `jquery-machine`, our neat weapon.
 `jquery-machine` provides you with a beautiful DSL to attach finite state machines to DOM objects, and automatically handles states transitions and events for you.
 
 
-Usage
+## Usage
 =====
 
 Attach a finite state machine to a jQuery selection:
@@ -98,19 +98,19 @@ $("#myelement").machine({
 });
 ```
 
-Getting the state
+## Getting the state
 -----------------
 
 You can read the state of an element in any moment with `$("#myelement").data("state")`.
 
 
-Setting the state
+## Setting the state
 -----------------
 
 You should not set the state programmatically. Let the events trigger automatically the state transitions you specified: you shouldn't use `$("#myelement").data("state", "myForcedState")` to force the state, because that puts the state machine out of sync (`onExit` and `onEnter` don't get called). When needed, you can always trigger events programmatically via the jQuery function `.trigger()`.
 
 
-Configuration options
+## Configuration options
 =====================
 
 The `machine()` function optionally accepts an object containing configuration options as the second argument. The full list of options is the following:
@@ -122,7 +122,7 @@ The `machine()` function optionally accepts an object containing configuration o
 Further explanation of these configuration options follows.
 
 
-Default state
+## Default state
 -------------
 
 There are three ways of specifying the state initially set by default:
@@ -135,7 +135,7 @@ The last method let you attach the same state machine to different elements, wit
 
 However you choose to define it, you must make sure that one of the states is the `defaultState`.
 
-Classes corresponding to the current state
+## Classes corresponding to the current state
 ------------------------------------------
 
 Often it is useful to set classes corresponding to the present state of an element. This way, it is easy to change the style of the element depending on its state. You can get this behavior automatically setting the `setClass` option to `true`:
@@ -152,7 +152,7 @@ $("#myelement").machine({
 ```
 
 
-Scoping and multiple state machines on the same element
+## Scoping and multiple state machines on the same element
 -------------------------------------------------------
 
 You can attach multiple independent state machines to the same element by giving them different scopes:
@@ -185,7 +185,7 @@ $("#myelement").data("openess-state"); // it may return 'open' or 'closed'
 
 Classes set by `jquery-machine` when you set the option `setClass` to `true` will be prefixed as well.
 
-Testing
+## Testing
 -------
 
 Tests are written using [quint](http://qunitjs.com).
@@ -195,7 +195,7 @@ npm install
 grunt test
 ```
 
-Building (which also runs the tests)
+## Building (which also runs the tests)
 ------------------------------------
 
 ```bash
@@ -203,7 +203,7 @@ npm install
 grunt
 ```
 
-Changelog
+## Changelog
 =========
 
 - **v1.0.1** Enforce the requirement for at least one `defaultState`, modified the build process to use [grunt](http://gruntjs.com). Other small tidy ups. (thanks to [davesag](https://github.com/davesag))
