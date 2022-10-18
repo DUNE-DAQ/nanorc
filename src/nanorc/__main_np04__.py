@@ -221,7 +221,7 @@ def start_defaults_overwrite(kwargs):
     return kwargs
 
 def is_authenticated():
-    if not credentials.check_kerberos_credentials():
+    if not credentials.check_kerberos_credentials(silent=True):
         logging.getLogger("cli").error(f'\'{credentials.user}\' doesn\'t have valid kerberos ticket, use \'kinit\', or \'change_user\' to create a ticket (in a shell or in nanorc)')
         return False
     return True
