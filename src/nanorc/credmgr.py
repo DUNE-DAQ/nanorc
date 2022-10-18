@@ -4,7 +4,6 @@ from getpass import getpass
 import subprocess
 import logging
 import tempfile
-
 class Authentication():
     def __init__(self, service:str, user:str, password:str):
         self.service = service
@@ -18,6 +17,10 @@ class CredentialManager:
         self.authentications = []
         self.user = None
         self.console = None
+        krb_cache_path = os.path.expanduser('~/.nanorc_kerbcache')
+        if not os.path.isdir(krb_cache_path):
+            os.mkdir(krb_cache_path)
+        self.krbenv = {'KRB5CCNAME': f'DIR:{krb_cache_path}'}
 
     def add_login(self, service:str, user:str, password:str):
         self.authentications.append(Authentication(service, user, password))
@@ -68,9 +71,10 @@ class CredentialManager:
 
     def check_kerberos_credentials(self, silent=False):
         while True:
-            args=["klist"] # on my mac, we can specify --json and that gives everything nicely in json format... but...
-            proc = subprocess.run(args, capture_output=True, text=True)
+            args=['klist'] # on my mac, we can specify --json and that gives everything nicely in json format... but...
+            proc = subprocess.run(args, capture_output=True, text=True, env=self.krbenv)
             raw_kerb_info = proc.stdout.split('\n')
+            if not silent: self.log.info(proc.stdout)
             kerb_user = None
             valid_until = None
             for line in raw_kerb_info:
@@ -83,6 +87,10 @@ class CredentialManager:
 
                 if kerb_user:
                     break
+            if kerb_user:
+                self.log.info(f'Detected kerb ticket for user: \'{kerb_user}\'')
+            else:
+                self.log.info(f'No kerb ticket')
 
             if not kerb_user:
                 if not silent: self.log.error('CredentialManager: No kerberos ticket!')
@@ -90,7 +98,7 @@ class CredentialManager:
             elif kerb_user != self.user: # we enforce the user is thec
                 return False
             else:
-                return True if subprocess.call(['klist', '-s']) == 0 else False
+                return True if subprocess.call(['klist', '-s'], env=self.krbenv) == 0 else False
 
 
 
@@ -105,7 +113,8 @@ class CredentialManager:
                 return False
 
             p = subprocess.Popen(['kinit', self.user+'@CERN.CH'],
-                                 stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+                                 stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE,
+                                 env=self.krbenv)
             stdout_data = p.communicate(password.encode())
             print(stdout_data[-1].decode())
             success = p.returncode==0
@@ -117,7 +126,9 @@ class CredentialManager:
         max_tries = 3
         it_try = 0
         args=["cern-get-sso-cookie", "--krb", "-r", "-u", website, "-o", f"{SSO_COOKIE_PATH}"]
-        proc = subprocess.run(args, env={ 'LD_LIBRARY_PATH':'/lib64' })
+        env = { 'LD_LIBRARY_PATH':'/lib64'}
+        env.update(self.krbenv)
+        proc = subprocess.run(args, env=env)
         if proc.returncode != 0:
             self.log.error("CredentialManager: Couldn't get SSO cookie!")
             self.log.error("You need to 'kinit' or 'change_user' and try again!")

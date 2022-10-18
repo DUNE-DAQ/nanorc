@@ -192,6 +192,19 @@ def change_user(ctx, obj, user):
 def kinit(ctx, obj):
     credentials.new_kerberos_ticket()
 
+@np04cli.command('klist')
+@click.pass_obj
+@click.pass_context
+def klist(ctx, obj):
+    credentials.check_kerberos_credentials(silent=False)
+    import subprocess
+    # print(subprocess.call(['klist', '-s']))
+    proc = subprocess.run(['klist', '-s'], capture_output=True, text=True, env=credentials.krbenv)
+    obj.rc.log.info(f'klist -s\nstdout: {proc.stdout}')
+    obj.rc.log.info(f'stderr: {proc.stderr}')
+    obj.rc.log.info(f'ret code: {proc.returncode}')
+
+
 def add_run_start_parameters():
     # sigh start...
     def add_decorator(function):
