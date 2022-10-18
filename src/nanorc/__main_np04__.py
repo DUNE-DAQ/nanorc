@@ -56,6 +56,28 @@ from nanorc.nano_context import NanoContext
 @click.pass_obj
 @click.pass_context
 def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, dotnanorc, kerberos, timeout, partition_number, partition_label, web, pm, cfg_dir, user):
+    credentials.set_partition(
+        partition_number=partition_number,
+        partition_name=partition_label
+    )
+
+    in_use = credentials.partition_in_use()
+    if in_use:
+        kuser = credentials.get_kerberos_user(silent=True)
+
+        if kuser!=None and kuser != user:
+            obj.console.print(f'[bold red]Partition #{partition_number}, \'{in_use}\', seems to be used by \'{kuser}\', do you want to steal it? Y/N[/bold red]')
+        else:
+            obj.console.print(f'[bold red]You seem to already have partition #{partition_number}, \'{in_use}\', active, are you sure you want to proceed? Y/N[/bold red]')
+            while True:
+                steal = input()
+                if   steal == 'Y': break
+                elif steal == 'N': exit(0)
+                obj.console.print(f'[bold red]Wrong answer! Y or N?[/bold red]')
+
+    credentials.start_partition()
+
+
 
     if not elisa_conf:
         with resources.path(confdata, "elisa_conf.json") as p:
@@ -63,6 +85,9 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
 
     obj.print_traceback = traceback
     credentials.change_user(user)
+    if credentials.user is None:
+        print()
+        raise RuntimeError(f'User {user} couldn\'t login')
     ctx.command.shell.prompt = f"{credentials.user}@np04rc> "
     grid = Table(title='Shonky Nano04RC', show_header=False, show_edge=False)
     grid.add_column()
@@ -163,11 +188,13 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
         raise click.Abort()
 
     def cleanup_rc():
+        credentials.quit()
         if rc.topnode.state != 'none':
             logging.getLogger("cli").warning("NanoRC context cleanup: Aborting applications before exiting")
             rc.abort(timeout=120)
         if rc.return_code:
             ctx.exit(rc.return_code)
+
 
     ctx.call_on_close(cleanup_rc)
     obj.rc = rc
