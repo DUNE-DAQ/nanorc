@@ -47,12 +47,12 @@ class CredentialManager:
         self.create_kerb_cache()
 
     def stop_partition(self):
-        if os.path.isfile(self.krb_cache_path/'active'):
-            os.remove(self.krb_cache_path/'active')
+        if os.path.isfile(self.krb_cache_path/'active_partition'):
+            os.remove(self.krb_cache_path/'active_partition')
 
     def start_partition(self):
         if not self.cache_initialised: raise RuntimeError('Nanorc\'s kerberos cache wasn\'t initialised!')
-        f = open(self.krb_cache_path/'active', "w")
+        f = open(self.krb_cache_path/'active_partition', "w")
         f.write(self.partition_name)
         f.close()
 
@@ -106,8 +106,8 @@ class CredentialManager:
 
     def partition_in_use(self):
         if not self.cache_initialised: raise RuntimeError('Nanorc\'s kerberos cache wasn\'t initialised!')
-        if os.path.isfile(self.krb_cache_path/'active'):
-            f = open(self.krb_cache_path/'active', "r")
+        if os.path.isfile(self.krb_cache_path/'active_partition'):
+            f = open(self.krb_cache_path/'active_partition', "r")
             pname = f.read()
             return pname
         return None
