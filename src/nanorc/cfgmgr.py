@@ -177,7 +177,7 @@ class ConfigManager:
 
             origuri = connection['uri']
             connection['uri'] = parse_string(connection['uri'], hosts)
-            self.log.debug(f" - '{connection['uid']}': {connection['uri']} ({origuri})")
+            self.log.debug(f" - '{connection['id']['uid']}': {connection['uri']} ({origuri})")
         return data
 
 
