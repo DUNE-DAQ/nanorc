@@ -257,6 +257,11 @@ class SubsystemNode(StatefulNode):
                 parent=self,
                 fsm_conf=self.fsm_conf)
 
+            tries=0 # give it 10 more seconds to come up
+            while (not child.sup.desc.proc.is_alive() or not child.sup.commander.ping()) and tries<20:
+                time.sleep(0.5)
+                tries+=1
+
 
             if child.sup.desc.proc.is_alive() and child.sup.commander.ping():
                 # nothing really happens in these 2:
