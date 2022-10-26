@@ -4,8 +4,10 @@
 Command Line Interface for NanoRC
 """
 
-from .cli import *
+from .cli import cli, logging
 from .credmgr import credentials
+from rich.console import Console
+from nanorc.nano_context import NanoContext
 
 def main():
     from rich.logging import RichHandler
