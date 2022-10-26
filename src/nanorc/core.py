@@ -312,7 +312,12 @@ class NanoRC:
 
         if self.logbook:
             try:
-                self.logbook.message_on_start(message, run, run_type)
+                self.logbook.message_on_start(
+                    message = message,
+                    apparatus = self.apparatus_id,
+                    run_num = run,
+                    run_type = run_type
+                )
             except Exception as e:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
@@ -369,7 +374,10 @@ class NanoRC:
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
             try:
-                self.logbook.add_message(message)
+                self.logbook.add_message(
+                    message = message,
+                    apparatus = self.apparatus_id
+                )
                 # if self.runs:
                 #     if self.runs[-1].is_running():
                 #         self.runs[-1].messages.append(message)
@@ -433,7 +441,10 @@ class NanoRC:
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
             try:
-                self.logbook.message_on_stop(message)
+                self.logbook.message_on_stop(
+                    message = message,
+                    apparatus = self.apparatus_id
+                )
                 # if self.runs: self.runs[-1].messages.append(message)
             except Exception as e:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
