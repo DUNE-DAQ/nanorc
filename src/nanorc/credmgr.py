@@ -32,18 +32,18 @@ class CredentialManager:
         #     shutil.rmtree(self.krb_cache_path)
 
     def create_kerb_cache(self):
-        if self.partition_number is None:
-            raise RuntimeError('Partition number hasn\'t been specified, I cannot create a nanorc kerberos cache')
+        if self.partition_number is None or self.partition_name is None:
+            raise RuntimeError('Partition number (or name) hasn\'t been specified, I cannot create a nanorc kerberos cache')
 
-        self.krb_cache_path = Path(os.path.expanduser(f'~/.nanorc_kerbcache_part{self.partition_number}'))
+        self.krb_cache_path = Path(os.path.expanduser(f'~/.nanorc_kerbcache_{self.partition_name}_part{self.partition_number}'))
         if not os.path.isdir(self.krb_cache_path):
             os.mkdir(self.krb_cache_path)
         self.krbenv = {'KRB5CCNAME': f'DIR:{self.krb_cache_path}'}
         self.cache_initialised = True
 
-    def set_partition(self, partition_number, partition_name):
+    def set_partition(self, partition_number, apparatus_id):
         self.partition_number = partition_number
-        self.partition_name = partition_name
+        self.partition_name = apparatus_id # here is the mother of all the partition definition questions...
         self.create_kerb_cache()
 
     def stop_partition(self):

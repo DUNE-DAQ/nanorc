@@ -20,7 +20,6 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.console import Console
 from rich.traceback import Traceback
-from rich.progress import *
 
 
 from nanorc.core import NanoRC
@@ -56,26 +55,6 @@ from nanorc.nano_context import NanoContext
 @click.pass_obj
 @click.pass_context
 def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, dotnanorc, kerberos, timeout, partition_number, partition_label, web, pm, cfg_dir, user):
-    credentials.set_partition(
-        partition_number=partition_number,
-        partition_name=partition_label
-    )
-
-    in_use = credentials.partition_in_use()
-    if in_use:
-        kuser = credentials.get_kerberos_user(silent=True)
-
-        if kuser!=None and kuser != user:
-            obj.console.print(f'[bold red]Partition #{partition_number}, \'{in_use}\', seems to be used by \'{kuser}\', do you want to steal it? Y/N[/bold red]')
-        else:
-            obj.console.print(f'[bold red]You seem to already have partition #{partition_number}, \'{in_use}\', active, are you sure you want to proceed? Y/N[/bold red]')
-            while True:
-                steal = input()
-                if   steal == 'Y': break
-                elif steal == 'N': exit(0)
-                obj.console.print(f'[bold red]Wrong answer! Y or N?[/bold red]')
-
-    credentials.start_partition()
 
 
 
@@ -84,17 +63,12 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
             elisa_conf = p
 
     obj.print_traceback = traceback
-    credentials.change_user(user)
-    if credentials.user is None:
-        print()
-        raise RuntimeError(f'User {user} couldn\'t login')
-    ctx.command.shell.prompt = f"{credentials.user}@np04rc> "
     grid = Table(title='Shonky Nano04RC', show_header=False, show_edge=False)
     grid.add_column()
     grid.add_row("This is an admittedly shonky nano RC to control DUNE-DAQ applications.")
     grid.add_row("  Give it a command and it will do your biddings,")
     grid.add_row("  but trust it and it will betray you!")
-    grid.add_row(f"Use it with care, {credentials.user}!")
+    grid.add_row("Use it with care, user!")
 
     obj.console.print(Panel.fit(grid))
 
@@ -110,7 +84,7 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
     try:
         dotnanorc = os.path.expanduser(dotnanorc)
         obj.console.print(f"[blue]Loading {dotnanorc}[/blue]")
-        f = open(dotnanorc)
+        f = open(dotnanorc, 'r')
         dotnanorc = json.load(f)
 
         rundb_socket = json.loads(resources.read_text(confdata, "run_number.json"))['socket']
@@ -137,6 +111,28 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
             port_offset = port_offset,
             pm = pm
         )
+        credentials.set_partition(partition_number=partition_number,apparatus_id=rc.apparatus_id)
+
+        in_use = credentials.partition_in_use()
+        if in_use:
+            kuser = credentials.get_kerberos_user(silent=True)
+
+            if kuser!=None and kuser != user:
+                obj.console.print(f'[bold red]Partition #{partition_number} on apparatus \'{in_use}\' seems to be used by \'{kuser}\', do you want to steal it? Y/N[/bold red]')
+            else:
+                obj.console.print(f'[bold red]You seem to already have partition #{partition_number} on apparatus \'{in_use}\' active, are you sure you want to proceed? Y/N[/bold red]')
+                while True:
+                    steal = input()
+                    if   steal == 'Y': break
+                    elif steal == 'N': exit(0)
+                    obj.console.print(f'[bold red]Wrong answer! Y or N?[/bold red]')
+
+        credentials.start_partition()
+        credentials.change_user(user)
+        ctx.command.shell.prompt = f"{credentials.user}@np04rc> "
+        if credentials.user is None:
+            print()
+            raise RuntimeError(f'User {user} couldn\'t login')
 
         rc.log_path = os.path.abspath(log_path)
         add_common_cmds(ctx.command, end_of_run_cmds=False)
