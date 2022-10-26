@@ -84,11 +84,12 @@ def updateLogLevel(loglevel):
 @accept_timeout(60)
 @click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=argval.validate_partition_number)
 @click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn WEBUI')
+@click.option('--tui/--no-tui', is_flag=True, default=False, help='whether to use TUI')
 @click.argument('top_cfg', type=str, callback=argval.validate_conf)
 @click.argument('partition-label', type=str, callback=argval.validate_partition)
 @click.pass_obj
 @click.pass_context
-def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, timeout, kerberos, partition_number, web, top_cfg, partition_label, pm):
+def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, timeout, kerberos, partition_number, web, top_cfg, partition_label, tui, pm):
     obj.print_traceback = traceback
     credentials.user = 'user'
     ctx.command.shell.prompt = f'{credentials.user}@rc> '
@@ -100,7 +101,8 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
     grid.add_row("  but trust it and it will betray you!")
     grid.add_row(f"Use it with care, {credentials.user}!")
 
-    obj.console.print(Panel.fit(grid))
+    if not tui:
+        obj.console.print(Panel.fit(grid))
 
     port_offset = 0 + partition_number * 500
     rest_port = 5005 + partition_number
@@ -111,7 +113,8 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
 
     rest_thread  = threading.Thread()
     webui_thread = threading.Thread()
-
+    if web and tui:
+        raise RuntimeError("cant have TUI and GUI at the same time")
     try:
         rc = NanoRC(
             console = obj.console,
@@ -180,6 +183,8 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
             obj.console.log(f"")
 
 
+
+
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
         raise click.Abort()
@@ -200,6 +205,12 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
         rest_thread.join()
         webui_thread.join()
 
+    if tui:
+        from .tui import NanoRCTUI
+        tui = NanoRCTUI(rc=rc, banner=Panel.fit(grid))
+        tui.run()
+        cleanup_rc()
+        ctx.exit(rc.return_code)
 
 
 ################################
@@ -250,4 +261,3 @@ def start(ctx, obj:NanoContext, **kwargs):
     obj.rc.start(**start_defaults_overwrite(kwargs))
     check_rc(ctx,obj.rc)
     obj.rc.status()
-
