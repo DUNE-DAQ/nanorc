@@ -19,7 +19,7 @@ from . import confdata
 from rich.traceback import Traceback
 from rich.progress import *
 from rich.table import Table
-from .runinfo import start_run, print_run_info
+from .runinfo import start_run, get_run_info
 
 from datetime import datetime
 
@@ -217,15 +217,14 @@ class NanoRC:
             return
 
         if self.runs:
-            print_run_info(self.runs[-1], self.console)
-        print_status(apparatus_id=self.apparatus_id, topnode=self.topnode, console=self.console, partition=self.partition)
+            self.console.print(print_run_info(self.runs[-1]))
+        self.console.print(get_status(apparatus_id=self.apparatus_id, topnode=self.topnode, partition=self.partition))
 
     def ls(self, leg:bool) -> NoReturn:
         """
         Print the nodes
         """
-        self.return_code = print_node(node=self.topnode, console=self.console, leg=leg)
-
+        self.console.print(get_node(node=self.topnode))
 
     def boot(self, timeout:int) -> NoReturn:
         """

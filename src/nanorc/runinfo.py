@@ -39,7 +39,10 @@ def start_run(run_number:int,
     return ri
 
 
-def print_run_info(run_info:RunInfo, console:Console):
+def get_run_info(run_info:RunInfo=None) -> Table:
+    if run_info is None:
+        return Table(title = f'No run ongoing')
+        
     if run_info.run_stop_time:
         table = Table(title=f'Run [bold]#{run_info.run_number}[/bold] finished',show_header=False)
     else:
@@ -65,4 +68,4 @@ def print_run_info(run_info:RunInfo, console:Console):
         table.add_row("Trigger rate", "default from config (1Hz?)")
 
 
-    console.print(table)
+    return table

@@ -36,7 +36,7 @@ def status_data(node, get_children=True) -> dict:
     return ret
 
 
-def print_status(topnode, console, apparatus_id='', partition='') -> int:
+def get_status(topnode, apparatus_id:str='', partition:str='') -> Table:
     table = Table(title=f"[bold]{apparatus_id}[/bold] applications" + (f" in partition [bold]{partition}[/bold]" if partition else ''))
     table.add_column("name", style="blue")
     table.add_column("state", style="blue")
@@ -106,9 +106,9 @@ def print_status(topnode, console, apparatus_id='', partition='') -> int:
                 state_txt
             )
 
-    console.print(table)
-
-def print_node(node, console, leg:bool=False) -> int:
+    return table
+    
+def get_node(node, leg:bool=False) -> Panel:
     rows = []
     try:
         for pre, _, all_node in RenderTree(node):
@@ -121,16 +121,13 @@ def print_node(node, console, leg:bool=False) -> int:
             else:
                 rows.append(f"{pre}{all_node.name}")
 
-        console.print(Panel.fit('\n'.join(rows)))
+        return Panel.fit('\n'.join(rows))
 
-        if leg:
-            console.print("\nLegend:")
-            console.print(" - [red]top node[/red]")
-            console.print(" - [yellow]subsystems[/yellow]")
-            console.print(" - [blue]applications[/blue]\n")
+        # if leg:
+        #     console.print("\nLegend:")
+        #     console.print(" - [red]top node[/red]")
+        #     console.print(" - [yellow]subsystems[/yellow]")
+        #     console.print(" - [blue]applications[/blue]\n")
 
     except Exception as ex:
-        console.print("Tree is corrupted!")
-        return_code = 14
         raise RuntimeError("Tree is corrupted")
-    return 0
