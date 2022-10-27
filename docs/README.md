@@ -2,7 +2,7 @@
 
 Poor man's Run Control for DUNE DAQ applications
 
-Pssst! check you the FAQ [here](FAQ.md).
+Pssst! Check out the FAQ [here](FAQ.md)!
 
 ## How to run me
 
