@@ -60,47 +60,51 @@ class SubsystemNode(StatefulNode):
         self.pm = None
         self.listener = None
 
-    def can_execute_custom_or_expert(self, command, quiet=False, check_dead=True, check_inerror=True, only_included=True):
+    def can_execute_custom_or_expert(self, command, quiet=False, check_dead=True, check_inerror=True, check_children=True, only_included=True):
         ret = super().can_execute_custom_or_expert(
-            command = command,
-            quiet = quiet,
-            check_dead = check_dead,
-            check_inerror = check_inerror,
-            only_included = only_included,
+            command        = command,
+            quiet          = quiet,
+            check_dead     = check_dead,
+            check_inerror  = check_inerror,
+            check_children = check_children,
+            only_included  = only_included,
         )
         if ret != CanExecuteReturnVal.CanExecute:
             return ret
 
-        for c in self.children:
-            if not c.included and only_included: continue
+        if check_children:
+            for c in self.children:
+                if not c.included and only_included: continue
 
-            if check_dead and not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
-                self.return_code = ErrorCode.Failed
-                self.log.error(f'{c.name} is dead, cannot send {command}')
-                return CanExecuteReturnVal.Dead
+                if check_dead and not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
+                    self.return_code = ErrorCode.Failed
+                    self.log.error(f'{c.name} is dead, cannot send {command}')
+                    return CanExecuteReturnVal.Dead
 
         self.return_code = ErrorCode.Success
         return CanExecuteReturnVal.CanExecute
 
-    def can_execute(self, command, quiet=False, check_dead=True, check_inerror=True, only_included=True):
+    def can_execute(self, command, quiet=False, check_dead=True, check_inerror=True, check_children=True, only_included=True):
         ret = super().can_execute(
-            command = command,
-            quiet = quiet,
-            check_dead = check_dead,
-            check_inerror = check_inerror,
-            only_included = only_included,
+            command        = command,
+            quiet          = quiet,
+            check_dead     = check_dead,
+            check_inerror  = check_inerror,
+            check_children = check_children,
+            only_included  = only_included,
         )
 
         if ret != CanExecuteReturnVal.CanExecute:
             return ret
 
-        for c in self.children:
-            if not c.included and only_included: continue
+        if check_children:
+            for c in self.children:
+                if not c.included and only_included: continue
 
-            if not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
-                self.return_code = ErrorCode.Failed
-                self.log.error(f'{c.name} is dead, cannot send {command} unless you disable it or --force')
-                return CanExecuteReturnVal.Dead
+                if check_dead and not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
+                    self.return_code = ErrorCode.Failed
+                    self.log.error(f'{c.name} is dead, cannot send {command} unless you disable it or --force')
+                    return CanExecuteReturnVal.Dead
 
         self.return_code = ErrorCode.Success
         return CanExecuteReturnVal.CanExecute

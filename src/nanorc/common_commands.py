@@ -362,8 +362,7 @@ def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool, cmd_args:di
     for seq_cmd in sequence:
         cmd = seq_cmd['cmd']
         optional = seq_cmd['optional']
-        canexec = rc.can_execute(cmd, check_inerror=False, check_dead=False, quiet=True)
-        rc.log.info(f'Trying to execute {cmd}: {str(canexec)}')
+        canexec = rc.can_execute(cmd, quiet=True, check_children=False)
         
         if canexec == CanExecuteReturnVal.InvalidTransition:
             if optional:
@@ -371,8 +370,7 @@ def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool, cmd_args:di
             else:
                 break
         
-        rc.log.info(f'checking if error to execute {cmd}')
-        canexec = rc.can_execute(cmd, check_inerror=True, check_dead=True, quiet=True)
+        canexec = rc.can_execute(cmd, check_inerror=True, check_dead=True, quiet=True, check_children=True)
 
         if canexec != CanExecuteReturnVal.CanExecute and not force:
             rc.log.error(f"Cannot execute '{cmd}' in the '{command}' reason: {str(canexec)}, you may be able to use --force")
@@ -384,7 +382,6 @@ def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool, cmd_args:di
             rc.log.error(f"Function {cmd} doesn't exist in nanorc.core!")
             if not force: break
 
-        rc.log.info(f'Actually executing {cmd}')
         seq_func(**cmd_args)
 
         check_rc(ctx, rc)

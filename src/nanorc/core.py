@@ -101,8 +101,14 @@ class NanoRC:
         seq_cmd = self.topnode.fsm.command_sequences.get(command)
         return seq_cmd if seq_cmd else [command]
 
-    def can_execute(self, command:str, quiet=False, check_dead=True, check_inerror=True):
-        return self.topnode.can_execute(command, quiet=quiet, check_dead=check_dead, check_inerror=check_inerror)
+    def can_execute(self, command:str, quiet=False, check_dead=True, check_inerror=True, check_children=True):
+        return self.topnode.can_execute(
+            command        = command,
+            quiet          = quiet,
+            check_dead     = check_dead,
+            check_inerror  = check_inerror,
+            check_children = check_children
+        )
 
     def execute_custom_command(self, command, data, timeout, node_path=None, check_dead=True, check_inerror=True, only_included=True):
         if not timeout:
@@ -110,10 +116,11 @@ class NanoRC:
 
         node_to_send = None
         extra_arg={}
-
+        check_children = False
         if not node_path:
             self.log.info(f'Sending {command} to all the nodes')
             node_to_send = self.topnode
+            check_children = True
         elif isinstance(node_path, ApplicationNode):
             self.log.info(f'Telling {node_path.parent.name} to send {command} to {node_path.name}')
             node_to_send = node_path.parent
@@ -123,11 +130,12 @@ class NanoRC:
             node_to_send = node_path
 
         canexec = node_to_send.can_execute_custom_or_expert(
-            command,
-            quiet=False,
-            check_dead=check_dead,
-            check_inerror=check_inerror,
-            only_included=only_included,
+            command        = command,
+            quiet          = False,
+            check_dead     = check_dead,
+            check_inerror  = check_inerror,
+            check_children = check_children,
+            only_included  = only_included,
         )
         if canexec != CanExecuteReturnVal.CanExecute:
             self.log.error(f'Cannot execute {command}, reason: {str(canexec)}')
@@ -141,7 +149,7 @@ class NanoRC:
         if not timeout:
             timeout = self.timeout
 
-        canexec = node_path.can_execute_custom_or_expert("expert", check_dead=True)
+        canexec = node_path.can_execute_custom_or_expert("expert", check_dead=True, check_children=False)
 
         if canexec != CanExecuteReturnVal.CanExecute:
             self.return_code = node_path.return_code
@@ -179,15 +187,18 @@ class NanoRC:
 
     def execute_command(self, command, node_path=None, **kwargs):
         force = kwargs.get('force')
+        check_children = True
         if not node_path:
             node_path=self.topnode
+            check_children = False
 
         canexec = node_path.can_execute(
-            command,
-            quiet=True,
-            check_dead=not force,
-            check_inerror=not force,
-            only_included=True,
+            command        = command,
+            quiet          = True,
+            check_dead     = not force,
+            check_inerror  = not force,
+            check_children = check_children and not force,
+            only_included  = True,
         )
         if canexec == CanExecuteReturnVal.InvalidTransition:
             self.return_code = node_path.return_code.value
@@ -481,6 +492,7 @@ class NanoRC:
             only_included = False,
             check_dead = False,
             check_inerror = False,
+            check_children = node_path.children != []
         )
         if canexec != CanExecuteReturnVal.CanExecute:
             self.log.error(f'Cannot execute exclude, reason: {str(canexec)}')
@@ -513,6 +525,7 @@ class NanoRC:
             only_included = False,
             check_dead = False,
             check_inerror = False,
+            check_children = node_path.children != []
         )
         if canexec != CanExecuteReturnVal.CanExecute:
             self.log.error(f'Cannot execute include, reason: {str(canexec)}')

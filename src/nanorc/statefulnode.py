@@ -51,7 +51,7 @@ class StatefulNode(NodeMixin):
         self.errored = False
 
 
-    def can_execute_custom_or_expert(self, command, quiet=True, check_dead=True, check_inerror=True, only_included=True):
+    def can_execute_custom_or_expert(self, command, quiet=True, check_dead=True, check_inerror=True, only_included=True, check_children=True):
         disallowed_state = ['booted', 'none']
         if self.errored and check_inerror:
             return CanExecuteReturnVal.InError
@@ -61,16 +61,17 @@ class StatefulNode(NodeMixin):
                 self.log.error(f"Cannot send '{command}' to '{self.name}' as it should at least be initialised")
             return CanExecuteReturnVal.NotInitialised
 
-        if check_dead or check_inerror:
+        if check_children:
             for c in self.children:
                 if not c.included and only_included: continue
 
                 ret = c.can_execute_custom_or_expert(
-                    command = command,
-                    quiet = quiet,
-                    check_dead = check_dead,
-                    check_inerror = check_inerror,
-                    only_included = only_included,
+                    command        = command,
+                    quiet          = quiet,
+                    check_dead     = check_dead,
+                    check_inerror  = check_inerror,
+                    check_children = True,
+                    only_included  = only_included,
                 )
                 if ret!=CanExecuteReturnVal.CanExecute:
                     self.return_code = ErrorCode.Failed
@@ -80,7 +81,7 @@ class StatefulNode(NodeMixin):
         return CanExecuteReturnVal.CanExecute
 
 
-    def can_execute(self, command, quiet=False, check_dead=True, check_inerror=True, only_included=True):
+    def can_execute(self, command, quiet=False, check_dead=True, check_inerror=True, only_included=True, check_children=True):
         if self.errored and check_inerror:
             return CanExecuteReturnVal.InError
 
@@ -95,7 +96,7 @@ class StatefulNode(NodeMixin):
                     self.return_code = ErrorCode.InvalidTransition
                 return CanExecuteReturnVal.InvalidTransition
 
-        if check_dead or check_inerror:
+        if check_children:
             for c in self.children:
                 if not c.included and only_included: continue
 
@@ -104,11 +105,12 @@ class StatefulNode(NodeMixin):
                     continue
 
                 ret = c.can_execute(
-                    command = command,
-                    quiet = quiet,
-                    check_dead = check_dead,
-                    check_inerror = check_inerror,
-                    only_included = only_included,
+                    command        = command,
+                    quiet          = quiet,
+                    check_dead     = check_dead,
+                    check_inerror  = check_inerror,
+                    check_children = True,
+                    only_included  = only_included,
                 )
                 if ret != CanExecuteReturnVal.CanExecute:
                     self.return_code = ErrorCode.Failed
