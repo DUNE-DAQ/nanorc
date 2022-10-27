@@ -61,19 +61,20 @@ class StatefulNode(NodeMixin):
                 self.log.error(f"Cannot send '{command}' to '{self.name}' as it should at least be initialised")
             return CanExecuteReturnVal.NotInitialised
 
-        for c in self.children:
-            if not c.included and only_included: continue
+        if check_dead or check_inerror:
+            for c in self.children:
+                if not c.included and only_included: continue
 
-            ret = c.can_execute_custom_or_expert(
-                command = command,
-                quiet = quiet,
-                check_dead = check_dead,
-                check_inerror = check_inerror,
-                only_included = only_included,
-            )
-            if ret!=CanExecuteReturnVal.CanExecute:
-                self.return_code = ErrorCode.Failed
-                return ret
+                ret = c.can_execute_custom_or_expert(
+                    command = command,
+                    quiet = quiet,
+                    check_dead = check_dead,
+                    check_inerror = check_inerror,
+                    only_included = only_included,
+                )
+                if ret!=CanExecuteReturnVal.CanExecute:
+                    self.return_code = ErrorCode.Failed
+                    return ret
 
         self.return_code = ErrorCode.Success
         return CanExecuteReturnVal.CanExecute
@@ -94,23 +95,24 @@ class StatefulNode(NodeMixin):
                     self.return_code = ErrorCode.InvalidTransition
                 return CanExecuteReturnVal.InvalidTransition
 
-        # for c in self.children:
-        #     if not c.included and only_included: continue
+        if check_dead or check_inerror:
+            for c in self.children:
+                if not c.included and only_included: continue
 
-        #     # How do I get rid of this enormity?
-        #     if command=='terminate' and c.state=='none':
-        #         continue
+                # How do I get rid of this enormity?
+                if command=='terminate' and c.state=='none':
+                    continue
 
-        #     ret = c.can_execute(
-        #         command = command,
-        #         quiet = quiet,
-        #         check_dead = check_dead,
-        #         check_inerror = check_inerror,
-        #         only_included = only_included,
-        #     )
-        #     if ret != CanExecuteReturnVal.CanExecute:
-        #         self.return_code = ErrorCode.Failed
-        #         return ret
+                ret = c.can_execute(
+                    command = command,
+                    quiet = quiet,
+                    check_dead = check_dead,
+                    check_inerror = check_inerror,
+                    only_included = only_included,
+                )
+                if ret != CanExecuteReturnVal.CanExecute:
+                    self.return_code = ErrorCode.Failed
+                    return ret
 
         self.return_code = ErrorCode.Success
         return CanExecuteReturnVal.CanExecute
