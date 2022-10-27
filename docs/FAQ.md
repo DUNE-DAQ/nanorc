@@ -2,7 +2,9 @@
 
 ## NanoRC exited ungracefully and all my apps are still running, what do I do?
 You'll need to go on each of the servers where the applications where running, run `htop --user ${USER}`, click on the `daq_application` (yes, click on your terminal) to select the app as shown in the image, then `F9` and enter twice.
+
 ![htop](htop.png)
+
 You can also do the equivalent by doing `ps a|grep daq_application`, note the first number of the line and run `kill <the-number>`.
 
 ## NanoRC can't start the response listener, what do I do?
@@ -40,6 +42,7 @@ This isn't particularly recommended, but if you are running on the `dunegpvm` yo
 
 ## Where are my app logs?
 NanoRC tells you where the apps logs are:
+
 ![boot-logs](boot-logs.png)
 
 If you are using with an older version of nanorc, this message won't be here, in this case 2 choices:
