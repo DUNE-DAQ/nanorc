@@ -29,6 +29,7 @@ class NanoRCStatus(Static):
     def compose(self) -> ComposeResult:
         yield StatusDisplay()
         yield Button('Update status', id='update_status', variant='primary')
+        yield Button('BEST BUTTONE!!!!!!!!!!!', id="idklol", variant='secondary')
 
 class RunInfo(Static):
     def __init__(self, rc, **kwargs):
@@ -54,6 +55,11 @@ class TreeView(Static):
     def on_mount(self) -> None:
         self.update_tree()
 
+class StateBox(Static):
+    def __init__(self, rc, **kwargs):
+        super().__init__(**kwargs)
+        self.rc = rc
+
 class NanoRCTUI(App):
     CSS_PATH = "nanorc.css"
 
@@ -67,5 +73,7 @@ class NanoRCTUI(App):
         yield TreeView(rc=self.rc)
         yield NanoRCStatus(rc=self.rc)
         yield RunInfo(rc=self.rc)
+        yield StateBox(rc=self.rc)
         yield Header()
         yield Footer()
+        
