@@ -1,0 +1,18 @@
+TreeView {
+    dock: left;
+    width: 20%;
+    height: 100%;
+    color: #0f2b41;
+}
+
+NanoRCStatus {
+    
+}
+RunInfo{
+}
+Button {
+    width: 16;
+}
+#update_status {
+    
+}

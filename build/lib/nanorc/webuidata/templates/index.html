@@ -1,0 +1,135 @@
+{% extends "bootstrap.html" %}
+{% block control %}
+<div id="statemachine" style="text-align:center;"></div>
+<div id="data" class="container-fluid">
+  <div id="" class="row ">
+    <div class="col-2">
+      <nav class="sb-sidenav accordion sb-sidenav-light" id="sidenavAccordion">
+
+        <div id="tree">
+          <div class="treetop">Control tree</div>
+          <div id="treecontainer">
+            <div id="controlTree" class="demo"></div>
+          </div>
+
+          <!-- <div id="logArea" class="sb-sidenav-light  " style="width: 100%; position:relative; height:0px;">
+               <div id="logHead" class="navbar navbar-expand navbar-dark bg-dark" style="height: 40px;">
+                 <h3 class="navbar-brand">Service log:</h3> &nbsp; &nbsp;
+                 <div id="logFilterDiv" class="logFilterContainer logFilterDataContainer">
+                   <ul class="navbar-nav navbar-expand ml-auto ml-md-0">
+                     <li class="nav-item dropdown w-auto"  style="margin-left:auto">
+                       <a class="nav-link dropdown-toggle" id="mtypeDropdown" href="#" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Msg types</a>
+                       <div class="dropdown-menu dropdown-menu-right" aria-labelledby="mtypeDropdown">
+                         <ul id="filters">
+                           <li><label>
+                               <input type="radio"> test1
+                           </label></li>
+                           <li><label>
+                               <input type="radio"> test2
+                           </label></li>
+                           <li><label>
+                               <input type="radio"> test3
+                           </label></li>
+                         </ul>
+                       </div>
+                     </li>
+                     <li class="nav-item dropdown w-auto"  style="margin-left:auto">
+                       <a class="nav-link dropdown-toggle" id="mtypeDropdown" href="#" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Source filter</a>
+                       <div class="dropdown-menu dropdown-menu-right" aria-labelledby="mtypeDropdown">
+                         <ul id="filters2">
+                           <li><label>
+                               <input type="radio"> test1
+                           </label></li>
+                           <li><label>
+                               <input type="radio"> test2
+                           </label></li>
+                           <li><label>
+                               <input type="radio"> test3
+                           </label></li>
+                         </ul>
+                       </div>
+                     </li>
+                   </ul>
+                 </div>
+                 <button id="logShow" class="button">Hide</button>
+               </div>
+               <div id="logCont" style=" margin: 10px;">
+                 <div id="logDiv" class="logContainer">
+                   <ul id="logList"></ul>
+                 </div>
+               </div>
+          </div> -->
+
+        </div>
+      </nav>
+    </div>
+    <div class="col-10">
+      <main class="mainBlock">
+        <div id="name" class="mt-1 mb-1 treetop">Controls </div>
+        <div id="detailPage" class="content default">
+          <div class="card mb-2">
+            <div class="row border-right border-left">
+              <div class="col-sm-8 float-left">
+                <h4>Commands</h4>
+                <div id="stateButtonsDiv" class="stateButtons button-group">
+                </div>
+                <!-- <h5> Last response from nanorc:</h5> -->
+              </div>
+              <div class="col-sm-2 float-left">
+                <h4>State</h4>
+                <input type="text" id="state" class="form-control" value="" readonly>
+                <div id="commargs">
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-12 bs-linebreak">
+            <div id="response-render"></div>
+          </div>
+
+          <br>
+        </div>
+        <div id='appstatus' class='mt-1 mb-1 treetop'>App status</div>
+        <div id="detailPage2" class="content default">
+          <div id="iframesector" class="row">
+            <div class="col-md-12 bs-linebreak">
+            </div>
+            <table class="table">
+              <thead class="thead">
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">State</th>
+                  <th scope="col">Host</th>
+                  <th scope="col">Last cmd</th>
+                  <th scope="col">Last succ. cmd</th>
+                </tr>
+              </thead>
+              <tbody id="statustable">
+              </tbody>
+          </div>
+        </div>
+    </main>
+    </div>
+  </div>
+</div>
+</div>
+<div class="modal fade" id="argumentsModal" tabindex="-1" role="dialog" aria-labelledby="argumentsModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="ModalLabel">Modal title</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div id="modalBody" class="modal-body">
+        ...
+      </div>
+      <div id="modalFooter" class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button id="executeBtn" type="button" class="btn btn-primary">Execute command</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
