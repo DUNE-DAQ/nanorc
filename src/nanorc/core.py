@@ -81,7 +81,6 @@ class NanoRC:
         self.logbook = None
         self.logbook_type = logbook_type
         self.log_path = None
-        self.current_run_type = None
         self.message_thread_id = None
         '''
         if logbook_type != 'file' and logbook_type != None and logbook_type != '':
@@ -315,13 +314,11 @@ class NanoRC:
 
         runtime_start_data = rccmd.StartParams(**stparam).pod() # EnFoRcE tHiS sChEmA aNd DiTcH iT
 
-        self.current_run_type = run_type
-
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
 
         try:
-            self.logbook.message_on_start(message, run, self.current_run_type)
+            self.logbook.message_on_start(message, run, run_type)
         except Exception as e:
                 self.log.error(f"Writing to the {self.logbook_type} logbook unsuccessful\nError text:\n{str(e)}")
 
@@ -387,15 +384,6 @@ class NanoRC:
         """
         Sends stop command
         """
-        if message != "":
-            self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
-
-        try:
-            self.logbook.message_on_stop()
-        except Exception as e:
-            self.log.error(f"Writing to the {self.logbook_type} logbook unsuccessful\nError text:\n{str(e)}")
-
-
         self.execute_command("stop", node_path=None, raise_on_fail=True, timeout=timeout, force=force)
 
     def stop_trigger_sources(self, force:bool, timeout:int, **kwargs) -> NoReturn:

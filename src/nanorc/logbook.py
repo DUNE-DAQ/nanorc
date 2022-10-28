@@ -39,9 +39,7 @@ class FileLogbook:
 
 class ElisaLogbook:
     def __init__(self, AID):
-        filepath = str(os.path.dirname(__file__)) + "/confdata/elisa_service.json"
-        e_file = json.load(open(filepath, 'r'))
-        self.socket = e_file['socket']
+        self.socket = json.loads(resources.read_text(confdata, "elisa_service.json"))['socket']
         self.apparatus_id = AID
         self.run_num = ""
         self.run_type = ""
