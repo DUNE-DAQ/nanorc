@@ -380,7 +380,7 @@ class NanoRC:
                 except Exception as e:
                     self.log.error(f"Writing to the {self.logbook_type} logbook unsuccessful\nError text:\n{str(e)}")
 
-    def stop(self, force:bool, timeout:int, message="", **kwargs) -> NoReturn:
+    def stop(self, force:bool, timeout:int, **kwargs) -> NoReturn:
         """
         Sends stop command
         """
