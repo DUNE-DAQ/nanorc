@@ -32,7 +32,6 @@ from nanorc.runmgr import SimpleRunNumberManager
 from nanorc.cfgsvr import FileConfigSaver
 from nanorc.core import NanoRC
 from nanorc.nano_context import NanoContext
-from nanorc.logbook import FileLogbook
 from nanorc.credmgr import credentials
 from nanorc.rest import RestApi, NanoWebContext, rc_context
 from nanorc.webui import WebServer

@@ -5,6 +5,8 @@ from .appctrl import AppSupervisor, ResponseListener
 import json
 import os
 import copy as cp
+import requests
+import importlib.resources as resources
 from rich.console import Console
 from rich.style import Style
 from rich.pretty import Pretty
@@ -13,7 +15,7 @@ from .treebuilder import TreeBuilder
 from .cfgsvr import FileConfigSaver, DBConfigSaver
 from .credmgr import credentials
 from .node_render import *
-from .logbook import ElisaLogbook, FileLogbook
+from . logbook import FileLogbook
 import importlib
 from . import confdata
 from rich.traceback import Traceback
@@ -77,8 +79,11 @@ class NanoRC:
         self.timeout = timeout
         self.return_code = None
         self.logbook = None
+        self.logbook_type = logbook_type
         self.log_path = None
-
+        self.current_run_type = None
+        self.message_thread_id = None
+        '''
         if logbook_type != 'file' and logbook_type != None and logbook_type != '':
             try:
                 elisa_conf = json.load(open(logbook_type,'r'))
@@ -89,11 +94,14 @@ class NanoRC:
                     self.log.error(f"Can't find config {self.apparatus_id} in {logbook_type}, reverting to file logbook!")
             except Exception as e:
                 self.log.error(f"Can't find {logbook_type}, reverting to file logbook! {str(e)}")
+        '''
 
-        elif logbook_type == 'file':
+        if logbook_type == 'file':
             self.log.info("Using filelogbook")
             self.logbook = FileLogbook(logbook_prefix, self.console)
-
+        filepath = str(os.path.dirname(__file__)) + "/confdata/elisa_service.json"
+        e_file = json.load(open(filepath, 'r'))
+        self.elisa_socket = e_file['socket']
         self.topnode = self.cfg.get_tree_structure()
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
 
@@ -307,14 +315,29 @@ class NanoRC:
 
         runtime_start_data = rccmd.StartParams(**stparam).pod() # EnFoRcE tHiS sChEmA aNd DiTcH iT
 
+        self.current_run_type = run_type
+
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
 
-        if self.logbook:
+        if self.logbook_type != 'file' and self.logbook_type != None and self.logbook_type != '':
             try:
-                self.logbook.message_on_start(message, run, run_type)
+                payload = {'apparatus_id': self.apparatus_id, 'author': credentials.user, 'message': message, 'run_num': run, 'run_type': self.current_run_type}
+                address = self.elisa_socket + "/v1/elisaLogbook/message_on_start/"
+                r = requests.post(address, data=payload, auth=('foouser', 'barpass'))
+                rtext = r.content
+                self.message_thread_id = ((rtext.split())[-1]).strip()
             except Exception as e:
-                self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
+                self.log.error(f"Couldn't make an entry to elisa, check that the service is running at {address}\nError text:\n{str(e)}")
+
+        elif self.logbook:
+            self.log.info("Using filelogbook")
+            try: 
+                self.logbook.message_on_start(message, run, self.current_run_type)
+            except Exception as e:
+                self.log.error(f"Writing to file logbook unsuccessful\nError text:\n{str(e)}")
+
+
 
 
         if self.cfgsvr:
@@ -366,20 +389,50 @@ class NanoRC:
         """
         Append the logbook
         """
+
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
-            try:
-                self.logbook.add_message(message)
-                # if self.runs:
-                #     if self.runs[-1].is_running():
-                #         self.runs[-1].messages.append(message)
-            except Exception as e:
-                self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
+            if self.logbook_type != 'file' and self.logbook_type != None and self.logbook_type != '':
+                try:
+                    payload = {'apparatus_id': self.apparatus_id, 'author': credentials.user, 'message': message, 'thread_id': self.message_thread_id}
+                    address = self.elisa_socket + "/v1/elisaLogbook/add_message/"
+                    r = requests.put(address, data=payload, auth=('foouser', 'barpass'))
+                    # if self.runs:
+                    #     if self.runs[-1].is_running():
+                    #         self.runs[-1].messages.append(message)
+                except Exception as e:
+                    self.log.error(f"Couldn't make an entry to elisa, check that the service is running at {address}\nError text:\n{str(e)}")
+            elif self.logbook:
+                self.log.info("Using filelogbook")
+                try: 
+                    self.logbook.add_message(message)
+                except Exception as e:
+                    self.log.error(f"Writing to file logbook unsuccessful\nError text:\n{str(e)}")
 
-    def stop(self, force:bool, timeout:int, **kwargs) -> NoReturn:
+    def stop(self, force:bool, timeout:int, message="", **kwargs) -> NoReturn:
         """
         Sends stop command
         """
+        run = 0
+        if self.run_num_mgr:
+            run = self.run_num_mgr.get_run_number()
+        else:
+            run = 1
+
+        if self.logbook_type != 'file' and self.logbook_type != None and self.logbook_type != '':
+            try:
+                payload = {'apparatus_id': self.apparatus_id, 'author': credentials.user, 'message': message, 'run_num': run, 'run_type': self.current_run_type, 'thread_id': self.message_thread_id}
+                address = self.elisa_socket + "/v1/elisaLogbook/message_on_stop/"
+                r = requests.put(address, data=payload, auth=('foouser', 'barpass'))
+            except Exception as e:
+                self.log.error(f"Couldn't make an entry to elisa, check that the service is running at {address}\nError text:\n{str(e)}")
+        elif self.logbook:
+            self.log.info("Using filelogbook")
+            try: 
+                self.logbook.message_on_stop(message)
+            except Exception as e:
+                self.log.error(f"Writing to file logbook unsuccessful\nError text:\n{str(e)}")
+
         self.execute_command("stop", node_path=None, raise_on_fail=True, timeout=timeout, force=force)
 
     def stop_trigger_sources(self, force:bool, timeout:int, **kwargs) -> NoReturn:
@@ -432,11 +485,26 @@ class NanoRC:
 
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
-            try:
-                self.logbook.message_on_stop(message)
-                # if self.runs: self.runs[-1].messages.append(message)
-            except Exception as e:
-                self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
+            run = 0
+            if self.run_num_mgr:
+                run = self.run_num_mgr.get_run_number()
+            else:
+                run = 1
+
+            if self.logbook_type != 'file' and self.logbook_type != None and self.logbook_type != '':
+                try:
+                    payload = {'apparatus_id': self.apparatus_id, 'author': credentials.user, 'message': message, 'run_num': run, 'run_type': self.current_run_type, 'thread_id': self.message_thread_id}
+                    address = self.elisa_socket + "/v1/elisaLogbook/message_on_stop/"
+                    r = requests.put(address, data=payload, auth=('foouser', 'barpass'))
+                    # if self.runs: self.runs[-1].messages.append(message)
+                except Exception as e:
+                    self.log.error(f"Couldn't make an entry to elisa, check that the service is running at {address}\nError text:\n{str(e)}")
+            elif self.logbook:
+                self.log.info("Using filelogbook")
+                try: 
+                    self.logbook.message_on_stop(message)
+                except Exception as e:
+                    self.log.error(f"Writing to file logbook unsuccessful\nError text:\n{str(e)}")
 
         if self.cfgsvr:
             self.cfgsvr.save_on_stop(self.runs[-1].run_number)
