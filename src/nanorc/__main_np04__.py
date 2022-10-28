@@ -90,6 +90,7 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
 
         rundb_socket = json.loads(resources.read_text(confdata, "run_number.json"))['socket']
         runreg_socket = json.loads(resources.read_text(confdata, "run_registry.json"))['socket']
+        logbook_socket = json.loads(resources.read_text(confdata, "elisa_service.json"))['socket']
 
         credentials.add_login("rundb",
                               dotnanorc["rundb"]["user"],
@@ -97,8 +98,12 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
         credentials.add_login("runregistrydb",
                               dotnanorc["runregistrydb"]["user"],
                               dotnanorc["runregistrydb"]["password"])
+        credentials.add_login("logbook",
+                              dotnanorc["logbook"]["user"],
+                              dotnanorc["logbook"]["password"])
         logging.getLogger("cli").info("RunDB socket "+rundb_socket)
         logging.getLogger("cli").info("RunRegistryDB socket "+runreg_socket)
+        logging.getLogger("cli").info("ELisA logbook socket "+logbook_socket)
 
         rc = NanoRC(
             console = obj.console,

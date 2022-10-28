@@ -34,3 +34,34 @@ class FileLogbook:
         f.write(f"-- User {credentials.user} stopped the run {self.run_num}, of type {self.run_type} --\n")
         f.write(credentials.user+": "+message+"\n")
         f.close()
+
+class ElisaLogbook:
+    def __init__(self, AID):
+        filepath = str(os.path.dirname(__file__)) + "/confdata/elisa_service.json"
+        e_file = json.load(open(filepath, 'r'))
+        self.socket = e_file['socket']
+        self.apparatus_id = AID
+        self.run_num = ""
+        self.run_type = ""
+
+    def message_on_start(self, message:str, run_num:int, run_type:str):
+        self.run_num = run_num
+        self.run_type = run_type
+        payload = {'apparatus_id': self.apparatus_id, 'author': credentials.user, 'message': message, 'run_num': self.run_num, 'run_type': self.run_type}
+        address = self.socket + "/v1/elisaLogbook/message_on_start/"
+        myauth = (credentials.get_login("logbook").user, credentials.get_login("logbook").password)
+        r = requests.post(address, data=payload, auth=myauth)
+        rtext = r.content
+        self.message_thread_id = ((rtext.split())[-1]).strip()
+
+    def add_message(self, message:str):
+        payload = {'apparatus_id': self.apparatus_id, 'author': credentials.user, 'message': message, 'thread_id': self.message_thread_id}
+        address = self.socket + "/v1/elisaLogbook/add_message/"
+        myauth = (credentials.get_login("logbook").user, credentials.get_login("logbook").password)
+        r = requests.put(address, data=payload, auth=myauth)
+
+    def message_on_stop(self, message:str):
+        payload = {'apparatus_id': self.apparatus_id, 'author': credentials.user, 'message': message, 'run_num': self.run_num, 'run_type': self.current_run_type, 'thread_id': self.message_thread_id}
+        address = self.socket + "/v1/elisaLogbook/message_on_stop/"
+        myauth = (credentials.get_login("logbook").user, credentials.get_login("logbook").password)
+        r = requests.put(address, data=payload, auth=myauth)
