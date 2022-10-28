@@ -29,7 +29,11 @@ class NanoRCStatus(Static):
     def compose(self) -> ComposeResult:
         yield StatusDisplay()
         yield Button('Update status', id='update_status', variant='primary')
-        yield Button('BEST BUTTONE!!!!!!!!!!!', id="idklol", variant='secondary')
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Event handler called when a button is pressed."""
+        if event.button.id == "update_status":
+            self.update_status()
 
 class RunInfo(Static):
     def __init__(self, rc, **kwargs):
@@ -59,14 +63,33 @@ class StateBox(Static):
     def __init__(self, rc, **kwargs):
         super().__init__(**kwargs)
         self.rc = rc
+    
+    def compose(self) -> ComposeResult:
+        #Creates the initial set of buttons
+        yield Button('boot', id="boot", variant="primary")
+        yield Button('hello', id="hello", variant="primary")
+        yield Button('stop', id="stop", variant="primary")
+        
+    
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Event handler called when a button is pressed."""
+        button_id = event.button.id
+        method = getattr(self.rc, button_id)    #The method is the 
+
+        #Then it must change the set of buttons to represent the allowed FSM transitions.
 
 class NanoRCTUI(App):
     CSS_PATH = "nanorc.css"
+    BINDINGS = [("d", "toggle_dark", "Toggle dark mode")]
 
     def __init__(self, rc, banner, **kwargs):
         super().__init__(**kwargs)
         self.rc = rc
         self.banner = banner
+
+    def action_toggle_dark(self) -> None:
+        """An action to toggle dark mode."""
+        self.dark = not self.dark
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
