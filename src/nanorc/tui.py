@@ -74,7 +74,9 @@ class StateBox(Static):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Event handler called when a button is pressed."""
         button_id = event.button.id
-        method = getattr(self.rc, button_id)    #The method is the 
+        method = getattr(self.rc, button_id)    #We use the name of the button to find the right method of the Nanorc class
+        params = 120                            #Placeholder!
+        method(params)
 
         #Then it must change the set of buttons to represent the allowed FSM transitions.
 
