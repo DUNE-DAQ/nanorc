@@ -4,7 +4,7 @@ from functools import partial
 class FSM(Machine):
     def __init__(self,console, fsm_type, verbose=False):
         if fsm_type == 'timing':
-            self.states_cfg = [ 'none', 'booted', 'initial', 'configured', 'error', 'running' ]
+            self.states_cfg = [ 'none', 'booted', 'initial', 'configured', 'running' ]
             self.transitions_cfg = [
                 { 'trigger': 'boot',      'source': 'none',        'dest': 'initial'    },
                 { 'trigger': 'conf',      'source': 'initial',     'dest': 'configured' },
@@ -12,7 +12,7 @@ class FSM(Machine):
                 { 'trigger': 'stop',      'source': 'running',     'dest': 'configured' },
                 { 'trigger': 'scrap',     'source': 'configured',  'dest': 'initial'    },
                 { 'trigger': 'terminate', 'source': 'initial',     'dest': 'none'       },
-                { 'trigger': 'terminate', 'source': 'error',       'dest': 'none'       },
+                # { 'trigger': 'terminate', 'source': 'error',       'dest': 'none'       },
                 { 'trigger': 'abort',     'source': '*',           'dest': 'none'       },
                 # { 'trigger': 'to_error',  'source': '*',           'dest': 'error'      }
             ]
@@ -34,7 +34,7 @@ class FSM(Machine):
         else:
             self.states_cfg = [
                 'none', 'booted', 'initial', 'configured', 'ready', 'running',
-                'paused', 'dataflow_drained', 'trigger_sources_stopped', 'error'
+                'paused', 'dataflow_drained', 'trigger_sources_stopped'
             ]
             self.transitions_cfg = [
                 { 'trigger': 'boot',                 'source': 'none',                    'dest': 'initial'                },
@@ -47,7 +47,7 @@ class FSM(Machine):
                 { 'trigger': 'stop',                 'source': 'trigger_sources_stopped', 'dest': 'configured'             },
                 { 'trigger': 'scrap',                'source': 'configured',              'dest': 'initial'                },
                 { 'trigger': 'terminate',            'source': 'initial',                 'dest': 'none'                   },
-                { 'trigger': 'terminate',            'source': 'error',                   'dest': 'none'                   },
+                # { 'trigger': 'terminate',            'source': 'error',                   'dest': 'none'                   },
                 { 'trigger': 'abort',                'source': '*',                       'dest': 'none'                   },
                 # { 'trigger': 'to_error',             'source': '*',                       'dest': 'error'                  }
             ]
@@ -161,3 +161,32 @@ class FSM(Machine):
             self._checked_assignment(node, function_name, new_method)
 
         super().add_model(node)
+
+    def get_available_commands(self, state:str) -> set[str]:
+        if state not in self.states_cfg:
+            raise RuntimeError(f'State {state} not in the FSM, available states {self.states_cfg}')
+
+        available_commands = set()# type: set[str]
+        
+        for tr in self.transitions_cfg:
+            if tr['source'] == state or tr['source'] == '*':
+                available_commands.add(tr['trigger'])
+
+        transitions = { tr['trigger']: {'source':tr['source'], 'dest': tr['dest'] } for tr in self.transitions_cfg}
+        for name, seq in self.command_sequences.items():
+            
+            for cmd_seq in seq:
+                cmd = cmd_seq['cmd']
+                opt = cmd_seq['optional']
+                
+                if not opt and transitions[cmd]['source'] != state:
+                    break
+
+                if transitions[cmd]['source'] == state:
+                    available_commands.add(name)
+                    break
+
+        if 'abort' in available_commands:
+            available_commands.remove('abort')
+
+        return available_commands
