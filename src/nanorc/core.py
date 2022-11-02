@@ -12,7 +12,7 @@ from .statefulnode import StatefulNode, CanExecuteReturnVal
 from .treebuilder import TreeBuilder
 from .cfgsvr import FileConfigSaver, DBConfigSaver
 from .credmgr import credentials
-from .node_render import print_node, print_status
+from .node_render import get_status, get_node
 from .logbook import ElisaLogbook, FileLogbook
 import importlib
 from . import confdata
@@ -216,7 +216,7 @@ class NanoRC:
             return
 
         if self.runs:
-            self.console.print(print_run_info(self.runs[-1]))
+            self.console.print(get_run_info(self.runs[-1]))
         self.console.print(get_status(apparatus_id=self.apparatus_id, topnode=self.topnode, partition=self.partition))
 
     def ls(self, leg:bool) -> NoReturn:
