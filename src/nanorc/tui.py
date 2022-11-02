@@ -1,3 +1,4 @@
+from textual import log
 from textual.app import App, ComposeResult
 from textual.containers import Container, Content
 from textual.widgets import Button, Header, Footer, Static
@@ -66,9 +67,9 @@ class StateBox(Static):
     
     def compose(self) -> ComposeResult:
         #Creates the initial set of buttons
-        yield Button('boot', id="boot", variant="primary")
-        yield Button('hello', id="hello", variant="primary")
-        yield Button('stop', id="stop", variant="primary")
+
+        for c in self.rc.topnode.fsm.get_available_commands(self.rc.topnode.state):
+            yield Button(c, id=c, variant="primary")
         
     
     def on_button_pressed(self, event: Button.Pressed) -> None:
