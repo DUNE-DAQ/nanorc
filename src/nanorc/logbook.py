@@ -2,7 +2,7 @@ from elisa_client_api.elisa import Elisa
 from elisa_client_api.searchCriteria import SearchCriteria
 from elisa_client_api.messageInsert import MessageInsert
 from elisa_client_api.messageReply import MessageReply
-from elisa_client_api.exception import *
+from elisa_client_api.exception import ElisaError
 
 import logging
 import os.path
