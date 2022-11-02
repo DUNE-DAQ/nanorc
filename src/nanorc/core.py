@@ -18,11 +18,11 @@ import importlib
 from . import confdata
 from rich.traceback import Traceback
 from rich.table import Table
-from .runinfo import start_run, print_run_info
+from .runinfo import start_run, print_run_info, RunInfo
 
 from datetime import datetime
 
-from typing import Union, NoReturn
+from typing import Union, Optional, Any
 
 # Good ol' moo import
 from dunedaq.env import get_moo_model_path
@@ -66,7 +66,7 @@ class NanoRC:
 
         self.apparatus_id = self.cfg.apparatus_id
 
-        self.runs = []
+        self.runs = [] # type: list[RunInfo]
         self.run_num_mgr = run_num_mgr
 
         self.cfgsvr = run_registry
@@ -74,8 +74,8 @@ class NanoRC:
             self.cfgsvr.cfgmgr = self.cfg
             self.cfgsvr.apparatus_id = self.apparatus_id
         self.timeout = timeout
-        self.return_code = None
-        self.logbook = None
+        self.return_code = None # type: Optional[int]
+        self.logbook = None # type: Optional[FileLogbook|ElisaLogbook]
         self.log_path = None
 
         if logbook_type != 'file' and logbook_type != None and logbook_type != '':
@@ -206,7 +206,7 @@ class NanoRC:
         self.return_code = node_path.return_code.value
 
 
-    def status(self) -> NoReturn:
+    def status(self) -> None:
         """
         Displays the status of the applications
         :returns:   Nothing
@@ -219,14 +219,15 @@ class NanoRC:
             print_run_info(self.runs[-1], self.console)
         print_status(apparatus_id=self.apparatus_id, topnode=self.topnode, console=self.console, partition=self.partition)
 
-    def ls(self, leg:bool) -> NoReturn:
+    def ls(self, leg:bool) -> None:
         """
         Print the nodes
         """
-        self.return_code = print_node(node=self.topnode, console=self.console, leg=leg)
+        print_node(node=self.topnode, console=self.console, leg=leg)
+        self.return_code = 0
 
 
-    def boot(self, timeout:int) -> NoReturn:
+    def boot(self, timeout:int) -> None:
         """
         Boot applications
         """
@@ -239,13 +240,13 @@ class NanoRC:
         )
 
 
-    def terminate(self, timeout:int, force:bool, **kwargs) -> NoReturn:
+    def terminate(self, timeout:int, force:bool, **kwargs) -> None:
         """
         Terminates applications (but keep all the subsystems structure)
         """
         self.execute_command("terminate", timeout=timeout, force=force)
 
-    def ls_thread(self) -> NoReturn:
+    def ls_thread(self) -> None:
         import threading
         self.console.print("Threading threads")
         self.console.print(threading.enumerate())
@@ -254,27 +255,27 @@ class NanoRC:
             self.console.print("Multiprocess threads")
             self.console.print(manager.list())
 
-    def abort(self, timeout:int, **kwargs) -> NoReturn:
+    def abort(self, timeout:int, **kwargs) -> None:
         """
         Abort applications
         """
         self.execute_command("abort", timeout=timeout, force=True)
 
 
-    def conf(self, node_path, timeout:int, **kwargs) -> NoReturn:
+    def conf(self, node_path, timeout:int, **kwargs) -> None:
         """
         Sends configure command to the applications.
         """
         self.execute_command("conf", node_path=node_path, raise_on_fail=True, timeout=timeout)
 
 
-    def scrap(self, node_path, force:bool, timeout:int, **kwargs) -> NoReturn:
+    def scrap(self, node_path, force:bool, timeout:int, **kwargs) -> None:
         """
         Send scrap command
         """
         self.execute_command("scrap", node_path=node_path, raise_on_fail=True, timeout=timeout, force=force)
 
-    def start(self, run_type:str, trigger_rate:float, disable_data_storage:bool, timeout:int, message:str, **kwargs) -> NoReturn:
+    def start(self, run_type:str, trigger_rate:float, disable_data_storage:bool, timeout:int, message:str, **kwargs) -> None:
         """
         Sends start command to the applications
 
@@ -299,7 +300,7 @@ class NanoRC:
         stparam = {
             "run":run,
             "disable_data_storage":disable_data_storage
-        }
+        } # type: dict[str, Any]
 
         if not trigger_rate is None:
             stparam['trigger_rate'] = trigger_rate
@@ -313,7 +314,10 @@ class NanoRC:
             try:
                 self.logbook.message_on_start(message, run, run_type)
             except Exception as e:
-                self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
+                if isinstance(self.logbook, ElisaLogbook):
+                    self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
+                else:
+                    self.log.error(f"Couldn't make an entry to the logbook\nError text:\n{str(e)}")
 
 
         if self.cfgsvr:
@@ -361,10 +365,12 @@ class NanoRC:
             self.log.error(f"There was an error when starting the run #{run}:")
             self.log.error(f'Response: {self.topnode.response}')
 
-    def message(self, message:str) -> NoReturn:
+    def message(self, message:str) -> None:
         """
         Append the logbook
         """
+        if not self.logbook:
+            raise RuntimeError('No logbook!')
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
             try:
@@ -373,26 +379,29 @@ class NanoRC:
                 #     if self.runs[-1].is_running():
                 #         self.runs[-1].messages.append(message)
             except Exception as e:
-                self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
-
-    def stop(self, force:bool, timeout:int, **kwargs) -> NoReturn:
+                if isinstance(self.logbook, ElisaLogbook):
+                    self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
+                else:
+                    self.log.error(f"Couldn't make an entry to the logbook\nError text:\n{str(e)}")
+    
+    def stop(self, force:bool, timeout:int, **kwargs) -> None:
         """
         Sends stop command
         """
         self.execute_command("stop", node_path=None, raise_on_fail=True, timeout=timeout, force=force)
 
-    def stop_trigger_sources(self, force:bool, timeout:int, **kwargs) -> NoReturn:
+    def stop_trigger_sources(self, force:bool, timeout:int, **kwargs) -> None:
         """
         Sends stop command
         """
         self.execute_command("stop_trigger_sources", node_path=None, raise_on_fail=True, timeout=timeout, force=force)
 
 
-    def execute_script(self, timeout, data=None) -> NoReturn:
+    def execute_script(self, timeout, data=None) -> None:
         self.execute_custom_command('scripts', data=data, timeout=timeout)
 
 
-    def enable_triggers(self, timeout, **kwargs) -> NoReturn:
+    def enable_triggers(self, timeout, **kwargs) -> None:
         """
         Start the triggers
         """
@@ -405,7 +414,7 @@ class NanoRC:
             timeout = timeout
         )
 
-    def disable_triggers(self, timeout:int, force:bool, **kwargs) -> NoReturn:
+    def disable_triggers(self, timeout:int, force:bool, **kwargs) -> None:
         """
         Stop the triggers
         """
@@ -417,7 +426,7 @@ class NanoRC:
             timeout = timeout,
         )
 
-    def drain_dataflow(self, timeout:int, force:bool, message:str, **kwargs) -> NoReturn:
+    def drain_dataflow(self, timeout:int, force:bool, message:str, **kwargs) -> None:
         """
         Stop the triggers
         """
@@ -432,10 +441,14 @@ class NanoRC:
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
             try:
+                if not self.logbook: raise RuntimeError('No logbook')
                 self.logbook.message_on_stop(message)
                 # if self.runs: self.runs[-1].messages.append(message)
             except Exception as e:
-                self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
+                if isinstance(self.logbook, ElisaLogbook):
+                    self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
+                else:
+                    self.log.error(f"Couldn't make an entry to the logbook\nError text:\n{str(e)}")
 
         if self.cfgsvr:
             self.cfgsvr.save_on_stop(self.runs[-1].run_number)
@@ -454,7 +467,7 @@ class NanoRC:
                 self.console.rule(f"[bold magenta]Stopped running[/bold magenta]")
 
 
-    def change_rate(self, trigger_rate:float, timeout) -> NoReturn:
+    def change_rate(self, trigger_rate:float, timeout) -> None:
         """
         Change the trigger interval ticks
         """
@@ -472,7 +485,7 @@ class NanoRC:
             self.runs[-1].trigger_rate = trigger_rate
 
 
-    def exclude(self, node_path, timeout, resource_name) -> NoReturn:
+    def exclude(self, node_path, timeout, resource_name) -> None:
 
         canexec = node_path.can_execute_custom_or_expert(
             command = "exclude",
@@ -504,7 +517,7 @@ class NanoRC:
 
 
 
-    def include(self, node_path, timeout, resource_name) -> NoReturn:
+    def include(self, node_path, timeout, resource_name) -> None:
 
         canexec = node_path.can_execute_custom_or_expert(
             command = "include",
@@ -524,7 +537,7 @@ class NanoRC:
 
         self.execute_custom_command(
             "include",
-            data = {'resource_name': resource_name if resource_name else node_paht.name},
+            data = {'resource_name': resource_name if resource_name else node_path.name},
             timeout = timeout,
             node_path = None,
             only_included = False,

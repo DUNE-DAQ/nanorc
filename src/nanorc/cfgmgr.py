@@ -97,8 +97,8 @@ class ConfigManager:
             )
             self.custom_commands = self._get_custom_commands_from_dirs(conf_path)
 
-    def _import_data(self, cfg_path: dict) -> None:
-        data = {}
+    def _import_data(self, cfg_path: str) -> dict[str, dict]:
+        data = {} # type: dict[str, dict]
         if not os.path.exists(cfg_path):
             raise RuntimeError(f"ERROR: {cfg_path} not found")
 
@@ -107,6 +107,7 @@ class ConfigManager:
                 return json.load(jf)
             except json.decoder.JSONDecodeError as e:
                 raise RuntimeError(f"ERROR: failed to load {cfg_path}") from e
+        raise RuntimeError(f"ERROR: failed to load {cfg_path}") from e
 
     def _get_custom_commands_from_dict(self, data:dict):
         from collections import defaultdict
@@ -142,7 +143,7 @@ class ConfigManager:
         return self.custom_commands
 
 
-    def _resolve_dir_and_save_to_tmpdir(self, conf_path, hosts:dict, port_offset:int=0) -> None:
+    def _resolve_dir_and_save_to_tmpdir(self, conf_path, hosts:dict, port_offset:int=0) -> str:
         if not os.path.exists(conf_path):
             raise RuntimeError(f"ERROR: {conf_path} does not exist!")
 
@@ -277,6 +278,7 @@ class ConfigManager:
         elif self.scheme == 'file://':
             if for_apps: return self.scheme+self.conf_str
             else:        return self.conf_str
+        raise RuntimeError('Configuration not found!')
 
     def generate_data_for_module(self, data: dict=None, module:str="") -> dict:
         """
@@ -305,33 +307,33 @@ class ConfigManager:
         }
 
 
-if __name__ == "__main__":
-    from os.path import dirname, join
-    from rich.console import Console
-    from rich.pretty import Pretty
-    from rich.traceback import Traceback
+# if __name__ == "__main__":
+#     from os.path import dirname, join
+#     from rich.console import Console
+#     from rich.pretty import Pretty
+#     from rich.traceback import Traceback
 
-    console = Console()
-    try:
-        cfg = ConfigManager(join(dirname(__file__), "examples", "minidaqapp"))
-    except Exception as e:
-        console.print(Traceback())
+#     console = Console()
+#     try:
+#         cfg = ConfigManager(join(dirname(__file__), "examples", "minidaqapp"))
+#     except Exception as e:
+#         console.print(Traceback())
 
-    console.print("Boot data :boot:")
-    console.print(Pretty(cfg.boot))
+#     console.print("Boot data :boot:")
+#     console.print(Pretty(cfg.boot))
 
-    console.print("Init data :boot:")
-    console.print(Pretty(cfg.init))
+#     console.print("Init data :boot:")
+#     console.print(Pretty(cfg.init))
 
-    console.print("Conf data :boot:")
-    console.print(Pretty(cfg.conf))
+#     console.print("Conf data :boot:")
+#     console.print(Pretty(cfg.conf))
 
-    console.print("Start data :runner:")
-    console.print(Pretty(cfg.start))
-    console.print("Start order :runner:")
-    console.print(Pretty(cfg.start_order))
+#     console.print("Start data :runner:")
+#     console.print(Pretty(cfg.start))
+#     console.print("Start order :runner:")
+#     console.print(Pretty(cfg.start_order))
 
-    console.print("Stop data :busstop:")
-    console.print(Pretty(cfg.stop))
-    console.print("Stop order :busstop:")
-    console.print(Pretty(cfg.stop_order))
+#     console.print("Stop data :busstop:")
+#     console.print(Pretty(cfg.stop))
+#     console.print("Stop order :busstop:")
+#     console.print(Pretty(cfg.stop_order))

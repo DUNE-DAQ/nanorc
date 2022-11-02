@@ -25,7 +25,7 @@ class RunInfo:
         return not self.run_stop_time
 
 def start_run(run_number:int,
-              run_type:int,
+              run_type:str,
               enable_data_storage:bool,
               trigger_rate:float=None):
 

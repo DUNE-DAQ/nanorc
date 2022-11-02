@@ -1,6 +1,8 @@
 import nanorc.argval as argval
 from nanorc.nano_context import NanoContext
+from nanorc.core import NanoRC
 import click
+from typing import Any
 from .statefulnode import CanExecuteReturnVal
 
 def check_rc(ctx, rc):
@@ -48,12 +50,14 @@ def add_run_end_parameters():
 @accept_message(argument=True)
 @click.pass_obj
 def message(obj, message):
+    if not obj.rc: raise RuntimeError('Core RC not defined')
     obj.rc.message(message)
 
 
 @click.command()
 @click.pass_obj
 def status(obj: NanoContext):
+    if not obj.rc: raise RuntimeError('Core RC not defined')
     obj.rc.status()
 
 
@@ -61,6 +65,7 @@ def status(obj: NanoContext):
 @click.option('--legend', type=bool, is_flag=True, default=False)
 @click.pass_obj
 def ls(obj, legend):
+    if not obj.rc: raise RuntimeError('Core RC not defined')
     obj.rc.ls(leg=legend)
 
 
@@ -70,9 +75,12 @@ def ls(obj, legend):
 @click.pass_obj
 @click.pass_context
 def pin_threads(ctx, obj:NanoContext, pin_thread_file, timeout:int):
-    data = { "script_name": 'thread_pinning' }
+    if not obj.rc: raise RuntimeError('Core RC not defined')
+    
+    data = { "script_name": 'thread_pinning' } # type: dict[str, Any]
     if pin_thread_file:
-        data["env"]: { "DUNEDAQ_THREAD_PIN_FILE": pin_thread_file }
+        data["env"] = { "DUNEDAQ_THREAD_PIN_FILE": pin_thread_file }
+        
     obj.rc.execute_script(data=data, timeout=timeout)
 
 
@@ -354,11 +362,11 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
         cli.add_command(execute_custom, c)
 
 
-def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool, cmd_args:dict):
+def execute_cmd_sequence(command:str, ctx:NanoContext, rc:NanoRC, wait:int, force:bool, cmd_args:dict):
     sequence = rc.get_command_sequence(command)
     import time
     last_cmd = sequence[-1]['cmd']
-    
+
     for seq_cmd in sequence:
         cmd = seq_cmd['cmd']
         optional = seq_cmd['optional']

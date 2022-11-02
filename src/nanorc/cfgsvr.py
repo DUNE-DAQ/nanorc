@@ -11,6 +11,8 @@ import tempfile
 from .statefulnode import StatefulNode
 from .node import SubsystemNode
 from .cfgmgr import ConfigManager
+from .treebuilder import TreeBuilder
+from typing import Optional
 from .credmgr import credentials,Authentication
 from distutils.dir_util import copy_tree
 
@@ -144,6 +146,7 @@ class DBConfigSaver:
         self.API_PSWD = auth.password
         self.timeout = 2
         self.apparatus_id = None
+        self.cfgmgr = None # type: Optional[TreeBuilder]
         self.log = logging.getLogger(self.__class__.__name__)
 
     def save_on_resume(self, topnode, overwrite_data:dict, cfg_method:str) -> str:
@@ -161,6 +164,8 @@ class DBConfigSaver:
         with tempfile.TemporaryDirectory() as dir_name:
             from urllib.parse import ParseResult
             dname = dir_name
+            if not self.cfgmgr or not self.cfgmgr.top_cfg:
+                raise RuntimeError('no treebuilder/top_cfg')
             json_object = self.cfgmgr.top_cfg
             nice_top = {}
             for key, value in json_object.items():

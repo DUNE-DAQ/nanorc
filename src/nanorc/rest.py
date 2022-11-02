@@ -27,7 +27,7 @@ class NanoWebContext:
         self.last_command = None
         self.last_path = None
         self.worker_thread = None
-        self.commands = []
+        self.commands = [] # type: list[str]
 
 ## PL:
 ## I don't know how else to do this, if this is None, the variable isn't global

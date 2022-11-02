@@ -11,9 +11,10 @@ from flask import Flask, request, cli
 from multiprocessing import Process, Queue
 from rich.console import Console
 from rich.pretty import Pretty
-from .sshpm import AppProcessDescriptor
+from .sshpm import AppProcessDescriptor as sshapd
+from .k8spm import AppProcessDescriptor as k8sapd
 
-from typing import Union, NoReturn
+from typing import Union, Optional
 
 
 log = logging.getLogger("werkzeug")
@@ -28,7 +29,7 @@ class ResponseDispatcher(threading.Thread):
         threading.Thread.__init__(self)
         self.listener = listener
 
-    def run(self) -> NoReturn:
+    def run(self) -> None:
         while True:
             r = self.listener.response_queue.get()
             if r == self.STOP:
@@ -36,7 +37,7 @@ class ResponseDispatcher(threading.Thread):
 
             self.listener.notify(r)
 
-    def stop(self) -> NoReturn:
+    def stop(self) -> None:
         self.listener.response_queue.put_nowait(self.STOP)
         self.join()
 
@@ -47,7 +48,7 @@ class FlaskManager(threading.Thread):
         self.flask = None
         self.queue = queue
         self.port = port
-        self.ready_lock = threading.Lock()
+        self.ready_lock = threading.Lock() # type: threading.Lock
         self.ready_lock.acquire()
 
     def _create_flask(self) -> Process:
@@ -92,7 +93,7 @@ class FlaskManager(threading.Thread):
         self.ready_lock.release()
         return flask_srv
 
-    def stop(self) -> NoReturn:
+    def stop(self) -> None:
         self.flask.terminate()
         self.flask.join()
         self.join()
@@ -106,18 +107,18 @@ class FlaskManager(threading.Thread):
         self.flask.join()
         self.log.info(f'ResponseListener: Flask joined')
 
-    def run(self) -> NoReturn:
+    def run(self) -> None:
         self._create_and_join_flask()
 
 class ResponseListener:
     """
     This class describes a notification listener.
     """
-    def __init__(self, port : int ):
+    def __init__(self, port:int):
         self.log = logging.getLogger("ResponseListener")
         self.port = port
         self.response_queue = None
-        self.flask_manager = None
+        self.flask_manager = None # type: Optional[FlaskManager]
         self.dispatcher = None
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -127,7 +128,7 @@ class ResponseListener:
         sock.close()
 
         self.response_queue = Queue()
-        self.handlers = {}
+        self.handlers = {} # type: dict[str,AppCommander]
         self.flask_manager = self.create_manager()
         self.dispatcher = ResponseDispatcher(self)
         self.dispatcher.start()
@@ -174,7 +175,7 @@ class ResponseListener:
 
         self.handlers[app] = handler
 
-    def unregister(self, app: str) -> NoReturn:
+    def unregister(self, app: str) -> None:
         """
         De-register a notification handler
 
@@ -183,7 +184,7 @@ class ResponseListener:
 
         """
         if not app in self.handlers:
-            return RuntimeError(f"No handler registered for app {app}")
+            raise RuntimeError(f"No handler registered for app {app}")
         del self.handlers[app]
 
     def notify(self, reply: dict):
@@ -208,7 +209,7 @@ class AppCommander:
     """docstring for DAQAppController"""
 
     def __init__(
-        self, console: Console, app: str, host: str, port: int, response_port: int, response_host: str = None, proxy : tuple = None
+        self, console: Console, app: str, host: str, port: int, response_port:int, response_host: str = None, proxy:tuple = None
     ):
         self.log = logging.getLogger(app)
         self.console = console
@@ -219,8 +220,8 @@ class AppCommander:
         self.listener_port = response_port
         self.listener_host = response_host
         self.proxy = proxy
-        self.response_queue = Queue()
-        self.sent_cmd = None
+        self.response_queue = Queue() #type: queue.Queue
+        self.sent_cmd = None # type: Optional[str]
 
     def __del__(self):
         pass
@@ -318,14 +319,16 @@ class AppSupervisor:
     Tracks the last executed and successful commands
     """
 
-    def __init__(self, console: Console, desc: AppProcessDescriptor, listener: ResponseListener, response_host: str = None, proxy: tuple = None):
+    def __init__(self, console: Console, desc: Union[sshapd, k8sapd], listener: ResponseListener, response_host: str = None, proxy: tuple = None):
         self.console = console
         self.desc = desc
+        if not desc.port or not desc.host:
+            raise RuntimeError('need host and port to start app')
         self.commander = AppCommander(
             console, desc.name, desc.host, desc.port, listener.port, response_host, proxy
         )
-        self.last_sent_command = None
-        self.last_ok_command = None
+        self.last_sent_command = None # type: Optional[str]
+        self.last_ok_command = None # type: Optional[str]
         self.listener = listener
         self.listener.register(desc.name, self.commander)
 
@@ -335,10 +338,13 @@ class AppSupervisor:
             cmd_data: dict,
             entry_state: str = "ANY",
             exit_state: str = "ANY"):
-        self.listener.flask_manager.ready_lock.acquire()
-        self.listener.flask_manager.ready_lock.release()
-        self.last_sent_command = cmd_id
-        self.commander.send_command(cmd_id, cmd_data, entry_state, exit_state)
+        if self.listener.flask_manager:
+            self.listener.flask_manager.ready_lock.acquire()
+            self.listener.flask_manager.ready_lock.release()
+            self.last_sent_command = cmd_id
+            self.commander.send_command(cmd_id, cmd_data, entry_state, exit_state)
+        else:
+            raise RuntimeError('No flask manager')
 
     def check_response(self, timeout: int = 0):
         r = self.commander.check_response(timeout)
@@ -356,10 +362,13 @@ class AppSupervisor:
             exit_state: str = "ANY",
             timeout: int = 10,
         ):
-        self.listener.flask_manager.ready_lock.acquire()
-        self.listener.flask_manager.ready_lock.release()
-        self.send_command(cmd_id, cmd_data, entry_state, exit_state)
-        return self.check_response(timeout)
+        if self.listener.flask_manager:
+            self.listener.flask_manager.ready_lock.acquire()
+            self.listener.flask_manager.ready_lock.release()
+            self.send_command(cmd_id, cmd_data, entry_state, exit_state)
+            return self.check_response(timeout)
+        else:
+            raise RuntimeError('No flask manager')
 
     def terminate(self):
         self.listener.unregister(self.desc.name)

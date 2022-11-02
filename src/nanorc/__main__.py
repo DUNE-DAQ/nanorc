@@ -4,8 +4,8 @@
 Command Line Interface for NanoRC
 """
 
-from .cli import cli, logging
-from .credmgr import credentials
+from nanorc.cli import cli, logging
+from nanorc.credmgr import credentials
 from rich.console import Console
 from nanorc.nano_context import NanoContext
 

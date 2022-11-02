@@ -74,7 +74,7 @@ def updateLogLevel(loglevel):
 @click_shell.shell(prompt='shonky rc> ', chain=True, context_settings=CONTEXT_SETTINGS)
 @click.version_option(__version__)
 @click.option('-t', '--traceback', is_flag=True, default=False, help='Print full exception traceback')
-@click.option('-l', '--loglevel', type=click.Choice(loglevels.keys(), case_sensitive=False), default='INFO', help='Set the log level')
+@click.option('-l', '--loglevel', type=click.Choice(list(loglevels.keys()), case_sensitive=False), default='INFO', help='Set the log level')
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--log-path', type=click.Path(exists=True), default=None, help='Where the logs should go (on localhost of applications)')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
@@ -246,6 +246,8 @@ def start_run(ctx, obj, wait:int, **kwargs):
 @click.pass_obj
 @click.pass_context
 def start(ctx, obj:NanoContext, **kwargs):
+    if not obj.rc: raise RuntimeError('Core RC not defined')
+
     obj.rc.run_num_mgr.set_run_number(kwargs['run_num'])
     obj.rc.start(**start_defaults_overwrite(kwargs))
     check_rc(ctx,obj.rc)

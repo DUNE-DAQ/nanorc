@@ -45,7 +45,7 @@ class StatefulNode(NodeMixin):
         self.fsm = FSM(self.console, fsm_conf, verbose)
         self.fsm.make_node_fsm(self)
         self.return_code = ErrorCode.Success
-        self.status_receiver_queue = Queue()
+        self.status_receiver_queue = Queue() # type: Queue
         self.order = order if order else dict()
         self.included = True
         self.errored = False
@@ -162,7 +162,7 @@ class StatefulNode(NodeMixin):
         return ret
 
 
-    def on_enter_terminate_ing(self, _) -> NoReturn:
+    def on_enter_terminate_ing(self, _) -> None:
         if self.children:
             for child in self.children:
                 if child.can_execute('terminate', quiet=True) == CanExecuteReturnVal.CanExecute:
@@ -174,7 +174,7 @@ class StatefulNode(NodeMixin):
         self.end_terminate()
         self.included = True
 
-    def on_enter_abort_ing(self, _) -> NoReturn:
+    def on_enter_abort_ing(self, _) -> None:
         if self.children:
             for child in self.children:
                 child.abort()

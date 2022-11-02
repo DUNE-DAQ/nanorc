@@ -12,7 +12,7 @@ import copy as cp
 import logging
 from .pmdesc import PMFactory
 from .appctrl import AppSupervisor, ResponseListener, ResponseTimeout, NoResponse
-from typing import Union, NoReturn
+from typing import Union, Optional, Any
 from .fsm import FSM
 import os.path
 from .statefulnode import StatefulNode, ErrorCode, CanExecuteReturnVal
@@ -56,8 +56,11 @@ class SubsystemNode(StatefulNode):
         self.name = name
 
         self.cfgmgr = cfgmgr
-        self.pm = None
-        self.listener = None
+        from .sshpm import SSHProcessManager
+        from .k8spm import K8SProcessManager
+        
+        self.pm = None # type: Union[None, SSHProcessManager, K8SProcessManager]
+        self.listener = None # type: Optional[ResponseListener]
 
     def can_execute_custom_or_expert(self, command, quiet=False, check_dead=True, check_inerror=True, only_included=True):
         ret = super().can_execute_custom_or_expert(
@@ -105,8 +108,17 @@ class SubsystemNode(StatefulNode):
         return CanExecuteReturnVal.CanExecute
 
     def send_custom_command(self, cmd, data, timeout, app=None) -> dict:
-        ret = {}
-        if not self.listener.flask_manager.is_alive():
+        ret = {} # type: dict[str, dict]
+        if not self.listener:
+            raise RuntimeError('no listener')
+        if not self.pm:
+            raise RuntimeError('no process manager')
+        
+        if self.listener.flask_manager:
+            if not self.listener.flask_manager.is_alive():
+                self.log.error('Response listener is not alive, trying to respawn it!!')
+                self.listener.flask_manager = self.listener.create_manager()
+        else:
             self.log.error('Response listener is not alive, trying to respawn it!!')
             self.listener.flask_manager = self.listener.create_manager()
 
@@ -174,7 +186,16 @@ class SubsystemNode(StatefulNode):
         return ret
 
     def send_expert_command(self, app, cmd, timeout) -> dict:
-        if not self.listener.flask_manager.is_alive():
+        if not self.listener:
+            raise RuntimeError('no listener')
+        if not self.pm:
+            raise RuntimeError('no process manager')
+        
+        if self.listener.flask_manager:
+            if not self.listener.flask_manager.is_alive():
+                self.log.error('Response listener is not alive, trying to respawn it!!')
+                self.listener.flask_manager = self.listener.create_manager()
+        else:
             self.log.error('Response listener is not alive, trying to respawn it!!')
             self.listener.flask_manager = self.listener.create_manager()
 
@@ -196,13 +217,15 @@ class SubsystemNode(StatefulNode):
     def get_custom_commands(self):
         return self.cfgmgr.get_custom_commands()
 
-    def on_enter_boot_ing(self, event) -> NoReturn:
+    def on_enter_boot_ing(self, event) -> None:
+        if not self.pm:
+            raise RuntimeError('No process manager')
         partition = event.kwargs["partition"]
         self.log.info(f'Subsystem {self.name} is booting partition {partition}')
         response = {
             "node": self.name,
             "command": "boot",
-        }
+        } # type: dict[str,Any]
         try:
             if self.pm is None:
                 fact = PMFactory(self.cfgmgr, self.console)
@@ -240,11 +263,19 @@ class SubsystemNode(StatefulNode):
 
         children = []
         failed = []
+        
+
         for n,d in self.pm.apps.items():
 
             response_host = None
             proxy = None
             if event.kwargs['pm'].use_k8spm():
+                from .k8spm import K8SProcessManager
+                if not isinstance(self.pm, K8SProcessManager):
+                    raise RuntimeError('wrong type of pm')
+                
+                if not self.pm.nanorc_responder:
+                    raise RuntimeError('no responder')
                 response_host = self.pm.nanorc_responder
                 proxy = (event.kwargs['pm'].address, event.kwargs['pm'].port)
 
@@ -300,18 +331,20 @@ class SubsystemNode(StatefulNode):
         self.end_boot(response=response)
 
 
-    def on_exit_conf_ing(self, event) -> NoReturn:
+    def on_exit_conf_ing(self, event) -> None:
         scripts = self.cfgmgr.boot.get('scripts')
         thread_pinning = scripts.get('thread_pinning') if scripts else None
         if thread_pinning:
             try:
+                if not self.pm:
+                    raise RuntimeError('no pm')
                 self.pm.execute_script(thread_pinning)
             except Exception as e:
                 self.log.error(f'Couldn\'t execute the thread pinning scripts: {str(e)}')
         super()._on_exit_callback(event)
 
 
-    def terminate_logic(self) -> NoReturn:
+    def terminate_logic(self) -> None:
         self.log.debug(f"Terminate logic of {self.name}")
         if self.listener:
             self.listener.terminate()
@@ -320,7 +353,7 @@ class SubsystemNode(StatefulNode):
             self.pm = None
         self.log.debug(f"DONE Terminate logic of {self.name}")
 
-    def on_enter_terminate_ing(self, _) -> NoReturn:
+    def on_enter_terminate_ing(self, _) -> None:
         self.log.debug(f"Terminating {self.name}")
         if self.children:
             for child in self.children:
@@ -337,7 +370,7 @@ class SubsystemNode(StatefulNode):
         self.errored = False
         self.included = True
 
-    def on_enter_abort_ing(self, _) -> NoReturn:
+    def on_enter_abort_ing(self, _) -> None:
         self.log.debug(f"Aborting {self.name}")
         if self.children:
             for child in self.children:
@@ -351,7 +384,7 @@ class SubsystemNode(StatefulNode):
         self.errored = False
         self.log.debug(f"DONE Aborting {self.name}")
 
-    def _on_enter_callback(self, event):
+    def _on_enter_callback(self, event) -> None:
         command = event.event.name
         origin = event.transition.source
         cfg_method = event.kwargs.get("cfg_method")
@@ -365,8 +398,16 @@ class SubsystemNode(StatefulNode):
 
         appset = list(self.children)
         failed = []
-
-        if not self.listener.flask_manager.is_alive():
+        if not self.listener:
+            raise RuntimeError('no listener')
+        if not self.pm:
+            raise RuntimeError('no process manager')
+        
+        if self.listener.flask_manager:
+            if not self.listener.flask_manager.is_alive():
+                self.log.error('Response listener is not alive, trying to respawn it!!')
+                self.listener.flask_manager = self.listener.create_manager()
+        else:
             self.log.error('Response listener is not alive, trying to respawn it!!')
             self.listener.flask_manager = self.listener.create_manager()
 

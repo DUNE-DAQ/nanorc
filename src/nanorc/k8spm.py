@@ -12,18 +12,19 @@ from kubernetes import client, config
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeRemainingColumn, TimeElapsedColumn
 from rich.table import Table
+from typing import Optional
 
 
 class AppProcessDescriptor(object):
     """docstring for AppProcessDescriptor"""
 
-    def __init__(self, name):
+    def __init__(self, name:str):
         super(AppProcessDescriptor, self).__init__()
         self.name = name
-        self.host = None
-        self.node = None
+        self.host = None # type: Optional[str]
+        self.node = None # type: Optional[str]
         self.conf = None
-        self.port = None
+        self.port = None # type: Optional[int]
         self.proc = None
 
 
@@ -76,7 +77,7 @@ class K8SProcessManager(object):
         self.connections = connections
         self.mount_cvmfs = True
         self.console = console
-        self.apps = {}
+        self.apps = {} # type: dict[str, AppProcessDescriptor]
         self.partition = None
         self.cluster_config = cluster_config
 
@@ -180,7 +181,7 @@ class K8SProcessManager(object):
                 return pod.spec.node_name
         return 'unknown'
 
-    def get_container_port_list_from_connections(self, app_name:str, connections:list=None, cmd_port:int=3333):
+    def get_container_port_list_from_connections(self, app_name:str, connections:list=[], cmd_port:int=3333):
         ret = [
             client.V1ContainerPort(
                 name = 'restcmd',
@@ -201,7 +202,7 @@ class K8SProcessManager(object):
         return ret
 
 
-    def get_service_port_list_from_connections(self, app_name:str, connections:list=None, cmd_port:int=3333):
+    def get_service_port_list_from_connections(self, app_name:str, connections:list=[], cmd_port:int=3333):
         ret = [
             client.V1ServicePort(
                 name = 'restcmd',
@@ -654,7 +655,7 @@ class K8SProcessManager(object):
             self._core_v1_api.create_namespaced_persistent_volume_claim(namespace, claim)
         except Exception as e:
             self.log.error(e)
-            raise RuntimeError(f"Failed to create persistent volume claim \"{namespace}:{name}\"") from e
+            raise RuntimeError(f"Failed to create persistent volume claim \"{namespace}:{pvc['name']}\"") from e
 
 
 

@@ -8,9 +8,10 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 import sh
+from typing import Any
 
 def status_data(node, get_children=True) -> dict:
-    ret = {}
+    ret = {} # type:dict[str,Any]
     if isinstance(node, ApplicationNode):
         sup = node.sup
         if sup.desc.proc.is_alive():
@@ -28,7 +29,7 @@ def status_data(node, get_children=True) -> dict:
         ret['last_cmd_failed'] = (sup.last_sent_command != sup.last_ok_command)
         ret['name'] = node.name
         ret['state'] = ("error " if node.errored else "") + node.state + ("" if node.included else " - excluded")
-        ret['host'] = sup.desc.node if hasattr(sup.desc, 'node') else sup.desc.host,
+        ret['host'] = sup.desc.node if hasattr(sup.desc, 'node') else sup.desc.host
         ret['last_sent_command'] = sup.last_sent_command
         ret['last_ok_command'] = sup.last_ok_command
     else:
@@ -39,7 +40,7 @@ def status_data(node, get_children=True) -> dict:
     return ret
 
 
-def print_status(topnode, console, apparatus_id='', partition='') -> int:
+def print_status(topnode, console, apparatus_id='', partition='') -> None:
     table = Table(title=f"[bold]{apparatus_id}[/bold] applications" + (f" in partition [bold]{partition}[/bold]" if partition else ''))
     table.add_column("name", style="blue")
     table.add_column("state", style="blue")

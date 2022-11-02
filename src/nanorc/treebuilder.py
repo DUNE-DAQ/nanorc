@@ -10,6 +10,7 @@ from collections import OrderedDict
 from json import JSONDecoder
 from pathlib import Path
 from anytree import PreOrderIter
+from typing import Optional
 
 def dict_raise_on_duplicates(ordered_pairs):
     count=0
@@ -22,11 +23,12 @@ def dict_raise_on_duplicates(ordered_pairs):
     return d
 
 class TreeBuilder:
-    def extract_json_to_nodes(self, js, mother, fsm_conf) -> StatefulNode:
+    def extract_json_to_nodes(self, js, mother, fsm_conf) -> None:
         for n,d in js.items():
             if isinstance(d, dict):
                 child = StatefulNode(
                     name=n,
+                    log = self.log,
                     parent=mother,
                     console=self.console,
                     fsm_conf = fsm_conf)
@@ -58,6 +60,7 @@ class TreeBuilder:
 
     def __init__(self, log, top_cfg, resolve_hostname, fsm_conf, console, port_offset):
         self.log = log
+        self.top_cfg = None # type: Optional[dict]
         self.resolve_hostname = resolve_hostname
         self.fsm_conf = fsm_conf
         self.port_offset = port_offset

@@ -1,5 +1,6 @@
 from rich.console import Console
-
+from .core import NanoRC
+from typing import Optional
 class NanoContext:
     """docstring for NanoContext"""
     def __init__(self, console: Console):
@@ -11,4 +12,4 @@ class NanoContext:
         super(NanoContext, self).__init__()
         self.console = console
         self.print_traceback = False
-        self.rc = None
+        self.rc = None # type: Optional[NanoRC]

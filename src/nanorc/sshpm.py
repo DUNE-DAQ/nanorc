@@ -14,6 +14,7 @@ import logging
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeRemainingColumn, TimeElapsedColumn
 from rich.table import Table
+from typing import Optional
 
 
 # # ------------------------------------------------
@@ -77,10 +78,10 @@ class AppProcessDescriptor(object):
         self.name = name
         self.logfile = None
         self.ssh_args = None
-        self.host = None
+        self.host = None # type: Optional[str]
         self.cmd = None
         self.conf = None
-
+        self.port = None # type: Optional[int]
     def __str__(self):
         return str(vars(self))
 
@@ -107,7 +108,7 @@ class AppProcessWatcherThread(threading.Thread):
 class SSHProcessManager(object):
     """An poor's man process manager based on ssh"""
 
-    __instances = set()
+    __instances = set() # type: set[SSHProcessManager]
 
     @classmethod
     def kill_all_instances(cls):
@@ -119,9 +120,9 @@ class SSHProcessManager(object):
         super(SSHProcessManager, self).__init__()
         self.console = console
         self.log = logging.getLogger(__name__)
-        self.apps = {}
-        self.watchers = []
-        self.event_queue = queue.Queue()
+        self.apps = {} # type: dict[str, AppProcessDescriptor]
+        self.watchers = [] # type: list[AppProcessWatcherThread]
+        self.event_queue = queue.Queue() # type: queue.Queue
         self.ssh_conf = ssh_conf
         self.log_path = log_path
         # Add self to the list of instances

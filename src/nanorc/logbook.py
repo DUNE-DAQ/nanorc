@@ -16,7 +16,7 @@ class FileLogbook:
         self.path = path
         self.file_name = ""
         self.console = console
-        self.run_num = ""
+        self.run_num = 0
         self.run_type = ""
 
     def message_on_start(self, message:str, run_num:int, run_type:str):
