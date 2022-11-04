@@ -20,7 +20,6 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.console import Console
 from rich.traceback import Traceback
-from rich.progress import *
 
 
 from nanorc.core import NanoRC
@@ -57,19 +56,19 @@ from nanorc.nano_context import NanoContext
 @click.pass_context
 def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, dotnanorc, kerberos, timeout, partition_number, partition_label, web, pm, cfg_dir, user):
 
+
+
     if not elisa_conf:
         with resources.path(confdata, "elisa_conf.json") as p:
             elisa_conf = p
 
     obj.print_traceback = traceback
-    credentials.change_user(user)
-    ctx.command.shell.prompt = f"{credentials.user}@np04rc> "
     grid = Table(title='Shonky Nano04RC', show_header=False, show_edge=False)
     grid.add_column()
     grid.add_row("This is an admittedly shonky nano RC to control DUNE-DAQ applications.")
     grid.add_row("  Give it a command and it will do your biddings,")
     grid.add_row("  but trust it and it will betray you!")
-    grid.add_row(f"Use it with care, {credentials.user}!")
+    grid.add_row("Use it with care, user!")
 
     obj.console.print(Panel.fit(grid))
 
@@ -85,7 +84,7 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
     try:
         dotnanorc = os.path.expanduser(dotnanorc)
         obj.console.print(f"[blue]Loading {dotnanorc}[/blue]")
-        f = open(dotnanorc)
+        f = open(dotnanorc, 'r')
         dotnanorc = json.load(f)
 
         rundb_socket = json.loads(resources.read_text(confdata, "run_number.json"))['socket']
@@ -112,6 +111,28 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
             port_offset = port_offset,
             pm = pm
         )
+        credentials.set_partition(partition_number=partition_number,apparatus_id=rc.apparatus_id)
+
+        in_use = credentials.partition_in_use()
+        if in_use:
+            kuser = credentials.get_kerberos_user(silent=True)
+
+            if kuser!=None and kuser != user:
+                obj.console.print(f'[bold red]Partition #{partition_number} on apparatus \'{in_use}\' seems to be used by \'{kuser}\', do you want to steal it? Y/N[/bold red]')
+            else:
+                obj.console.print(f'[bold red]You seem to already have partition #{partition_number} on apparatus \'{in_use}\' active, are you sure you want to proceed? Y/N[/bold red]')
+                while True:
+                    steal = input()
+                    if   steal == 'Y': break
+                    elif steal == 'N': exit(0)
+                    obj.console.print(f'[bold red]Wrong answer! Y or N?[/bold red]')
+
+        credentials.start_partition()
+        credentials.change_user(user)
+        ctx.command.shell.prompt = f"{credentials.user}@np04rc> "
+        if credentials.user is None:
+            print()
+            raise RuntimeError(f'User {user} couldn\'t login')
 
         rc.log_path = os.path.abspath(log_path)
         add_common_cmds(ctx.command, end_of_run_cmds=False)
@@ -163,11 +184,13 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
         raise click.Abort()
 
     def cleanup_rc():
+        credentials.quit()
         if rc.topnode.state != 'none':
             logging.getLogger("cli").warning("NanoRC context cleanup: Aborting applications before exiting")
             rc.abort(timeout=120)
         if rc.return_code:
             ctx.exit(rc.return_code)
+
 
     ctx.call_on_close(cleanup_rc)
     obj.rc = rc
@@ -192,6 +215,19 @@ def change_user(ctx, obj, user):
 def kinit(ctx, obj):
     credentials.new_kerberos_ticket()
 
+@np04cli.command('klist')
+@click.pass_obj
+@click.pass_context
+def klist(ctx, obj):
+    credentials.check_kerberos_credentials(silent=False)
+    import subprocess
+    # print(subprocess.call(['klist', '-s']))
+    proc = subprocess.run(['klist', '-s'], capture_output=True, text=True, env=credentials.krbenv)
+    obj.rc.log.info(f'klist -s\nstdout: {proc.stdout}')
+    obj.rc.log.info(f'stderr: {proc.stderr}')
+    obj.rc.log.info(f'ret code: {proc.returncode}')
+
+
 def add_run_start_parameters():
     # sigh start...
     def add_decorator(function):
@@ -208,7 +244,7 @@ def start_defaults_overwrite(kwargs):
     return kwargs
 
 def is_authenticated():
-    if not credentials.check_kerberos_credentials():
+    if not credentials.check_kerberos_credentials(silent=True):
         logging.getLogger("cli").error(f'\'{credentials.user}\' doesn\'t have valid kerberos ticket, use \'kinit\', or \'change_user\' to create a ticket (in a shell or in nanorc)')
         return False
     return True
