@@ -2,6 +2,8 @@
 
 Poor man's Run Control for DUNE DAQ applications
 
+Pssst! Check out the FAQ [here](FAQ.md)!
+
 ## How to run me
 
 This tutorial will guide you through the one-host minidaq example.
