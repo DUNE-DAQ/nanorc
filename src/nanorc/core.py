@@ -12,12 +12,11 @@ from .statefulnode import StatefulNode, CanExecuteReturnVal
 from .treebuilder import TreeBuilder
 from .cfgsvr import FileConfigSaver, DBConfigSaver
 from .credmgr import credentials
-from .node_render import *
+from .node_render import print_node, print_status
 from .logbook import ElisaLogbook, FileLogbook
 import importlib
 from . import confdata
 from rich.traceback import Traceback
-from rich.progress import *
 from rich.table import Table
 from .runinfo import start_run, print_run_info
 
@@ -101,8 +100,14 @@ class NanoRC:
         seq_cmd = self.topnode.fsm.command_sequences.get(command)
         return seq_cmd if seq_cmd else [command]
 
-    def can_execute(self, command:str, quiet=False):
-        return self.topnode.can_execute(command, quiet=quiet)
+    def can_execute(self, command:str, quiet=False, check_dead=True, check_inerror=True, check_children=True):
+        return self.topnode.can_execute(
+            command        = command,
+            quiet          = quiet,
+            check_dead     = check_dead,
+            check_inerror  = check_inerror,
+            check_children = check_children
+        )
 
     def execute_custom_command(self, command, data, timeout, node_path=None, check_dead=True, check_inerror=True, only_included=True):
         if not timeout:
@@ -110,10 +115,11 @@ class NanoRC:
 
         node_to_send = None
         extra_arg={}
-
+        check_children = False
         if not node_path:
             self.log.info(f'Sending {command} to all the nodes')
             node_to_send = self.topnode
+            check_children = True
         elif isinstance(node_path, ApplicationNode):
             self.log.info(f'Telling {node_path.parent.name} to send {command} to {node_path.name}')
             node_to_send = node_path.parent
@@ -123,11 +129,12 @@ class NanoRC:
             node_to_send = node_path
 
         canexec = node_to_send.can_execute_custom_or_expert(
-            command,
-            quiet=False,
-            check_dead=check_dead,
-            check_inerror=check_inerror,
-            only_included=only_included,
+            command        = command,
+            quiet          = False,
+            check_dead     = check_dead,
+            check_inerror  = check_inerror,
+            check_children = check_children,
+            only_included  = only_included,
         )
         if canexec != CanExecuteReturnVal.CanExecute:
             self.log.error(f'Cannot execute {command}, reason: {str(canexec)}')
@@ -141,7 +148,7 @@ class NanoRC:
         if not timeout:
             timeout = self.timeout
 
-        canexec = node_path.can_execute_custom_or_expert("expert", check_dead=True)
+        canexec = node_path.can_execute_custom_or_expert("expert", check_dead=True, check_children=False)
 
         if canexec != CanExecuteReturnVal.CanExecute:
             self.return_code = node_path.return_code
@@ -179,15 +186,18 @@ class NanoRC:
 
     def execute_command(self, command, node_path=None, **kwargs):
         force = kwargs.get('force')
+        check_children = True
         if not node_path:
             node_path=self.topnode
+            check_children = False
 
         canexec = node_path.can_execute(
-            command,
-            quiet=True,
-            check_dead=not force,
-            check_inerror=not force,
-            only_included=True,
+            command        = command,
+            quiet          = True,
+            check_dead     = not force,
+            check_inerror  = not force,
+            check_children = check_children and not force,
+            only_included  = True,
         )
         if canexec == CanExecuteReturnVal.InvalidTransition:
             self.return_code = node_path.return_code.value
@@ -312,7 +322,12 @@ class NanoRC:
 
         if self.logbook:
             try:
-                self.logbook.message_on_start(message, run, run_type)
+                self.logbook.message_on_start(
+                    message = message,
+                    apparatus = self.apparatus_id,
+                    run_num = run,
+                    run_type = run_type
+                )
             except Exception as e:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
@@ -369,7 +384,10 @@ class NanoRC:
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
             try:
-                self.logbook.add_message(message)
+                self.logbook.add_message(
+                    message = message,
+                    apparatus = self.apparatus_id
+                )
                 # if self.runs:
                 #     if self.runs[-1].is_running():
                 #         self.runs[-1].messages.append(message)
@@ -433,7 +451,10 @@ class NanoRC:
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
             try:
-                self.logbook.message_on_stop(message)
+                self.logbook.message_on_stop(
+                    message = message,
+                    apparatus = self.apparatus_id
+                )
                 # if self.runs: self.runs[-1].messages.append(message)
             except Exception as e:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
@@ -481,6 +502,7 @@ class NanoRC:
             only_included = False,
             check_dead = False,
             check_inerror = False,
+            check_children = node_path.children != []
         )
         if canexec != CanExecuteReturnVal.CanExecute:
             self.log.error(f'Cannot execute exclude, reason: {str(canexec)}')
@@ -513,6 +535,7 @@ class NanoRC:
             only_included = False,
             check_dead = False,
             check_inerror = False,
+            check_children = node_path.children != []
         )
         if canexec != CanExecuteReturnVal.CanExecute:
             self.log.error(f'Cannot execute include, reason: {str(canexec)}')
