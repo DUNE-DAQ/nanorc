@@ -16,9 +16,9 @@ def accept_timeout(default_timeout):
 def accept_path(argument:bool=False):
     def add_decorator(function):
         if argument:
-            return click.argument('node-path', type=str, callback=argval.validate_node_path)(function)
+            return click.argument('node-path', type=str)(function)
         else:
-            return click.option('--node-path', type=str, default=None, callback=argval.validate_node_path)(function)
+            return click.option('--node-path', type=str, default=None)(function)
     return add_decorator
 
 def accept_message(argument:bool=False):
@@ -98,7 +98,8 @@ def ls_thread(ctx, obj):
 @click.pass_obj
 @click.pass_context
 def conf(ctx, obj, node_path, timeout:int):
-    obj.rc.conf(node_path=node_path, timeout=timeout)
+    node = argval.validate_node_path(ctx, obj, node_path)
+    obj.rc.conf(node_path=node, timeout=timeout)
     check_rc(ctx,obj.rc)
     obj.rc.status()
 
@@ -208,7 +209,8 @@ def stop_run(ctx, obj, wait:int, **kwargs):
 @click.pass_obj
 @click.pass_context
 def scrap(ctx, obj, node_path, force, timeout):
-    obj.rc.scrap(node_path=node_path, force=force, timeout=timeout)
+    node = argval.validate_node_path(ctx, obj, node_path)
+    obj.rc.scrap(node_path=node, force=force, timeout=timeout)
     check_rc(ctx,obj.rc)
     obj.rc.status()
 
@@ -231,9 +233,10 @@ def change_rate(ctx, obj, trigger_rate, timeout):
 @click.pass_obj
 @click.pass_context
 def include(ctx, obj, node_path, resource_name, timeout):
+    node = argval.validate_node_path(ctx, obj, node_path)
     if not resource_name:
-        resource_name = node_path.name
-    obj.rc.include(node_path=node_path, timeout=timeout, resource_name=resource_name)
+        resource_name = node.name
+    obj.rc.include(node_path=node, timeout=timeout, resource_name=resource_name)
     check_rc(ctx,obj.rc)
     obj.rc.status()
 
@@ -245,9 +248,10 @@ def include(ctx, obj, node_path, resource_name, timeout):
 @click.pass_obj
 @click.pass_context
 def exclude(ctx, obj, node_path, resource_name, timeout):
+    node = argval.validate_node_path(ctx, obj, node_path)
     if not resource_name:
-        resource_name = node_path.name
-    obj.rc.exclude(node_path=node_path, timeout=timeout, resource_name=resource_name)
+        resource_name = node.name
+    obj.rc.exclude(node_path=node, timeout=timeout, resource_name=resource_name)
     check_rc(ctx,obj.rc)
     obj.rc.status()
 
@@ -257,9 +261,11 @@ def exclude(ctx, obj, node_path, resource_name, timeout):
 @click.argument('json_file', type=click.Path(exists=True))
 @accept_timeout(None)
 @click.pass_obj
-def expert_command(obj, node_path, json_file, timeout):
+@click.pass_context
+def expert_command(ctx,obj, node_path, json_file, timeout):
+    node = argval.validate_node_path(ctx, obj, node_path)
     obj.rc.send_expert_command(
-        node_path=node_path,
+        node_path=node,
         json_file=json_file,
         timeout=timeout
     )
@@ -357,7 +363,7 @@ def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool, cmd_args:di
     sequence = rc.get_command_sequence(command)
     import time
     last_cmd = sequence[-1]['cmd']
-    
+
     for seq_cmd in sequence:
         cmd = seq_cmd['cmd']
         optional = seq_cmd['optional']
