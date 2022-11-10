@@ -2,6 +2,8 @@ from textual import log
 from textual.app import App, ComposeResult
 from textual.containers import Container, Content
 from textual.widgets import Button, Header, Footer, Static
+from textual.reactive import reactive
+from .core import NanoRC
 
 class StatusDisplay(Static):
     pass
@@ -15,15 +17,20 @@ class StatusDisplay(Static):
 
 
 class NanoRCStatus(Static):
+    rc = reactive(NanoRC)
+    
     def __init__(self, rc, **kwargs):
         super().__init__(**kwargs)
-        self.rc = rc
+        self.rcobj = rc
 
     def update_status(self) -> None:
         from .node_render import get_status
         status_display = self.query_one(StatusDisplay)
-        status_display.update(get_status(self.rc.topnode))
-
+        status_display.update(get_status(self.rcobj.topnode))
+        
+    def watch_rcobj(self) -> None:
+        self.update_status()
+        
     def on_mount(self) -> None:
         self.update_status()
 
