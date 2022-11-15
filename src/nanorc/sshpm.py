@@ -154,7 +154,7 @@ class SSHProcessManager(object):
             proc = sh.ssh(ssh_args)
             self.log.info(proc)
 
-    def boot(self, boot_info, conf_loc, timeout):
+    def boot(self, boot_info, conf_loc, timeout, this_app_name=None):
 
         if self.apps:
             raise RuntimeError(
@@ -172,6 +172,9 @@ class SSHProcessManager(object):
             self.log.info(f'Using the Runtime environment script "{rte_script}"')
 
         for app_name, app_conf in apps.items():
+
+            if this_app_name is not None and this_app_name != app_name:
+                continue
 
             host = hosts[app_conf["host"]]
             env_formatter = {
@@ -244,12 +247,18 @@ class SSHProcessManager(object):
 
         apps_running = []
         for name, desc in self.apps.items():
+            if this_app_name is not None and this_app_name != app_name:
+                continue
+
             if is_port_open(desc.host, desc.port):
                 apps_running += [name]
         if apps_running:
             raise RuntimeError(f"ERROR: apps already running? {apps_running}")
 
         for name, desc in self.apps.items():
+            if this_app_name is not None and this_app_name != app_name:
+                continue
+
             proc = sh.ssh(
                 *desc.ssh_args,
                 _out=file_logger(desc.logfile) if not self.log_path else None,
@@ -271,33 +280,44 @@ class SSHProcessManager(object):
             console=self.console,
         ) as progress:
             total = progress.add_task("[yellow]# apps started", total=len(apps))
-            apps_tasks = {
-                a: progress.add_task(f"[blue]{a}", total=1) for a in self.apps
-            }
+            if this_app_name is not None:
+                apps_tasks = {
+                    this_app_name: progress.add_task(f"[blue]{this_app_name}", total=1)
+                }
+            else:
+                apps_tasks = {
+                    a: progress.add_task(f"[blue]{a}", total=1) for a in self.apps
+                }
             waiting = progress.add_task("[yellow]timeout", total=timeout)
 
             for _ in range(timeout):
                 progress.update(waiting, advance=1)
 
-                alive, failed, resp = self.check_apps()
+                alive, failed, resp = self.check_apps(this_app_name)
 
                 for a, t in apps_tasks.items():
                     if a in resp:
                         progress.update(t, completed=1)
 
                 progress.update(total, completed=len(resp))
-
-                if set.union(set(resp), set(failed.keys())) == set(self.apps.keys()):
-                    progress.update(waiting, visible=False)
-                    break
+                if this_app_name:
+                    if set.union(set(resp), set(failed.keys())) == set([this_app_name]):
+                        progress.update(waiting, visible=False)
+                        break
+                else:
+                    if set.union(set(resp), set(failed.keys())) == set(self.apps.keys()):
+                        progress.update(waiting, visible=False)
+                        break
                 time.sleep(1)
 
-    def check_apps(self):
+    def check_apps(self, this_app_name=None):
         responding = []
         alive = []
         failed = {}
 
         for name, desc in self.apps.items():
+            if this_app_name is not None and this_app_name != name:
+                continue
 
             if desc.proc is None:
                 # Should I throw an error here?
@@ -346,8 +366,12 @@ class SSHProcessManager(object):
                     pass
         self.apps = {}
 
-    def kill(self):
+    def kill(self, this_app_name=None):
         for name, desc in self.apps.items():
+
+            if this_app_name is not None and name != this_app_name:
+                continue
+
             if desc.proc is not None and desc.proc.is_alive():
                 try:
                     desc.proc.kill()

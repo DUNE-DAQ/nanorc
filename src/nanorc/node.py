@@ -60,6 +60,90 @@ class SubsystemNode(StatefulNode):
         self.pm = None
         self.listener = None
 
+    def kill_app(self, app):
+        if app.sup.desc.proc.is_alive:
+            self.log.info(f'Killing {app.name}')
+            self.pm.kill(app.name)
+        else:
+            self.log.info(f'{app.name} is already dead, not killing it')
+
+    def restart_app(self, app, partition, timeout):
+        if app.sup.desc.proc.is_alive:
+            self.log.info(f'{app.name} seems to be alive, killing it')
+            app.terminate()
+
+
+        try:
+            if self.pm is None:
+                raise RuntimeError('there is not ProcessManager on this node!')
+
+            boot_info = cp.deepcopy(self.cfgmgr.boot)
+            boot_info['env']['DUNEDAQ_PARTITION'] = partition
+
+            self.pm.boot(
+                boot_info = boot_info,
+                timeout = timeout,
+                conf_loc = self.cfgmgr.get_conf_location(for_apps=True),
+                this_app_name = app.name
+            )
+
+        except Exception as e:
+            self.log.exception(e)
+            self.to_error(
+                text=f'Couldn\'t boot {app.name}',
+                command='boot',
+                exception=e,
+            )
+            return
+
+        descriptor = self.pm.apps[app.name]
+
+        child = ApplicationNode(
+            name=app.name,
+            console=self.console,
+            log=self.log,
+            sup=AppSupervisor(self.console, d, self.listener, response_host, proxy),
+            parent=self,
+            fsm_conf=self.fsm_conf
+        )
+
+        tries=0 # give it 10 more seconds to come up
+        while (not child.sup.desc.proc.is_alive() or not child.sup.commander.ping()) and tries<20:
+            time.sleep(0.5)
+            tries+=1
+
+
+        if child.sup.desc.proc.is_alive() and child.sup.commander.ping():
+            # nothing really happens in these 2:
+            child.boot()
+            child.end_boot()
+            # ... but now the application is booted
+        else:
+            failed.append({
+                "node": child.name,
+                "status_code": 1,## I don't know
+                "command": "boot",
+                "error": "Not bootable",
+            })
+            etext=''
+            if not child.sup.desc.proc.is_alive():
+                etext='Process isn\'t alive! '
+            if not child.sup.commander.ping():
+                etext='Cannot ping the app!'
+            child.to_error(
+                text=etext,
+                command='boot'
+            )
+
+        index = 0
+        for c in self.children:
+            if c.name == app.name:
+                break
+            index += 1
+        del children[index]
+        children.append(child)
+
+
     def can_execute_custom_or_expert(self, command, quiet=False, check_dead=True, check_inerror=True, check_children=True, only_included=True):
         ret = super().can_execute_custom_or_expert(
             command        = command,

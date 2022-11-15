@@ -21,7 +21,7 @@ from rich.table import Table
 from .runinfo import start_run, print_run_info
 
 from datetime import datetime
-
+from .node import ApplicationNode, SubsystemNode
 from typing import Union, NoReturn
 
 # Good ol' moo import
@@ -548,7 +548,65 @@ class NanoRC:
 
         self.execute_custom_command(
             "include",
-            data = {'resource_name': resource_name if resource_name else node_paht.name},
+            data = {'resource_name': resource_name if resource_name else node_path.name},
+            timeout = timeout,
+            node_path = None,
+            only_included = False,
+            check_dead = False,
+            check_inerror = False,
+        )
+
+        self.topnode.resolve_error()
+
+    def restart_app(self, node_path, timeout) -> NoReturn:
+        if not timeout:
+            timeout = self.timeout
+
+        if not isinstance(node_path, ApplicationNode):
+            raise RuntimeError('Can only restart applications!')
+
+        parent = node_path.parent
+        if not isinstance(parent, SubsystemNode):
+            raise RuntimeError(f'{parent.name} should be a subsystem!')
+
+        ret = parent.restart_app(
+            node_path,
+            partition = self.partition,
+            timeout = timeout,
+        )
+
+        if ret != 0:
+            return
+
+        self.execute_custom_command(
+            "restart",
+            data = {'resource_name': resource_name if resource_name else node_path.name},
+            timeout = timeout,
+            node_path = None,
+            only_included = False,
+            check_dead = False,
+            check_inerror = False,
+        )
+
+        self.topnode.resolve_error()
+
+
+    def kill_app(self, node_path):
+        if not isinstance(node_path, ApplicationNode):
+            raise RuntimeError('Can only restart applications!')
+
+        parent = node_path.parent
+        if not isinstance(parent, SubsystemNode):
+            raise RuntimeError(f'{parent.name} should be a subsystem!')
+
+        ret = parent.kill_app(node_path)
+
+        if ret != 0:
+            return
+
+        self.execute_custom_command(
+            "kill",
+            data = {'resource_name': resource_name if resource_name else node_path.name},
             timeout = timeout,
             node_path = None,
             only_included = False,

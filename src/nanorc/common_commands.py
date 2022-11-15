@@ -44,6 +44,23 @@ def add_run_end_parameters():
      # sigh end
     return add_decorator
 
+
+@click.command('restart-app')
+@accept_path(argument=True)
+@accept_timeout(None)
+@click.pass_obj
+def restart_app(obj, node_path, timeout:int):
+    obj.rc.restart_app(
+        node_path = node_path,
+        timeout = timeout
+    )
+
+@click.command('kill-app')
+@accept_path(argument=True)
+@click.pass_obj
+def kill_app(obj, node_path):
+    obj.rc.kill_app(node_path)
+
 @click.command()
 @accept_message(argument=True)
 @click.pass_obj
@@ -321,6 +338,8 @@ def add_common_cmds(shell, end_of_run_cmds=True):
     shell.add_command(expert_command      , 'expert_command'      )
     shell.add_command(wait                , 'wait'                )
     shell.add_command(start_shell         , 'start_shell'         )
+    shell.add_command(kill_app            , 'kill_app'            )
+    shell.add_command(restart_app         , 'restart_app'         )
     if end_of_run_cmds:
         shell.add_command(drain_dataflow      , 'drain_dataflow'      )
         shell.add_command(stop_run            , 'stop_run'            )
