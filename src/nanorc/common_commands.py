@@ -362,7 +362,7 @@ def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool, cmd_args:di
     for seq_cmd in sequence:
         cmd = seq_cmd['cmd']
         optional = seq_cmd['optional']
-        canexec = rc.can_execute(cmd, quiet=True, check_children=False)
+        canexec = rc.can_execute(cmd, quiet=True, check_children=False, check_inerror=False)
         
         if canexec == CanExecuteReturnVal.InvalidTransition:
             if optional:
