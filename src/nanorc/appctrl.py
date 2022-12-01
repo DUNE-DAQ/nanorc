@@ -269,6 +269,7 @@ class AppCommander:
             self.app_url,
             data=json.dumps(cmd),
             headers=headers,
+            timeout=1.,
             proxies={
                 'http': f'socks5h://{self.proxy[0]}:{self.proxy[1]}',
                 'https': f'socks5h://{self.proxy[0]}:{self.proxy[1]}'

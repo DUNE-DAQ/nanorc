@@ -60,47 +60,51 @@ class SubsystemNode(StatefulNode):
         self.pm = None
         self.listener = None
 
-    def can_execute_custom_or_expert(self, command, quiet=False, check_dead=True, check_inerror=True, only_included=True):
+    def can_execute_custom_or_expert(self, command, quiet=False, check_dead=True, check_inerror=True, check_children=True, only_included=True):
         ret = super().can_execute_custom_or_expert(
-            command = command,
-            quiet = quiet,
-            check_dead = check_dead,
-            check_inerror = check_inerror,
-            only_included = only_included,
+            command        = command,
+            quiet          = quiet,
+            check_dead     = check_dead,
+            check_inerror  = check_inerror,
+            check_children = check_children,
+            only_included  = only_included,
         )
         if ret != CanExecuteReturnVal.CanExecute:
             return ret
 
-        for c in self.children:
-            if not c.included and only_included: continue
+        if check_children:
+            for c in self.children:
+                if not c.included and only_included: continue
 
-            if check_dead and not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
-                self.return_code = ErrorCode.Failed
-                self.log.error(f'{c.name} is dead, cannot send {command}')
-                return CanExecuteReturnVal.Dead
+                if check_dead and not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
+                    self.return_code = ErrorCode.Failed
+                    self.log.error(f'{c.name} is dead, cannot send {command}')
+                    return CanExecuteReturnVal.Dead
 
         self.return_code = ErrorCode.Success
         return CanExecuteReturnVal.CanExecute
 
-    def can_execute(self, command, quiet=False, check_dead=True, check_inerror=True, only_included=True):
+    def can_execute(self, command, quiet=False, check_dead=True, check_inerror=True, check_children=True, only_included=True):
         ret = super().can_execute(
-            command = command,
-            quiet = quiet,
-            check_dead = check_dead,
-            check_inerror = check_inerror,
-            only_included = only_included,
+            command        = command,
+            quiet          = quiet,
+            check_dead     = check_dead,
+            check_inerror  = check_inerror,
+            check_children = check_children,
+            only_included  = only_included,
         )
 
         if ret != CanExecuteReturnVal.CanExecute:
             return ret
 
-        for c in self.children:
-            if not c.included and only_included: continue
+        if check_children:
+            for c in self.children:
+                if not c.included and only_included: continue
 
-            if not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
-                self.return_code = ErrorCode.Failed
-                self.log.error(f'{c.name} is dead, cannot send {command} unless you disable it or --force')
-                return CanExecuteReturnVal.Dead
+                if check_dead and not (c.sup.desc.proc.is_alive() and c.sup.commander.ping()):
+                    self.return_code = ErrorCode.Failed
+                    self.log.error(f'{c.name} is dead, cannot send {command} unless you disable it or --force')
+                    return CanExecuteReturnVal.Dead
 
         self.return_code = ErrorCode.Success
         return CanExecuteReturnVal.CanExecute
@@ -257,6 +261,11 @@ class SubsystemNode(StatefulNode):
                 parent=self,
                 fsm_conf=self.fsm_conf)
 
+            tries=0 # give it 10 more seconds to come up
+            while (not child.sup.desc.proc.is_alive() or not child.sup.commander.ping()) and tries<20:
+                time.sleep(0.5)
+                tries+=1
+
 
             if child.sup.desc.proc.is_alive() and child.sup.commander.ping():
                 # nothing really happens in these 2:
@@ -358,7 +367,6 @@ class SubsystemNode(StatefulNode):
         cfg_method = event.kwargs.get("cfg_method")
         timeout = event.kwargs["timeout"]
         force = event.kwargs.get('force')
-
         exit_state = self.get_destination(command).upper()
 
         log = f"Sending {command} to the subsystem {self.name}"
@@ -399,6 +407,7 @@ class SubsystemNode(StatefulNode):
                 if chuck == app.name:
                     del appset[i]
 
+        ignore = []
         for child_node in appset:
             data = self.cfgmgr.generate_data_for_module(event.kwargs.get('overwrite_data'))
             if not child_node.included:
@@ -406,19 +415,29 @@ class SubsystemNode(StatefulNode):
                 continue
             self.log.debug(f'Sending {command} to {child_node.name}')
 
-
             entry_state = child_node.state.upper()
+            try:
+                child_node.trigger(command)
+                ## APP now in *_ing
+                child_node.sup.send_command(
+                    cmd_id = command,
+                    cmd_data = data,
+                    entry_state=entry_state,
+                    exit_state=exit_state
+                )
+            except Exception as e:
+                if force:
+                    self.log.error(f'Failed to send \'{command}\' to \'{child_node.name}\', --force was specified so continuing anyway')
+                    ignore+=[child_node.name]
+                else:
+                    self.log.error(f'Failed to send \'{command}\' to \'{child_node.name}\'')
+                    raise e
 
-            child_node.trigger(command)
-            ## APP now in *_ing
 
-            child_node.sup.send_command(
-                cmd_id = command,
-                cmd_data = data,
-                entry_state=entry_state,
-                exit_state=exit_state
-            )
-
+        for chuck in ignore:
+            for i, app in enumerate(appset):
+                if chuck == app.name:
+                    del appset[i]
         start = datetime.now()
 
         for _ in range(timeout*10):
