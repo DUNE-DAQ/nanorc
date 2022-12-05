@@ -147,7 +147,7 @@ class SSHProcessManager(object):
         env_vars = script_data["env"]
         cmd =';'.join([ f"export {n}=\"{v}\"" for n,v in env_vars.items()])
         cmd += ";"+"; ".join(script_data['cmd'])
-        hosts = set(self.boot_info["hosts"].values())
+        hosts = set(self.boot_info["hosts-ctrl"].values())
         for host in hosts:
             self.log.info(f'Executing {script_data["cmd"]} on {host}.')
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"] + [cmd]
@@ -164,7 +164,7 @@ class SSHProcessManager(object):
         # Add a check for env and apps in boot_info keys
         self.boot_info = boot_info
         apps = boot_info["apps"]
-        hosts = boot_info["hosts"]
+        hosts = boot_info["hosts-ctrl"]
         rte_script = boot_info.get('rte_script')
         env_vars = boot_info["env"]
 
