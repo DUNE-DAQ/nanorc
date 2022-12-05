@@ -156,7 +156,7 @@ class ConfigManager:
 
         for original_file in os.listdir(conf_path):
             data = self._import_data(conf_path/original_file)
-            self.log.debug(f"Original conections in '{conf_path/original_file}':")
+            self.log.debug(f"Original connections in '{conf_path/original_file}':")
             data = self._resolve_hostnames(data, hosts_data)
             if port_offset:
                 self.log.debug(f"Offsetting the ports by {port_offset}, new connections:")
@@ -191,11 +191,14 @@ class ConfigManager:
             if "queue://" in connection['uri']:
                 continue
 
-            if not connection['uid'] in external_connections:
-                port = urlparse(connection['uri']).port
-                newport = port + self.port_offset
-                connection['uri'] = connection['uri'].replace(str(port), str(newport))
-                self.log.debug(f" - '{connection['uid']}': {connection['uri']}")
+            if not connection['id']['uid'] in external_connections:
+                try:
+                    port = urlparse(connection['uri']).port
+                    newport = port + self.port_offset
+                    connection['uri'] = connection['uri'].replace(str(port), str(newport))
+                    self.log.debug(f" - '{connection['id']['uid']}': {connection['uri']}")
+                except Exception as e:
+                    self.log.debug(f" - '{connection['id']['uid']}' port wasn\'t offset")
 
         return data
 
