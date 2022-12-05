@@ -10,7 +10,9 @@ import os
 from urllib.parse import urlparse
 from kubernetes import client, config
 from rich.console import Console
-from rich.progress import *
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeRemainingColumn, TimeElapsedColumn, track
+from rich.table import Table
+
 
 class AppProcessDescriptor(object):
     """docstring for AppProcessDescriptor"""

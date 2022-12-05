@@ -12,7 +12,7 @@ from datetime import datetime
 import signal
 import logging
 from rich.console import Console
-from rich.progress import *
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeRemainingColumn, TimeElapsedColumn
 from rich.table import Table
 
 
