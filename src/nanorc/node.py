@@ -16,7 +16,6 @@ from typing import Union, NoReturn
 from .fsm import FSM
 import os.path
 from .statefulnode import StatefulNode, ErrorCode, CanExecuteReturnVal
-from rich.progress import *
 
 log = logging.getLogger("transitions")
 log.setLevel(logging.ERROR)
