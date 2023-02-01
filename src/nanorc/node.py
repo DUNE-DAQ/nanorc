@@ -311,6 +311,14 @@ class SubsystemNode(StatefulNode):
 
 
     def on_exit_conf_ing(self, event) -> NoReturn:
+        self.pin_thread()
+        super()._on_exit_callback(event)
+
+    def on_exit_boot_ing(self, event) -> NoReturn:
+        self.pin_thread()
+        super()._on_exit_callback(event)
+
+    def pin_thread(self):
         scripts = self.cfgmgr.boot.get('scripts')
         thread_pinning = scripts.get('thread_pinning') if scripts else None
         if thread_pinning:
@@ -318,7 +326,6 @@ class SubsystemNode(StatefulNode):
                 self.pm.execute_script(thread_pinning)
             except Exception as e:
                 self.log.error(f'Couldn\'t execute the thread pinning scripts: {str(e)}')
-        super()._on_exit_callback(event)
 
 
     def terminate_logic(self) -> NoReturn:
