@@ -212,6 +212,11 @@ class ConfigManager:
             }
 
         #port offseting
+        if "services" in boot:
+            for app in boot["services"]:
+                port = boot['services'][app]['port']
+                newport = port + port_offset
+                boot['services'][app]['port'] = newport
         for app in boot["apps"]:
             port = boot['apps'][app]['port']
             newport = port + port_offset
