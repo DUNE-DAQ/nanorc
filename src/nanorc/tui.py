@@ -2,7 +2,6 @@ import sys
 import asyncio
 import requests
 from datetime import datetime
-#from rc import RC
 
 from rich import print
 from rich.align import Align
@@ -30,7 +29,8 @@ import queue
 from anytree import RenderTree
 
 logging.basicConfig(level=logging.DEBUG)
-
+allowInput = True
+alwaysAsk = False
 
 class TitleBox(Static):
     def __init__(self, title, **kwargs):
@@ -205,6 +205,8 @@ class StatusDisplay(Static): pass
 
 class Status(Static):
     rcstatus = reactive('none')
+    active = reactive('none')
+    ask = reactive('none')
 
     def __init__(self, hostname, **kwargs):
         super().__init__(**kwargs)
@@ -215,13 +217,36 @@ class Status(Static):
         info = r.json()                 #dictionary of information about the topnode
         self.rcstatus = info['state']
 
-    def watch_rcstatus(self, status:str) -> None:
+    def watch_rcstatus(self, rcstatus:str) -> None:
+        self.change_status(rcstatus, self.active, self.ask)
+
+    def update_active(self):
+        if allowInput:
+            self.active = "Idle"
+        else:
+            self.active = "Working..."
+    
+    def watch_active(self, active:str) -> None:
+        self.change_status(self.rcstatus, active, self.ask)
+
+    def update_ask(self):
+        if alwaysAsk:
+            self.ask = "All inputs required"
+        else:
+            self.ask = "Default Inputs used"
+
+    def watch_ask(self, ask:str):
+        self.change_status(self.rcstatus, self.active, ask)
+
+    def change_status(self, status, act, asktext):
         status_display = self.query_one(StatusDisplay)
         nice_status = status.replace('_', ' ').capitalize()
-        status_display.update(Markdown(f'# Status\n\n{nice_status}'))
+        status_display.update(Markdown(f'# Status\n{nice_status}\n{act}\n\n{asktext}'))
 
     def on_mount(self) -> None:
         self.set_interval(0.1, self.update_rcstatus)
+        self.set_interval(0.1, self.update_active)
+        self.set_interval(0.1, self.update_ask)
 
     def compose(self) -> ComposeResult:
         # yield TitleBox("Status {}")
@@ -342,7 +367,8 @@ class Command(Static):
         self.commands = [key for key in r.json()]   #Command is a dict of currently allowed commands and some associated data, this gets the keys
 
     def watch_commands(self, commands:list[str]) -> None:
-        #always_displayed = ['quit', 'abort']
+        always_displayed = ['quit', 'abort']
+        global allowInput
         for button in self.query(Button):
             if button.id in self.commands:
                 button.display=True
@@ -351,13 +377,15 @@ class Command(Static):
 
             if button.id == 'abort':
                 button.color = 'red'
+        allowInput = True        #A change in FSM state means our command is done so we can accept a new one
         
     def compose(self) -> ComposeResult:
         yield TitleBox('Commands')
         r = requests.get((f'{self.hostname}/nanorcrest/fsm'), auth=("fooUsr", "barPass"))
         fsm = r.json()
         for data in fsm['transitions']:         #List of transitions, format is {'dest': 'ready', 'source': 'configured', 'trigger': 'start'}
-            self.all_commands.append(data['trigger']) #Gets every transition trigger (i.e every command)
+            if data['trigger'] not in self.all_commands:    #There can be duplicates: avoid them
+                self.all_commands.append(data['trigger'])   #Gets every transition trigger (i.e every command)
 
         yield Vertical(
             Horizontal(
@@ -371,17 +399,34 @@ class Command(Static):
             ),
             id = 'verticalbuttoncontainer'
         )
-        
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         """Event handler called when a button is pressed."""
-        button_id = event.button.id
-        if button_id == 'abort':
-            sys.exit(0)
-        else:
-            self.app.mount(InputWindow(hostname=self.hostname, command=button_id, id="pop_up"))
-            #Since this code runs as a module, we need to ask the command widget what its app is
-            for b in self.query(Button):
-                b.disable = True
+        global allowInput
+        if allowInput:
+            button_id = event.button.id
+            if button_id == 'abort':
+                sys.exit(0)
+            r = requests.get((f'{self.hostname}/nanorcrest/command'), auth=("fooUsr", "barPass"))
+            data = r.json()         #json has format {'boot': [{'timeout': {'default': None, 'required': False, 'type': 'INT'}}]}
+            paramlist = data[button_id]
+            mandatory = False 
+            for p in paramlist:
+                for key in p:       #Should be just one of these
+                    info = p[key]
+                if info['required']:
+                    mandatory = True
+                    break
+            allowInput = False      #Deactivate until the command is completed
+            #The box must be shown if there are mandatory arguments. It also can be requested by holding ctrl while clicking.
+            if mandatory or alwaysAsk:               
+                self.app.mount(InputWindow(hostname=self.hostname, command=button_id, id="pop_up"))
+            else:
+                payload = {'command': button_id}
+                r = requests.post((f'{self.hostname}/nanorcrest/command'), auth=("fooUsr", "barPass"), data=payload)
+                
+                #Since this code runs as a module, we need to ask the command widget what its app is
+                #for b in self.query(Button):
+                    #b.disable = True
             
 class InputWindow(Widget):
     def __init__(self, hostname, command, **kwargs):
@@ -413,24 +458,34 @@ class InputWindow(Widget):
                 params[i.id] = i.value
             payload = {'command': self.command, **params}
             r = requests.post((f'{self.hostname}/nanorcrest/command'), auth=("fooUsr", "barPass"), data=payload)
+
+        if button_id == "cancel":
+            global allowInput
+            allowInput = True
             
         self.remove()
 
 class NanoRCTUI(App):
-    CSS_PATH = "/afs/cern.ch/user/j/jhancock/nanorc-dev-area/sourcecode/nanorc/src/nanorc/tui.css"
-    BINDINGS = [("d", "toggle_dark", "Toggle dark mode")]
+    #TODO Do this in a way that works for users other than me
+    CSS_PATH = "/afs/cern.ch/user/j/jhancock/tui-test-area/nanorc/src/nanorc/tui.css"
+    BINDINGS = [
+        ("d", "toggle_dark", "Toggle dark mode"),
+        ("i", "toggle_inputs", "Toggle whether optional inputs are taken")
+        ]
 
     def __init__(self, host, rest_port, banner, **kwargs):
         super().__init__(**kwargs)
         self.log_queue = queue.Queue(-1)
         self.queue_handler = QueueHandler(self.log_queue)
-        #self.rc.log.propagate = False
-        #self.rc.log.addHandler(self.queue_handler)
         self.hostname = f'http://{host}:{rest_port}'
 
     def action_toggle_dark(self) -> None:
         """An action to toggle dark mode."""
         self.dark = not self.dark
+    
+    def action_toggle_inputs(self) -> None:
+        global alwaysAsk
+        alwaysAsk = not alwaysAsk
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
@@ -451,6 +506,6 @@ if __name__ == "__main__":
     app.run()
 
 #TODO get rid of the foouser stuff since it's insecure (get auth from dotnanorc like with the logbook)
-#TODO get rid of anything that accesses the rc object (API only!)
-#TODO the popup should only appear when there are mandatory arguments, or the user uses a keybind (ctrl?)
-#TODO Command buttons should be deactivated when there is a popup
+#TODO Time freezes when requests are sent: figure out why
+#TODO FIx logs
+#TODO Fix tree view
