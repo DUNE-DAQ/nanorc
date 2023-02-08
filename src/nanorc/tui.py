@@ -27,6 +27,7 @@ import logging
 from logging.handlers import QueueHandler, QueueListener
 import queue
 from anytree import RenderTree
+from anytree.importer import DictImporter
 
 logging.basicConfig(level=logging.DEBUG)
 allowInput = True
@@ -199,8 +200,6 @@ class Logs(Static):
         searchedlist = [log for log in loglist if term.lower() in log.lower()]   
         return "\n".join(searchedlist)                                              #Reformats the list as a string with newlines
 
-
-
 class StatusDisplay(Static): pass
 
 class Status(Static):
@@ -255,7 +254,7 @@ class Status(Static):
 class TreeDisplay(Static): pass
 
 class TreeView(Static):
-    rctree = reactive('')
+    rctree = reactive('none')
     
     def __init__(self, hostname, **kwargs):
         super().__init__(**kwargs)
@@ -263,93 +262,26 @@ class TreeView(Static):
         
     def compose(self) -> ComposeResult:
         yield TitleBox("Apps")
-        yield Vertical(TreeDisplay(), id='verticaltree')
+        #yield Vertical(TreeDisplay(), id='verticaltree')
+        yield TreeDisplay()
     
     def update_rctree(self) -> None:
         r = requests.get((f'{self.hostname}/nanorcrest/tree'), auth=("fooUsr", "barPass"))
-        self.rctree = r.json()      #Format is {'children': [...], 'name': 'foonode'} where the elements of children have the same structure
+        #Format is {'children': [...], 'name': 'foonode'} where the elements of children have the same structure
+        importer = DictImporter()
+        data = importer.import_(r.json())
+        the_text = ""
+        for pre, _, node in RenderTree(data):
+            the_text += f"{pre}{node.name}\n"
+        self.rctree = the_text      #This is a string representation of the tree
 
-    def watch_rctree(self, tree:dict) -> None:
+    def watch_rctree(self, rctree:str) -> None:
         tree_display = self.query_one(TreeDisplay)
-
-        nicetree = self.render_json(tree, 0, "")
-        tree_display.update(nicetree)
+        tree_display.update(rctree)
+        #raise ValueError(self.rctree)
 
     def on_mount(self) -> None:
         self.set_interval(0.1, self.update_rctree)
-
-    def render_json(self, elements, level:int, prefix:str):
-        branch_extend = '│  '
-        branch_mid    = '├─ '
-        branch_last   = '└─ '
-        spacing       = '   '
-        rows = []
-        last_cat = False
-        last_app = False
-        clist = self.make_colour_list("bold magenta", "royal_blue1", "green")        #Colours may be altered here
-        '''
-        for tl_key in tree:                                                                 #Loop over top level nodes
-            tlvalue = tree[tl_key]
-            typelist = tlvalue['children']
-            text = f"{col1}{tl_key}: {tlvalue['state']}\n{col1end}"    
-            rows.append(text)
-            for i, typedict in enumerate(typelist):                                         #Loop over the dictionaries that correspond to a category
-                last_cat = (i == len(typelist)-1)
-                typename = list(typedict.keys())[0]    
-                typedata = typedict[typename]                                               #Gets the subdictionary with state and children
-                applist = typedata['children']
-                if last_cat:                                                    #If we are at the end, use the right shape
-                    c1 = branch_last
-                else:
-                    c1 = branch_mid               
-                text = f"{col1}{c1}{col1end}{col2}{typename}: {typedata['state']}\n{col2end}"
-                rows.append(text)
-                for j, appdict in enumerate(applist):                                                     #Loop over the apps themselves
-                    last_app = (j == len(applist)-1)
-                    appname = list(appdict.keys())[0]
-                    appdata = appdict[appname]                                              #Gets the subdictionary that contains the state
-                    if last_cat:
-                        a1 = spacing
-                    else:
-                        a1 = branch_extend
-                    if last_app:
-                        a2 = branch_last
-                    else:
-                        a2 = branch_mid
-                    text = f"{col1}{a1}{col1end}{col2}{a2}{col2end}{col3}{appname}: {appdata['state']}\n{col3end}"
-                    rows.append(text)
-        '''
-        
-        '''
-        if type(elements) == dict:      #The top level might be a dict instead of a list of them
-            text = elements['name']
-            if 'children' in tree:
-                new_level  = level + 1
-                for child in children:
-                    new_prefix = branch
-                    rows += render_json(child, new_level, )
-            return "".join(rows)
-        else:
-            for node in elements:       #A list of dictionaries
-                text = tree['name']
-                if 'children' in tree:
-                    new_level  = level + 1
-                    for child in children:
-                        new_prefix = branch
-                        rows += render_json(child, new_level, )
-                return "".join(rows)
-        '''
-        return f"[red]WORK IN PROGRESS![/red]"
-    
-    def make_colour_list(*colours):
-        clist = []
-        for c in colours:
-            col = f'[{c}]'              #Adds square brackets
-            c_end = f"[/{col[1:]}"      #Inserts a slash at the start
-            c_tuple = (col, c_end)
-            clist.append(c_tuple)
-
-        return clist
 
 class Command(Static):
     commands = reactive([])
@@ -417,7 +349,7 @@ class Command(Static):
                     mandatory = True
                     break
             allowInput = False      #Deactivate until the command is completed
-            #The box must be shown if there are mandatory arguments. It also can be requested by holding ctrl while clicking.
+            #The box must be shown if there are mandatory arguments. It also can be requested by pressing 'i' to switch modes.
             if mandatory or alwaysAsk:               
                 self.app.mount(InputWindow(hostname=self.hostname, command=button_id, id="pop_up"))
             else:
@@ -455,7 +387,8 @@ class InputWindow(Widget):
 
         if button_id == "go":
             for i in inputs:
-                params[i.id] = i.value
+                if i != "":
+                    params[i.id] = i.value
             payload = {'command': self.command, **params}
             r = requests.post((f'{self.hostname}/nanorcrest/command'), auth=("fooUsr", "barPass"), data=payload)
 
@@ -507,5 +440,5 @@ if __name__ == "__main__":
 
 #TODO get rid of the foouser stuff since it's insecure (get auth from dotnanorc like with the logbook)
 #TODO Time freezes when requests are sent: figure out why
-#TODO FIx logs
+#TODO Fix logs
 #TODO Fix tree view
