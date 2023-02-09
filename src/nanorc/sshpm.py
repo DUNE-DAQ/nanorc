@@ -384,7 +384,7 @@ class SSHProcessManager(object):
                         time.sleep(0.1)
                 except OSError:
                     pass
-            pid_file = f"{name}.pid"
+            pid_file = f"{name}_{desc.port}.pid"
             if os.path.exists(pid_file):
                 with open(pid_file, "r") as pf:
                     pid=pf.read()
@@ -405,7 +405,7 @@ class SSHProcessManager(object):
                     desc.proc.kill()
                 except OSError:
                     pass
-            pid_file = f"{name}.pid"
+            pid_file = f"{name}_{desc.port}.pid"
             if os.path.exists(pid_file):
                 with open(pid_file, "r") as pf:
                     pid=pf.read()
