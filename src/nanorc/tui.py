@@ -49,7 +49,7 @@ class RunInfo(Static):
         super().__init__(**kwargs)
         self.runtext = Markdown('# Run info')
         self.hostname = hostname
-    
+
     def update_text(self):
         run_num_display = self.query_one(RunNumDisplay)
         
@@ -147,6 +147,11 @@ class LogDisplay(Static):
                 f.write(data)
         except:
             pass
+
+    async def receive_log(self, the_log):
+        md = Text(the_log)              #Renders the message into rich text
+        self.logs = f'{md}\n' + self.logs
+        self.update(self.logs)
     
 class Logs(Static):
     def __init__(self, log_queue, hostname, **kwargs):
@@ -162,10 +167,13 @@ class Logs(Static):
             Button("Clear logs", id="delete_logs"),
             classes='horizontalbuttonscontainer'
         )
+        '''
         yield Vertical(
             LogDisplay(self.log_queue),
             id='verticallogs'
         )
+        '''
+        yield LogDisplay(self.log_queue)
 
     async def on_button_pressed (self, event: Button.Pressed) -> None:
         button_id = event.button.id
@@ -199,6 +207,11 @@ class Logs(Static):
         #Gets a list of all logs that contain term as a substring (case insensitive)
         searchedlist = [log for log in loglist if term.lower() in log.lower()]   
         return "\n".join(searchedlist)                                              #Reformats the list as a string with newlines
+
+    async def deliver_message(self, text):
+        logdisplay = self.query_one(LogDisplay)
+        await logdisplay.receive_log(text)
+
 
 class StatusDisplay(Static): pass
 
@@ -278,13 +291,18 @@ class TreeView(Static):
     def watch_rctree(self, rctree:str) -> None:
         tree_display = self.query_one(TreeDisplay)
         tree_display.update(rctree)
-        #raise ValueError(self.rctree)
 
     def on_mount(self) -> None:
         self.set_interval(0.1, self.update_rctree)
 
 class Command(Static):
     commands = reactive([])
+
+    class NewLog(Message):    
+        '''The message that informs the log queue of a new entry'''
+        def __init__(self, sender: MessageTarget, text:str) -> None:
+            self.text = text
+            super().__init__(sender)
     
     def __init__(self, hostname, **kwargs):
         super().__init__(**kwargs)
@@ -338,6 +356,7 @@ class Command(Static):
             button_id = event.button.id
             if button_id == 'abort':
                 sys.exit(0)
+            #Get all allowed commands and their inputs
             r = requests.get((f'{self.hostname}/nanorcrest/command'), auth=("fooUsr", "barPass"))
             data = r.json()         #json has format {'boot': [{'timeout': {'default': None, 'required': False, 'type': 'INT'}}]}
             paramlist = data[button_id]
@@ -354,11 +373,11 @@ class Command(Static):
                 self.app.mount(InputWindow(hostname=self.hostname, command=button_id, id="pop_up"))
             else:
                 payload = {'command': button_id}
+                #Sends the command to nanorc 
                 r = requests.post((f'{self.hostname}/nanorcrest/command'), auth=("fooUsr", "barPass"), data=payload)
-                
-                #Since this code runs as a module, we need to ask the command widget what its app is
-                #for b in self.query(Button):
-                    #b.disable = True
+                cmd_log = r.json()['logs']                      #Other fields are form and "return_code"
+                self.emit_no_wait(self.NewLog(self, cmd_log))   #Sends a message to the parent (the app)
+                   
             
 class InputWindow(Widget):
     def __init__(self, hostname, command, **kwargs):
@@ -399,7 +418,6 @@ class InputWindow(Widget):
         self.remove()
 
 class NanoRCTUI(App):
-    #TODO Do this in a way that works for users other than me
     CSS_PATH = "/afs/cern.ch/user/j/jhancock/tui-test-area/nanorc/src/nanorc/tui.css"
     BINDINGS = [
         ("d", "toggle_dark", "Toggle dark mode"),
@@ -408,9 +426,16 @@ class NanoRCTUI(App):
 
     def __init__(self, host, rest_port, banner, **kwargs):
         super().__init__(**kwargs)
+        self.mylog = logging.getLogger("NanoRCTUI")
         self.log_queue = queue.Queue(-1)
         self.queue_handler = QueueHandler(self.log_queue)
+        self.mylog.addHandler(self.queue_handler)
         self.hostname = f'http://{host}:{rest_port}'
+
+    async def on_command_new_log(self, message:Command.NewLog) -> None:
+        '''To get the right name, we convert from CamelCase to snake_case'''
+        log_obj = self.query_one(Logs)
+        await log_obj.deliver_message(message.text)
 
     def action_toggle_dark(self) -> None:
         """An action to toggle dark mode."""
@@ -440,5 +465,6 @@ if __name__ == "__main__":
 
 #TODO get rid of the foouser stuff since it's insecure (get auth from dotnanorc like with the logbook)
 #TODO Time freezes when requests are sent: figure out why
-#TODO Fix logs
-#TODO Fix tree view
+#TODO Make the logs scroll again
+#TODO Tree view should probably show the state of apps
+#TODO Proceduarally generate the CSS_PATH somehow
