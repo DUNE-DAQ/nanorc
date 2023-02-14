@@ -66,10 +66,11 @@ class node(Resource):
 class tree(Resource):
     @auth.login_required
     def get(self):
+        wanted = ["name", "included", "errored", "state"]      
         if rc_context.worker_thread and rc_context.worker_thread.is_alive():
             return "I'm busy!"
         if rc_context.rc.topnode:
-            exporter = DictExporter(attriter=lambda attrs: [(k, v) for k, v in attrs if k == "name"])
+            exporter = DictExporter(attriter=lambda attrs: [(k, v) for k, v in attrs if k in wanted])
             json_tree = exporter.export(rc_context.rc.topnode)
             resp = make_response(jsonify(json_tree))
             return resp

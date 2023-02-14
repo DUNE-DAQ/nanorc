@@ -283,10 +283,27 @@ class TreeView(Static):
         #Format is {'children': [...], 'name': 'foonode'} where the elements of children have the same structure
         importer = DictImporter()
         data = importer.import_(r.json())
-        the_text = ""
+        the_text = Text("")
         for pre, _, node in RenderTree(data):
-            the_text += f"{pre}{node.name}\n"
-        self.rctree = the_text      #This is a string representation of the tree
+            working = True
+            state_str = ': '
+            style = ''
+            if node.errored:
+                state_str += "ERROR - "
+                style = 'bold red'
+                working = False
+            state_str += f"{node.state}"
+            if not node.included:
+                state_str += " - excluded"
+                style = 'bright_black'
+                working = False
+            if node.state != "none" and working:        #A none state will have the default colour (white)
+                style = "green"
+            state_str += '\n'
+            the_text.append(f"{pre}{node.name}", style=(style))
+            the_text.append(state_str, style=(style))
+
+        self.rctree = the_text     #This is a string representation of the tree
 
     def watch_rctree(self, rctree:str) -> None:
         tree_display = self.query_one(TreeDisplay)
