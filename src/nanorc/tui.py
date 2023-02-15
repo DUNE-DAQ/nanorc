@@ -1,6 +1,7 @@
 import sys
 import asyncio
 import requests
+import os
 from datetime import datetime
 
 from rich import print
@@ -212,7 +213,6 @@ class Logs(Static):
         logdisplay = self.query_one(LogDisplay)
         await logdisplay.receive_log(text)
 
-
 class StatusDisplay(Static): pass
 
 class Status(Static):
@@ -285,8 +285,9 @@ class TreeView(Static):
         data = importer.import_(r.json())
         the_text = Text("")
         for pre, _, node in RenderTree(data):
+            the_line = Text("")
             working = True
-            state_str = ': '
+            state_str = ''
             style = ''
             if node.errored:
                 state_str += "ERROR - "
@@ -300,7 +301,7 @@ class TreeView(Static):
             if node.state != "none" and working:        #A none state will have the default colour (white)
                 style = "green"
             state_str += '\n'
-            the_text.append(f"{pre}{node.name}", style=(style))
+            the_text.append(f"{pre}{node.name}: ", style=(style))
             the_text.append(state_str, style=(style))
 
         self.rctree = the_text     #This is a string representation of the tree
@@ -395,8 +396,13 @@ class Command(Static):
                 cmd_log = r.json()['logs']                      #Other fields are form and "return_code"
                 self.emit_no_wait(self.NewLog(self, cmd_log))   #Sends a message to the parent (the app)
                    
-            
 class InputWindow(Widget):
+    class NewLog(Message):    
+        '''The message that informs the log queue of a new entry'''
+        def __init__(self, sender: MessageTarget, text:str) -> None:
+            self.text = text
+            super().__init__(sender)
+
     def __init__(self, hostname, command, **kwargs):
         super().__init__(**kwargs)
         self.command = command
@@ -406,9 +412,9 @@ class InputWindow(Widget):
         r = requests.get((f'{self.hostname}/nanorcrest/command'), auth=("fooUsr", "barPass"))
         data = r.json()     #json has format {'boot': [{'timeout': {'default': None, 'required': False, 'type': 'INT'}}]}
         paramlist = data[self.command]
-        params = {k: v for d in paramlist for k, v in d.items()}    #We turn the list of dicts into one dict for convenience 
+        self.params = {k:v for d in paramlist for k, v in d.items()}    #We turn the list of dicts into one dict for convenience 
         yield Vertical(
-            *[Input(placeholder=key, id=key) for key in params],
+            *[Input(placeholder=key, id=key) for key in self.params],
             Horizontal(
                 Button("Execute Command", id="go"),
                 Button('Cancel',variant='error', id='cancel'),
@@ -420,22 +426,28 @@ class InputWindow(Widget):
         button_id = event.button.id
         params = {}
         inputs = self.query(Input)
+        global allowInput
 
         if button_id == "go":
             for i in inputs:
-                if i != "":
+                if i.value == "":     
+                    if self.params[i.id]['required']:       #We can't allow a required field to be empty!
+                        allowInput = True
+                        self.remove()
+                else:
                     params[i.id] = i.value
             payload = {'command': self.command, **params}
             r = requests.post((f'{self.hostname}/nanorcrest/command'), auth=("fooUsr", "barPass"), data=payload)
+            cmd_log = r.json()['logs']                      #Other fields are "form" and "return_code"
+            self.emit_no_wait(self.NewLog(self, cmd_log))   #Sends a message to the parent (the app)
 
         if button_id == "cancel":
-            global allowInput
             allowInput = True
             
         self.remove()
 
 class NanoRCTUI(App):
-    CSS_PATH = "/afs/cern.ch/user/j/jhancock/tui-test-area/nanorc/src/nanorc/tui.css"
+    CSS_PATH = __file__[:-2] + "css"      #Gets the full path for a file called tui.css in the same folder as tui.py
     BINDINGS = [
         ("d", "toggle_dark", "Toggle dark mode"),
         ("i", "toggle_inputs", "Toggle whether optional inputs are taken")
@@ -451,6 +463,11 @@ class NanoRCTUI(App):
 
     async def on_command_new_log(self, message:Command.NewLog) -> None:
         '''To get the right name, we convert from CamelCase to snake_case'''
+        log_obj = self.query_one(Logs)
+        await log_obj.deliver_message(message.text)
+
+    async def on_input_window_new_log(self, message:InputWindow.NewLog) -> None:
+        '''The input window can provide logs too'''
         log_obj = self.query_one(Logs)
         await log_obj.deliver_message(message.text)
 
@@ -483,5 +500,5 @@ if __name__ == "__main__":
 #TODO get rid of the foouser stuff since it's insecure (get auth from dotnanorc like with the logbook)
 #TODO Time freezes when requests are sent: figure out why
 #TODO Make the logs scroll again
-#TODO Tree view should probably show the state of apps
-#TODO Proceduarally generate the CSS_PATH somehow
+#TODO Make the command box not be narrow
+#TODO The input window should probably display errors
