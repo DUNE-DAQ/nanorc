@@ -275,7 +275,7 @@ class SSHProcessManager(object):
         apps_running = []
         for name, desc in self.apps.items():
             if is_port_open(desc.host, desc.port):
-                apps_running += [name]
+                apps_running += [f"{name} ({desc.host}:{desc.port})"]
         if apps_running:
             raise RuntimeError(f"ERROR: apps already running? {apps_running}")
 
