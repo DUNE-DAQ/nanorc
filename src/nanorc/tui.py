@@ -40,8 +40,6 @@ class TitleBox(Static):
 
 class RunNumDisplay(Static): pass
 
-# class RunTypeDisplay(Static): pass
-
 class RunInfo(Static):
     runnum  = reactive('none')
     runtype = reactive('none')
@@ -54,13 +52,14 @@ class RunInfo(Static):
     def update_text(self):
         run_num_display = self.query_one(RunNumDisplay)
         
-        if self.runtype != "none":
-            self.runtext = Markdown(f'# Run info\n\nNumber: {self.runnum}\n\nType: {self.runtype}')
-        else:
+        if self.runtype == "none":
             self.runtext = Markdown('# Run info')
-
+        else:
+            self.runtext = Markdown(f'# Run info\n\nNumber: {self.runnum}\n\nType: {self.runtype}')
+            
         self.change_colour(run_num_display)
-        run_num_display.update(self.runtext)
+        #run_num_display.update(self.runtext)
+        run_num_display.update(Markdown("A run is probably happening!"))
 
     def change_colour(self, obj) -> None:
         #If the colour is correct then return
@@ -76,7 +75,9 @@ class RunInfo(Static):
 
     def update_runnum(self) -> None:
         r = requests.get((f'{self.hostname}/nanorcrest/run_number'), auth=("fooUsr", "barPass"))
-        if r.text:
+        if r.text == "null":
+            self.runnum = ""
+        else:
             self.runnum = r.text
 
     def update_runtype(self) -> None:
@@ -349,24 +350,22 @@ class Command(Static):
         
     def compose(self) -> ComposeResult:
         yield TitleBox('Commands')
-        r = requests.get((f'{self.hostname}/nanorcrest/fsm'), auth=("fooUsr", "barPass"))
+        r = requests.get((f'{self.hostname}/nanorcrest/fsm'), auth=("fooUsr", "barPass"))   #Change this (to /command)!
         fsm = r.json()
         for data in fsm['transitions']:         #List of transitions, format is {'dest': 'ready', 'source': 'configured', 'trigger': 'start'}
             if data['trigger'] not in self.all_commands:    #There can be duplicates: avoid them
                 self.all_commands.append(data['trigger'])   #Gets every transition trigger (i.e every command)
 
-        yield Vertical(
-            Horizontal(
+        yield Horizontal(
                 *[Button(b.replace('_', ' ').capitalize(), id=b) for b in self.all_commands], #Generates a button for each command
                 classes='horizontalbuttonscontainer',
-            ),
-            Horizontal(
+            )
+        yield Horizontal(
                 Button('Quit', id='quit'),
                 Button('Abort',variant='error', id='abort'),
                 classes='horizontalbuttonscontainer',
-            ),
-            id = 'verticalbuttoncontainer'
-        )
+            )
+
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         """Event handler called when a button is pressed."""
         global allowInput
@@ -501,4 +500,7 @@ if __name__ == "__main__":
 #TODO Time freezes when requests are sent: figure out why
 #TODO Make the logs scroll again
 #TODO Make the command box not be narrow
+
+#TODO The run number box doesn't work for some reason
 #TODO The input window should probably display errors
+#TODO Fix idle/working thing

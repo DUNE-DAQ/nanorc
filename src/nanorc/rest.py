@@ -109,8 +109,17 @@ def parse_argument(form, ctx):
         if value != None:
             if str(param.type) == 'INT':
                 value = int(value)
+            elif str(param.type) == 'FLOAT':
+                value = float(value)
             elif str(param.type) == 'BOOL':
-                value = True if value == 'true' else False
+                if value.lower() in ['true', '1']:          #The .lower accounts for the user entering "True"
+                    value = True
+                elif value.lower() in ['false', '0']:
+                    value = False
+                else:
+                    raise ValueError("Not a valid boolean")
+            else:
+                raise RuntimeError("Unhandled Parameter Type")
 
         ### <hack>
         if param.name == 'timeout':

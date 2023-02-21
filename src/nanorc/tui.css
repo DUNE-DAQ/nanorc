@@ -32,12 +32,13 @@ TitleBox{
 }
 
 #log {
-    column-span: 4;
+    column-span: 3;
     row-span: 3;
 }
 
 #tree {
     row-span: 3;
+    column-span: 2;
 }
 
 #verticalbuttoncontainer {
