@@ -49,21 +49,21 @@ class RunInfo(Static):
         self.runtext = Markdown('# Run info')
         self.hostname = hostname
 
-    def update_text(self):
+    def change_text(self):
         run_num_display = self.query_one(RunNumDisplay)
-        
         if self.runtype == "none":
             self.runtext = Markdown('# Run info')
         else:
             self.runtext = Markdown(f'# Run info\n\nNumber: {self.runnum}\n\nType: {self.runtype}')
             
         self.change_colour(run_num_display)
-        #run_num_display.update(self.runtext)
-        run_num_display.update(Markdown("A run is probably happening!"))
+        run_num_display.update(self.runtext)
 
     def change_colour(self, obj) -> None:
+        redlist = ['STOPPED', 'none']
+        greenlist = ['TEST', 'PROD']
         #If the colour is correct then return
-        if ('STOPPED' in self.runtype and obj.has_class("redtextbox")) or ('STOPPED' not in self.runtype and obj.has_class("greentextbox")):
+        if (self.runtype in redlist and obj.has_class("redtextbox")) or ('STOPPED' not in self.runtype and obj.has_class("greentextbox")):
             return 
         #Otherwise, swap to the other colour
         if obj.has_class("redtextbox"):
@@ -85,17 +85,17 @@ class RunInfo(Static):
         self.runnum = r.text
 
     def watch_runtype(self, run:str) -> None:
-        self.update_text()
+        self.change_text()
 
     def watch_runnum(self, run:str) -> None:
-        self.update_text()
+        self.change_text()
 
     def on_mount(self) -> None:
         self.set_interval(0.1, self.update_runnum)
         self.set_interval(0.1, self.update_runtype)
 
     def compose(self) -> ComposeResult:
-        yield RunNumDisplay(classes="redtextbox")
+        yield RunNumDisplay(id="runbox", classes="redtextbox")
         
 class LogDisplay(Static):
     logs = reactive('')
@@ -326,7 +326,6 @@ class Command(Static):
     def __init__(self, hostname, **kwargs):
         super().__init__(**kwargs)
         self.hostname = hostname
-        self.all_commands = []
         
     def on_mount(self) -> None:
         self.set_interval(0.1, self.update_buttons)
@@ -336,8 +335,38 @@ class Command(Static):
         self.commands = [key for key in r.json()]   #Command is a dict of currently allowed commands and some associated data, this gets the keys
 
     def watch_commands(self, commands:list[str]) -> None:
-        always_displayed = ['quit', 'abort']
+        second_line = ["exclude", "include"]
         global allowInput
+        box1 = self.query(Horizontal)[0]
+        box2 = self.query(Horizontal)[1]
+
+        #Delete old buttons
+        all_buttons1 = box1.query(Button)
+        all_buttons2 = box2.query(Button)
+        for b in all_buttons1:
+            b.remove()
+        for b in all_buttons2:
+            b.remove()
+
+        #Generate 1st line
+        for c in self.commands:
+            if c in second_line:
+                continue
+            if c == "abort":
+                box1.mount(Button('Abort',variant='error', id='abort'))  #Abort button is red
+            else:
+                box1.mount(Button(c.replace('_', ' ').capitalize(), id=c))
+        #Generate 2nd line
+        for c in self.commands:
+            if c not in second_line:
+                continue
+            if c == "abort":
+                box2.mount(Button('Abort',variant='error', id='abort'))  #Abort button is red
+            else:
+                box2.mount(Button(c.replace('_', ' ').capitalize(), id=c))
+        
+
+        '''
         for button in self.query(Button):
             if button.id in self.commands:
                 button.display=True
@@ -346,10 +375,16 @@ class Command(Static):
 
             if button.id == 'abort':
                 button.color = 'red'
+        '''
+
+
         allowInput = True        #A change in FSM state means our command is done so we can accept a new one
         
     def compose(self) -> ComposeResult:
         yield TitleBox('Commands')
+        yield Horizontal(id="box1", classes='horizontalbuttonscontainer')
+        yield Horizontal(id="box2", classes='horizontalbuttonscontainer')
+        '''
         r = requests.get((f'{self.hostname}/nanorcrest/fsm'), auth=("fooUsr", "barPass"))   #Change this (to /command)!
         fsm = r.json()
         for data in fsm['transitions']:         #List of transitions, format is {'dest': 'ready', 'source': 'configured', 'trigger': 'start'}
@@ -365,6 +400,7 @@ class Command(Static):
                 Button('Abort',variant='error', id='abort'),
                 classes='horizontalbuttonscontainer',
             )
+        '''
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         """Event handler called when a button is pressed."""
@@ -392,14 +428,18 @@ class Command(Static):
                 payload = {'command': button_id}
                 #Sends the command to nanorc 
                 r = requests.post((f'{self.hostname}/nanorcrest/command'), auth=("fooUsr", "barPass"), data=payload)
-                cmd_log = r.json()['logs']                      #Other fields are form and "return_code"
-                self.emit_no_wait(self.NewLog(self, cmd_log))   #Sends a message to the parent (the app)
+                if button_id == "start":
+                    raise ValueError(r.json())
+                if "logs" in r.json():
+                    cmd_log = r.json()['logs']                      #Other fields are form and "return_code"
+                    self.emit_no_wait(self.NewLog(self, cmd_log))   #Sends a message to the parent (the app)
+                if "Exception" in r.json():
+                    raise ValueError(r.json())
                    
 class InputWindow(Widget):
     class NewLog(Message):    
         '''The message that informs the log queue of a new entry'''
         def __init__(self, sender: MessageTarget, text:str) -> None:
-            self.text = text
             super().__init__(sender)
 
     def __init__(self, hostname, command, **kwargs):
@@ -418,32 +458,56 @@ class InputWindow(Widget):
                 Button("Execute Command", id="go"),
                 Button('Cancel',variant='error', id='cancel'),
                 classes = "horizontalbuttonscontainer"
-            )
+            ), 
+            Static(id='errordisplay')
         )
     
     def on_button_pressed(self, event: Button.Pressed) -> None:
         button_id = event.button.id
-        params = {}
+        params_out = {}
         inputs = self.query(Input)
+        #A list of all statics with the given id. There should only be one of these, so we get element 0
+        errordisplay = [q for q in self.query(Static) if q.id == "errordisplay"][0]
         global allowInput
 
         if button_id == "go":
             for i in inputs:
                 if i.value == "":     
                     if self.params[i.id]['required']:       #We can't allow a required field to be empty!
-                        allowInput = True
-                        self.remove()
+                        errordisplay.update(f"Required parameter \"{i.id}\" is missing!")
+                        return                              #An attempt at sending a command is over
                 else:
-                    params[i.id] = i.value
-            payload = {'command': self.command, **params}
+                    #We enforce here that the string will be convertable to the appropriate type
+                    match self.params[i.id]['type']:
+                        case "INT":
+                            if not i.value.isdigit():
+                                errordisplay.update(f"{i.value} is not a valid input for \"{i.id}\". Input should be an integer.")
+                                return
+                        case "FLOAT":
+                            for char in i.value:
+                                if (not char.isdigit()) and (char != '.'):
+                                    errordisplay.update(f"{i.value} is not a valid input for \"{i.id}\". Input should be a float.")
+                                    return
+                        case "BOOL":
+                            if (i.value.lower() != "true") and (i.value.lower() != "false"):
+                                errordisplay.update(f"{i.value} is not a valid input for \"{i.id}\". Input should be a boolean.")
+                                return
+                    params_out[i.id] = i.value
+
+            payload = {'command': self.command, **params_out}
             r = requests.post((f'{self.hostname}/nanorcrest/command'), auth=("fooUsr", "barPass"), data=payload)
-            cmd_log = r.json()['logs']                      #Other fields are "form" and "return_code"
-            self.emit_no_wait(self.NewLog(self, cmd_log))   #Sends a message to the parent (the app)
+            if "logs" in r.json():
+                cmd_log = r.json()['logs']                      #Other fields are "form" and "return_code"
+                self.emit_no_wait(self.NewLog(self, cmd_log))   #Sends a message to the parent (the app)
+            if "Exception" in r.json():
+                raise ValueError(r.json())
+            allowInput = True
+            self.remove()
 
         if button_id == "cancel":
             allowInput = True
-            
-        self.remove()
+            self.remove()
+        
 
 class NanoRCTUI(App):
     CSS_PATH = __file__[:-2] + "css"      #Gets the full path for a file called tui.css in the same folder as tui.py
@@ -500,7 +564,8 @@ if __name__ == "__main__":
 #TODO Time freezes when requests are sent: figure out why
 #TODO Make the logs scroll again
 #TODO Make the command box not be narrow
+#TODO Get rid of logqueue maybe
 
 #TODO The run number box doesn't work for some reason
-#TODO The input window should probably display errors
 #TODO Fix idle/working thing
+#TODO commands that go back are freezing for some reason

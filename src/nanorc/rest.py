@@ -107,19 +107,23 @@ def parse_argument(form, ctx):
             value = param.default
 
         if value != None:
-            if str(param.type) == 'INT':
-                value = int(value)
-            elif str(param.type) == 'FLOAT':
-                value = float(value)
-            elif str(param.type) == 'BOOL':
-                if value.lower() in ['true', '1']:          #The .lower accounts for the user entering "True"
-                    value = True
-                elif value.lower() in ['false', '0']:
-                    value = False
-                else:
-                    raise ValueError("Not a valid boolean")
-            else:
-                raise RuntimeError("Unhandled Parameter Type")
+            match str(param.type):
+                case 'STRING':
+                    value = str(value)
+                case 'INT':
+                    value = int(value)
+                case 'FLOAT':
+                    value = float(value)
+                case 'BOOL':
+                    if type(value) == str:                          #If we get passed an actual bool then we don't want to do any of this
+                        if value.lower() in ['true', '1']:          #The .lower accounts for the user entering "True"
+                            value = True
+                        elif value.lower() in ['false', '0']:
+                            value = False
+                        else:
+                            raise ValueError("Not a valid boolean")
+                case _:
+                    raise RuntimeError("Unhandled Parameter Type")
 
         ### <hack>
         if param.name == 'timeout':
