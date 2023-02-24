@@ -147,7 +147,7 @@ class ConfigManager:
         if not os.path.exists(conf_path):
             raise RuntimeError(f"ERROR: {conf_path} does not exist!")
 
-        external_connections = self.boot['external_connections']
+        external_connections = []
 
         self.tmp = tempfile.TemporaryDirectory(
             dir=os.getcwd(),
