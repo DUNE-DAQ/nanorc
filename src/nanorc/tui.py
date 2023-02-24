@@ -41,8 +41,9 @@ class TitleBox(Static):
 class RunNumDisplay(Static): pass
 
 class RunInfo(Static):
-    runnum  = reactive('none')
-    runtype = reactive('none')
+    runnum  = reactive('null')
+    runtype = reactive('null')
+    running = reactive(False)
 
     def __init__(self, hostname, **kwargs):
         super().__init__(**kwargs)
@@ -51,51 +52,59 @@ class RunInfo(Static):
 
     def change_text(self):
         run_num_display = self.query_one(RunNumDisplay)
-        if self.runtype == "none":
+        if self.runtype == "null":                      #Before any runs start
             self.runtext = Markdown('# Run info')
         else:
-            self.runtext = Markdown(f'# Run info\n\nNumber: {self.runnum}\n\nType: {self.runtype}')
+            if self.running:                            #During a run
+                self.runtext = Markdown(f'# Run info\nNumber: {self.runnum}\n\nType: {self.runtype}')
+            else:                                       #Between runs
+                self.runtext = Markdown(f'# Run info\nLast Number: {self.runnum}\n\nLast Type: {self.runtype}')
             
         self.change_colour(run_num_display)
         run_num_display.update(self.runtext)
 
     def change_colour(self, obj) -> None:
-        redlist = ['STOPPED', 'none']
-        greenlist = ['TEST', 'PROD']
+        stoplist = ['STOPPED', "null"]      #STOPPED isn't used any more but we'll keep it just in case
+        runlist = ['TEST', 'PROD']
         #If the colour is correct then return
-        if (self.runtype in redlist and obj.has_class("redtextbox")) or ('STOPPED' not in self.runtype and obj.has_class("greentextbox")):
-            return 
-        #Otherwise, swap to the other colour
-        if obj.has_class("redtextbox"):
-            obj.remove_class("redtextbox")
-            obj.add_class("greentextbox")
+        if self.runtype in stoplist:        #No runs have happened, so red
+            rightclass = "redtextbox"
+        elif self.runtype in runlist:       #A run has happened, but is it ongoing?
+            if self.running:                #Ongoing run should be green
+                rightclass = "greentextbox"
+            else:                           #If we are between runs then go back to red
+                rightclass = "redtextbox"
         else:
-            obj.remove_class("greentextbox")
-            obj.add_class("redtextbox")
+            raise RuntimeError("Could not assign a colour!")
 
-    def update_runnum(self) -> None:
-        r = requests.get((f'{self.hostname}/nanorcrest/run_number'), auth=("fooUsr", "barPass"))
-        if r.text == "null":
-            self.runnum = ""
-        else:
-            self.runnum = r.text
+        if obj.has_class(rightclass):       #If the class is correct already, then we are done
+            return
+        else:                               #Otherwise, swap to the other colour
+            obj.toggle_class("redtextbox")
+            obj.toggle_class("greentextbox")
 
-    def update_runtype(self) -> None:
-        r = requests.get((f'{self.hostname}/nanorcrest/run_type'), auth=("fooUsr", "barPass"))
-        self.runnum = r.text
+    def update_all(self) -> None:
+        r = requests.get((f'{self.hostname}/nanorcrest/run_data'), auth=("fooUsr", "barPass"))
+        data = r.json()
+        self.runnum = data['number']
+        self.runtype = data['type']
+        self.running = data['is_running']
 
-    def watch_runtype(self, run:str) -> None:
+    def watch_runtype(self) -> None:
         self.change_text()
 
-    def watch_runnum(self, run:str) -> None:
+    def watch_runnum(self) -> None:
+        self.change_text()
+
+    def watch_running(self) -> None:
         self.change_text()
 
     def on_mount(self) -> None:
-        self.set_interval(0.1, self.update_runnum)
-        self.set_interval(0.1, self.update_runtype)
+        self.set_interval(0.1, self.update_all)
 
     def compose(self) -> ComposeResult:
-        yield RunNumDisplay(id="runbox", classes="redtextbox")
+        #yield RunNumDisplay(id="runbox", classes="redtextbox")
+        yield RunNumDisplay(classes="redtextbox")
         
 class LogDisplay(Static):
     logs = reactive('')
@@ -147,6 +156,7 @@ class LogDisplay(Static):
         try: 
             with open(filename, "x") as f:
                 f.write(data)
+            f.close()
         except:
             pass
 
@@ -440,6 +450,7 @@ class InputWindow(Widget):
     class NewLog(Message):    
         '''The message that informs the log queue of a new entry'''
         def __init__(self, sender: MessageTarget, text:str) -> None:
+            self.text = text
             super().__init__(sender)
 
     def __init__(self, hostname, command, **kwargs):
@@ -479,15 +490,18 @@ class InputWindow(Widget):
                 else:
                     #We enforce here that the string will be convertable to the appropriate type
                     match self.params[i.id]['type']:
+                        case "STRING":
+                            pass        #This is a valid input type, so it's included in case we need to do something later
                         case "INT":
                             if not i.value.isdigit():
                                 errordisplay.update(f"{i.value} is not a valid input for \"{i.id}\". Input should be an integer.")
                                 return
                         case "FLOAT":
-                            for char in i.value:
-                                if (not char.isdigit()) and (char != '.'):
-                                    errordisplay.update(f"{i.value} is not a valid input for \"{i.id}\". Input should be a float.")
-                                    return
+                            try:
+                                f = float(i.value)
+                            except:
+                                errordisplay.update(f"{i.value} is not a valid input for \"{i.id}\". Input should be a float.")
+                                return
                         case "BOOL":
                             if (i.value.lower() != "true") and (i.value.lower() != "false"):
                                 errordisplay.update(f"{i.value} is not a valid input for \"{i.id}\". Input should be a boolean.")
@@ -561,11 +575,10 @@ if __name__ == "__main__":
     app.run()
 
 #TODO get rid of the foouser stuff since it's insecure (get auth from dotnanorc like with the logbook)
-#TODO Time freezes when requests are sent: figure out why
+#TODO Time freezes when boot is sent: figure out why
 #TODO Make the logs scroll again
 #TODO Make the command box not be narrow
 #TODO Get rid of logqueue maybe
+#TODO command sequences don't send logs properly
 
-#TODO The run number box doesn't work for some reason
 #TODO Fix idle/working thing
-#TODO commands that go back are freezing for some reason

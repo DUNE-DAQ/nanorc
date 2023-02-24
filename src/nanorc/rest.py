@@ -252,19 +252,23 @@ class command(Resource):
             resp = make_response(jsonify({"Exception": str(e)}))
             return resp
 
-class run_number(Resource):
+class run_data(Resource):
     @auth.login_required
     def get(self):
-        return rc_context.rc.run_num_mgr.get_run_number()
-
-class run_type(Resource):
-    @auth.login_required
-    def get(self):
-        if rc_context.rc.runs:
-            return rc_context.rc.runs[-1].run_type
+        if rc_context.rc.runs != []:
+            resp_data = {
+                'number': rc_context.rc.runs[-1].run_number,
+                'is_running': rc_context.rc.runs[-1].is_running(),
+                'type': rc_context.rc.runs[-1].run_type
+            }
         else:
-            return None
-
+            resp_data = {
+                'number': "null",
+                'is_running': False,
+                'type': "null"
+            }
+        resp = make_response(resp_data)
+        return resp
 
 @auth.login_required
 def index():
@@ -280,13 +284,12 @@ class RestApi:
         self.api = Api(self.app)
         CORS(self.app)
 
-        self.api.add_resource(status,  '/nanorcrest/status')
-        self.api.add_resource(node,    '/nanorcrest/node/<path>')
-        self.api.add_resource(tree,    '/nanorcrest/tree')
-        self.api.add_resource(fsm,     '/nanorcrest/fsm')
-        self.api.add_resource(command, '/nanorcrest/command')
-        self.api.add_resource(run_number,   '/nanorcrest/run_number')
-        self.api.add_resource(run_type,     '/nanorcrest/run_type')
+        self.api.add_resource(status,       '/nanorcrest/status')
+        self.api.add_resource(node,         '/nanorcrest/node/<path>')
+        self.api.add_resource(tree,         '/nanorcrest/tree')
+        self.api.add_resource(fsm,          '/nanorcrest/fsm')
+        self.api.add_resource(command,      '/nanorcrest/command')
+        self.api.add_resource(run_data,     '/nanorcrest/run_data')
         self.app.add_url_rule('/', view_func=index)
 
     def run(self):
