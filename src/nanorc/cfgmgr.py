@@ -92,7 +92,8 @@ class ConfigManager:
             self.boot['response_listener']['port'] += self.port_offset
             self.conf_str = self._resolve_dir_and_save_to_tmpdir(
                 conf_path = Path(conf_path)/'data',
-                hosts = self.boot["hosts"],
+                hosts_ctrl = self.boot["hosts-ctrl"],
+                hosts_data = self.boot["hosts-data"],
                 port_offset = self.port_offset
             )
             self.custom_commands = self._get_custom_commands_from_dirs(conf_path)
@@ -142,7 +143,7 @@ class ConfigManager:
         return self.custom_commands
 
 
-    def _resolve_dir_and_save_to_tmpdir(self, conf_path, hosts:dict, port_offset:int=0) -> None:
+    def _resolve_dir_and_save_to_tmpdir(self, conf_path, hosts_ctrl:dict, hosts_data:dict, port_offset:int=0) -> None:
         if not os.path.exists(conf_path):
             raise RuntimeError(f"ERROR: {conf_path} does not exist!")
 
@@ -155,8 +156,8 @@ class ConfigManager:
 
         for original_file in os.listdir(conf_path):
             data = self._import_data(conf_path/original_file)
-            self.log.debug(f"Original conections in '{conf_path/original_file}':")
-            data = self._resolve_hostnames(data, hosts)
+            self.log.debug(f"Original connections in '{conf_path/original_file}':")
+            data = self._resolve_hostnames(data, hosts_data)
             if port_offset:
                 self.log.debug(f"Offsetting the ports by {port_offset}, new connections:")
                 data = self._offset_ports(data, external_connections)
@@ -177,7 +178,7 @@ class ConfigManager:
 
             origuri = connection['uri']
             connection['uri'] = parse_string(connection['uri'], hosts)
-            self.log.debug(f" - '{connection['uid']}': {connection['uri']} ({origuri})")
+            self.log.debug(f" - '{connection['id']['uid']}': {connection['uri']} ({origuri})")
         return data
 
 
@@ -190,11 +191,14 @@ class ConfigManager:
             if "queue://" in connection['uri']:
                 continue
 
-            if not connection['uid'] in external_connections:
-                port = urlparse(connection['uri']).port
-                newport = port + self.port_offset
-                connection['uri'] = connection['uri'].replace(str(port), str(newport))
-                self.log.debug(f" - '{connection['uid']}': {connection['uri']}")
+            if not connection['id']['uid'] in external_connections:
+                try:
+                    port = urlparse(connection['uri']).port
+                    newport = port + self.port_offset
+                    connection['uri'] = connection['uri'].replace(str(port), str(newport))
+                    self.log.debug(f" - '{connection['id']['uid']}': {connection['uri']}")
+                except Exception as e:
+                    self.log.debug(f" - '{connection['id']['uid']}' port wasn\'t offset")
 
         return data
 
@@ -202,12 +206,17 @@ class ConfigManager:
 
     def load_boot(self, boot, port_offset, resolve_hostname):
         if self.resolve_hostname:
-            boot["hosts"] = {
+            boot["hosts-ctrl"] = {
                 n: (h if (not h in ("localhost", "127.0.0.1")) else socket.gethostname())
-                for n, h in boot["hosts"].items()
+                for n, h in boot["hosts-ctrl"].items()
             }
 
         #port offseting
+        if "services" in boot:
+            for app in boot["services"]:
+                port = boot['services'][app]['port']
+                newport = port + port_offset
+                boot['services'][app]['port'] = newport
         for app in boot["apps"]:
             port = boot['apps'][app]['port']
             newport = port + port_offset
