@@ -1,8 +1,10 @@
 import sys
 import asyncio
+import httpx
 import requests
 import os
 from datetime import datetime
+import time
 
 from rich import print
 from rich.align import Align
@@ -31,7 +33,6 @@ from anytree import RenderTree
 from anytree.importer import DictImporter
 
 logging.basicConfig(level=logging.DEBUG)
-allowInput = True
 alwaysAsk = False
 
 class TitleBox(Static):
@@ -85,6 +86,8 @@ class RunInfo(Static):
 
     def update_all(self) -> None:
         r = requests.get((f'{self.hostname}/nanorcrest/run_data'), auth=("fooUsr", "barPass"))
+        if r.json() == "I'm busy!":
+            return
         data = r.json()
         self.runnum = data['number']
         self.runtype = data['type']
@@ -123,11 +126,14 @@ class LogDisplay(Static):
     
     def on_mount(self) -> None:
         self.set_interval(0.1, self.update_logs) # execute update_logs every second
+        s = self.vertical_scrollbar
     
     def update_logs(self) -> None:
         while True: # drain the queue of logs
             try:
                 record = self.log_queue.get(block=False)
+                if r.json() == "I'm busy!":
+                    return
                 text = self.handler.render_message(record, record.msg)
                 self.logs = f'{text}\n' + self.logs
             except:
@@ -228,7 +234,7 @@ class StatusDisplay(Static): pass
 
 class Status(Static):
     rcstatus = reactive('none')
-    active = reactive('none')
+    active = reactive(True)
     ask = reactive('none')
 
     def __init__(self, hostname, **kwargs):
@@ -237,19 +243,18 @@ class Status(Static):
 
     def update_rcstatus(self) -> None:
         r = requests.get((f'{self.hostname}/nanorcrest/status'), auth=("fooUsr", "barPass"))
+        if r.json() == "I'm busy!":
+            return
         info = r.json()                 #dictionary of information about the topnode
         self.rcstatus = info['state']
 
     def watch_rcstatus(self, rcstatus:str) -> None:
         self.change_status(rcstatus, self.active, self.ask)
 
-    def update_active(self):
-        if allowInput:
-            self.active = "Idle"
-        else:
-            self.active = "Working..."
-    
-    def watch_active(self, active:str) -> None:
+    def receive_active_change(self, new_active:bool) -> None:
+        self.active = new_active
+
+    def watch_active(self, active:bool):
         self.change_status(self.rcstatus, active, self.ask)
 
     def update_ask(self):
@@ -261,14 +266,17 @@ class Status(Static):
     def watch_ask(self, ask:str):
         self.change_status(self.rcstatus, self.active, ask)
 
-    def change_status(self, status, act, asktext):
+    def change_status(self, status, actBool, asktext):
+        if actBool:
+            actText = "Idle"
+        else:
+            actText = "Working"
         status_display = self.query_one(StatusDisplay)
         nice_status = status.replace('_', ' ').capitalize()
-        status_display.update(Markdown(f'# Status\n{nice_status}\n{act}\n\n{asktext}'))
+        status_display.update(Markdown(f'# Status\n{nice_status}\n{actText}\n\n{asktext}'))
 
     def on_mount(self) -> None:
         self.set_interval(0.1, self.update_rcstatus)
-        self.set_interval(0.1, self.update_active)
         self.set_interval(0.1, self.update_ask)
 
     def compose(self) -> ComposeResult:
@@ -291,6 +299,8 @@ class TreeView(Static):
     
     def update_rctree(self) -> None:
         r = requests.get((f'{self.hostname}/nanorcrest/tree'), auth=("fooUsr", "barPass"))
+        if r.json() == "I'm busy!":
+            return
         #Format is {'children': [...], 'name': 'foonode'} where the elements of children have the same structure
         importer = DictImporter()
         data = importer.import_(r.json())
@@ -336,17 +346,24 @@ class Command(Static):
     def __init__(self, hostname, **kwargs):
         super().__init__(**kwargs)
         self.hostname = hostname
+        self.active = True
         
     def on_mount(self) -> None:
         self.set_interval(0.1, self.update_buttons)
 
+    def compose(self) -> ComposeResult:
+        yield TitleBox('Commands')
+        yield Horizontal(id="box1", classes='horizontalbuttonscontainer')
+        yield Horizontal(id="box2", classes='horizontalbuttonscontainer')
+
     def update_buttons(self) -> None:
         r = requests.get((f'{self.hostname}/nanorcrest/command'), auth=("fooUsr", "barPass"))
+        if r.json() == "I'm busy!":
+            return
         self.commands = [key for key in r.json()]   #Command is a dict of currently allowed commands and some associated data, this gets the keys
 
     def watch_commands(self, commands:list[str]) -> None:
         second_line = ["exclude", "include"]
-        global allowInput
         box1 = self.query(Horizontal)[0]
         box2 = self.query(Horizontal)[1]
 
@@ -374,54 +391,18 @@ class Command(Static):
                 box2.mount(Button('Abort',variant='error', id='abort'))  #Abort button is red
             else:
                 box2.mount(Button(c.replace('_', ' ').capitalize(), id=c))
-        
-
-        '''
-        for button in self.query(Button):
-            if button.id in self.commands:
-                button.display=True
-            else:
-                button.display=False
-
-            if button.id == 'abort':
-                button.color = 'red'
-        '''
-
-
-        allowInput = True        #A change in FSM state means our command is done so we can accept a new one
-        
-    def compose(self) -> ComposeResult:
-        yield TitleBox('Commands')
-        yield Horizontal(id="box1", classes='horizontalbuttonscontainer')
-        yield Horizontal(id="box2", classes='horizontalbuttonscontainer')
-        '''
-        r = requests.get((f'{self.hostname}/nanorcrest/fsm'), auth=("fooUsr", "barPass"))   #Change this (to /command)!
-        fsm = r.json()
-        for data in fsm['transitions']:         #List of transitions, format is {'dest': 'ready', 'source': 'configured', 'trigger': 'start'}
-            if data['trigger'] not in self.all_commands:    #There can be duplicates: avoid them
-                self.all_commands.append(data['trigger'])   #Gets every transition trigger (i.e every command)
-
-        yield Horizontal(
-                *[Button(b.replace('_', ' ').capitalize(), id=b) for b in self.all_commands], #Generates a button for each command
-                classes='horizontalbuttonscontainer',
-            )
-        yield Horizontal(
-                Button('Quit', id='quit'),
-                Button('Abort',variant='error', id='abort'),
-                classes='horizontalbuttonscontainer',
-            )
-        '''
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         """Event handler called when a button is pressed."""
-        global allowInput
-        if allowInput:
+        if self.active:
             button_id = event.button.id
             if button_id == 'abort':
                 sys.exit(0)
             #Get all allowed commands and their inputs
-            r = requests.get((f'{self.hostname}/nanorcrest/command'), auth=("fooUsr", "barPass"))
-            data = r.json()         #json has format {'boot': [{'timeout': {'default': None, 'required': False, 'type': 'INT'}}]}
+            r1 = requests.get((f'{self.hostname}/nanorcrest/command'), auth=("fooUsr", "barPass"))
+            if r1.json() == "I'm busy!":
+                return
+            data = r1.json()         #json has format {'boot': [{'timeout': {'default': None, 'required': False, 'type': 'INT'}}]}
             paramlist = data[button_id]
             mandatory = False 
             for p in paramlist:
@@ -430,21 +411,36 @@ class Command(Static):
                 if info['required']:
                     mandatory = True
                     break
-            allowInput = False      #Deactivate until the command is completed
+            self.active = False      #Deactivate until the command is completed
+            for s in self.siblings:
+                if isinstance(s, Status):
+                    status_obj = s
+                    break
+            status_obj.receive_active_change(False)
             #The box must be shown if there are mandatory arguments. It also can be requested by pressing 'i' to switch modes.
             if mandatory or alwaysAsk:               
                 self.app.mount(InputWindow(hostname=self.hostname, command=button_id, id="pop_up"))
             else:
                 payload = {'command': button_id}
-                #Sends the command to nanorc 
-                r = requests.post((f'{self.hostname}/nanorcrest/command'), auth=("fooUsr", "barPass"), data=payload)
-                if button_id == "start":
-                    raise ValueError(r.json())
-                if "logs" in r.json():
-                    cmd_log = r.json()['logs']                      #Other fields are form and "return_code"
-                    self.emit_no_wait(self.NewLog(self, cmd_log))   #Sends a message to the parent (the app)
-                if "Exception" in r.json():
-                    raise ValueError(r.json())
+                if 'timeout' in payload:    #Default timeout is 5s: not enough to boot!
+                    t = int(payload['timeout'])
+                else:
+                    t = 60
+                #Sends the command to nanorc (asynchronously, to avoid freezing)
+                async with httpx.AsyncClient() as client:
+                    r2 = await client.post(f'{self.hostname}/nanorcrest/command', auth=("fooUsr", "barPass"), data=payload, timeout=t)
+
+                if "logs" in r2.json():
+                    cmd_log = r2.json()['logs']                             #Other fields are form and "return_code"
+                    self.post_message_no_wait(self.NewLog(self, cmd_log))   #Sends a message to the parent (the app)
+                if "Exception" in r2.json():
+                    raise ValueError(r2.json())
+                self.active = True
+                status_obj.receive_active_change(True)
+            
+
+    def receive_active_change(self, new_active:bool) -> None:
+        self.active = new_active
                    
 class InputWindow(Widget):
     class NewLog(Message):    
@@ -452,7 +448,7 @@ class InputWindow(Widget):
         def __init__(self, sender: MessageTarget, text:str) -> None:
             self.text = text
             super().__init__(sender)
-
+    
     def __init__(self, hostname, command, **kwargs):
         super().__init__(**kwargs)
         self.command = command
@@ -473,13 +469,12 @@ class InputWindow(Widget):
             Static(id='errordisplay')
         )
     
-    def on_button_pressed(self, event: Button.Pressed) -> None:
+    async def on_button_pressed(self, event: Button.Pressed) -> None:
         button_id = event.button.id
         params_out = {}
         inputs = self.query(Input)
         #A list of all statics with the given id. There should only be one of these, so we get element 0
         errordisplay = [q for q in self.query(Static) if q.id == "errordisplay"][0]
-        global allowInput
 
         if button_id == "go":
             for i in inputs:
@@ -507,22 +502,36 @@ class InputWindow(Widget):
                                 errordisplay.update(f"{i.value} is not a valid input for \"{i.id}\". Input should be a boolean.")
                                 return
                     params_out[i.id] = i.value
+            
+            for s in self.app.query(Static):    #This gets all the children of the app, since they all inherit from static
+                if isinstance(s, Status):
+                    status_obj = s
+                if isinstance(s, Command):
+                    command_obj = s
 
             payload = {'command': self.command, **params_out}
-            r = requests.post((f'{self.hostname}/nanorcrest/command'), auth=("fooUsr", "barPass"), data=payload)
+            if 'timeout' in payload:
+                t = int(payload['timeout'])
+            else:
+                t = 60
+
+            async with httpx.AsyncClient() as client:
+                r = await client.post(f'{self.hostname}/nanorcrest/command', auth=("fooUsr", "barPass"), data=payload, timeout=t)
+
             if "logs" in r.json():
                 cmd_log = r.json()['logs']                      #Other fields are "form" and "return_code"
                 self.emit_no_wait(self.NewLog(self, cmd_log))   #Sends a message to the parent (the app)
             if "Exception" in r.json():
                 raise ValueError(r.json())
-            allowInput = True
+            status_obj.receive_active_change(True)              #Turn commands back on, and tell status we are no longer working
+            command_obj.receive_active_change(True)
             self.remove()
 
         if button_id == "cancel":
-            allowInput = True
+            status_obj.receive_active_change(True)
+            command_obj.receive_active_change(True)
             self.remove()
         
-
 class NanoRCTUI(App):
     CSS_PATH = __file__[:-2] + "css"      #Gets the full path for a file called tui.css in the same folder as tui.py
     BINDINGS = [
@@ -575,10 +584,9 @@ if __name__ == "__main__":
     app.run()
 
 #TODO get rid of the foouser stuff since it's insecure (get auth from dotnanorc like with the logbook)
-#TODO Time freezes when boot is sent: figure out why
 #TODO Make the logs scroll again
-#TODO Make the command box not be narrow
 #TODO Get rid of logqueue maybe
 #TODO command sequences don't send logs properly
+#TODO Buttons disappear while commands are being sent (not like we were using them though)
 
-#TODO Fix idle/working thing
+#TODO Make the command box not be narrow
