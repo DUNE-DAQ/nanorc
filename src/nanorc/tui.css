@@ -7,7 +7,7 @@
 }
 
 Button {
-    width: 16;
+    width: 18;
     margin:1;
 }
 RunNumDisplay {
@@ -27,8 +27,8 @@ TitleBox{
     /* width: 30; */
 }
 #command {
-    column-span: 4;
-    row-span: 1
+    column-span: 3;
+    row-span: 2
 }
 
 #log {

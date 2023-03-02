@@ -369,6 +369,7 @@ class Command(Static):
                 continue
             else:
                 box2.mount(Button(c.replace('_', ' ').capitalize(), id=c))
+        box2.mount(Button('Quit', id='quit'))
         box2.mount(Button('Abort',variant='error', id='abort'))  #Abort button is red
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -377,6 +378,15 @@ class Command(Static):
             button_id = event.button.id
             if button_id == 'abort':
                 sys.exit(0)
+            if button_id == 'quit':
+                try:                                    #Try to shutdown
+                    payload = {'command': button_id}
+                    async with httpx.AsyncClient() as client:
+                        r2 = await client.post(f'{self.hostname}/nanorcrest/command', auth=("fooUsr", "barPass"), data=payload, timeout=60)
+                except:
+                    sys.exit(0)                         #If it fails then close the TUI anyway
+                sys.exit(0)                             #If it succeeds close the TUI
+
             #Get all allowed commands and their inputs
             r1 = requests.get((f'{self.hostname}/nanorcrest/command'), auth=("fooUsr", "barPass"))
             if r1.json() == "I'm busy!":
@@ -454,6 +464,11 @@ class InputWindow(Widget):
         inputs = self.query(Input)
         #A list of all statics with the given id. There should only be one of these, so we get element 0
         errordisplay = [q for q in self.query(Static) if q.id == "errordisplay"][0]
+        for s in self.app.query(Static):    #This gets all the children of the app, since they all inherit from static
+                if isinstance(s, Status):
+                    status_obj = s
+                if isinstance(s, Command):
+                    command_obj = s
 
         if button_id == "go":
             for i in inputs:
@@ -481,12 +496,6 @@ class InputWindow(Widget):
                                 errordisplay.update(f"{i.value} is not a valid input for \"{i.id}\". Input should be a boolean.")
                                 return
                     params_out[i.id] = i.value
-            
-            for s in self.app.query(Static):    #This gets all the children of the app, since they all inherit from static
-                if isinstance(s, Status):
-                    status_obj = s
-                if isinstance(s, Command):
-                    command_obj = s
 
             payload = {'command': self.command, **params_out}
             if 'timeout' in payload:
@@ -501,7 +510,8 @@ class InputWindow(Widget):
                 cmd_log = r.json()['logs']                      #Other fields are "form" and "return_code"
                 self.emit_no_wait(self.NewLog(self, cmd_log))   #Sends a message to the parent (the app)
             if "Exception" in r.json():
-                raise ValueError(r.json())
+                errordisplay.update(r.json()['Exception'])
+                return
             status_obj.receive_active_change(True)              #Turn commands back on, and tell status we are no longer working
             command_obj.receive_active_change(True)
             self.remove()
