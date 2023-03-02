@@ -17,7 +17,7 @@ RunNumDisplay {
 }
 RunInfo {
     column-span:1;
-    row-span:1;
+    row-span:2;
     layout: vertical;
     margin:0;
     padding:0;
@@ -37,8 +37,9 @@ TitleBox{
 }
 
 #tree {
-    row-span: 3;
     column-span: 2;
+    row-span: 3;
+    align: left bottom;
 }
 
 #verticalbuttoncontainer {
@@ -55,6 +56,8 @@ TitleBox{
 
 #verticallogs {
     height: 80%;
+    overflow-y: scroll;
+    background: green 80%;
 }
 
 #verticaltree {

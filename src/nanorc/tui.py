@@ -16,12 +16,13 @@ from rich.json import JSON
 from rich.console import RenderableType
 from rich.markdown import Markdown
 from rich.style import Style
+from rich.spinner import Spinner
 
 from textual import log, events
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Content, Container, Vertical
 from textual.widget import Widget
-from textual.widgets import Button, Header, Footer, Static, Input
+from textual.widgets import Button, Header, Footer, Static, Input, Label
 from textual.reactive import reactive, Reactive
 from textual.message import Message, MessageTarget
 from textual.screen import Screen
@@ -84,8 +85,9 @@ class RunInfo(Static):
             obj.toggle_class("redtextbox")
             obj.toggle_class("greentextbox")
 
-    def update_all(self) -> None:
-        r = requests.get((f'{self.hostname}/nanorcrest/run_data'), auth=("fooUsr", "barPass"))
+    async def update_all(self) -> None:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(f'{self.hostname}/nanorcrest/run_data', auth=("fooUsr", "barPass"))
         if r.json() == "I'm busy!":
             return
         data = r.json()
@@ -109,7 +111,7 @@ class RunInfo(Static):
         #yield RunNumDisplay(id="runbox", classes="redtextbox")
         yield RunNumDisplay(classes="redtextbox")
         
-class LogDisplay(Static):
+class LogDisplay(Label):
     logs = reactive('')
 
     class SearchAgain(Message):    
@@ -122,9 +124,6 @@ class LogDisplay(Static):
         self.handler = RichHandler()
         self.search_mode = False
         self.searched_logs = ''
-    
-    def on_mount(self) -> None:
-        pass
 
     def watch_logs(self, logs:str, searched_logs:str) -> None:
         if self.search_mode:
@@ -139,10 +138,7 @@ class LogDisplay(Static):
 
     def save_logs(self) -> None:
         data = self.logs
-        # self.delete_logs() # dont want to delete_logs here
-        
         time = str(datetime.now())
-        
         time = time[:-7]               # Times to the nearest second instead of microsecond
         time = "-".join(time.split())  # Joins date and time with a hyphen instead of a space
         time = time.replace(":","")    # chuck the weird ":"
@@ -172,8 +168,7 @@ class Logs(Static):
             Button("Clear logs", id="delete_logs"),
             classes='horizontalbuttonscontainer'
         )
-
-        yield LogDisplay()
+        yield Horizontal(LogDisplay(classes='verticallogs'))
 
     async def on_button_pressed (self, event: Button.Pressed) -> None:
         button_id = event.button.id
@@ -223,8 +218,9 @@ class Status(Static):
         super().__init__(**kwargs)
         self.hostname = hostname
 
-    def update_rcstatus(self) -> None:
-        r = requests.get((f'{self.hostname}/nanorcrest/status'), auth=("fooUsr", "barPass"))
+    async def update_rcstatus(self) -> None:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(f'{self.hostname}/nanorcrest/status', auth=("fooUsr", "barPass"))
         if r.json() == "I'm busy!":
             return
         info = r.json()                 #dictionary of information about the topnode
@@ -279,8 +275,9 @@ class TreeView(Static):
         #yield Vertical(TreeDisplay(), id='verticaltree')
         yield TreeDisplay()
     
-    def update_rctree(self) -> None:
-        r = requests.get((f'{self.hostname}/nanorcrest/tree'), auth=("fooUsr", "barPass"))
+    async def update_rctree(self) -> None:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(f'{self.hostname}/nanorcrest/tree', auth=("fooUsr", "barPass"))
         if r.json() == "I'm busy!":
             return
         #Format is {'children': [...], 'name': 'foonode'} where the elements of children have the same structure
@@ -338,8 +335,9 @@ class Command(Static):
         yield Horizontal(id="box1", classes='horizontalbuttonscontainer')
         yield Horizontal(id="box2", classes='horizontalbuttonscontainer')
 
-    def update_buttons(self) -> None:
-        r = requests.get((f'{self.hostname}/nanorcrest/command'), auth=("fooUsr", "barPass"))
+    async def update_buttons(self) -> None:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(f'{self.hostname}/nanorcrest/command', auth=("fooUsr", "barPass"))
         if r.json() == "I'm busy!":
             return
         self.commands = [key for key in r.json()]   #Command is a dict of currently allowed commands and some associated data, this gets the keys
@@ -388,9 +386,9 @@ class Command(Static):
                 sys.exit(0)                             #If it succeeds close the TUI
 
             #Get all allowed commands and their inputs
-            r1 = requests.get((f'{self.hostname}/nanorcrest/command'), auth=("fooUsr", "barPass"))
-            if r1.json() == "I'm busy!":
-                return
+            async with httpx.AsyncClient() as client:
+                r1 = await client.get(f'{self.hostname}/nanorcrest/command', auth=("fooUsr", "barPass"))
+
             data = r1.json()         #json has format {'boot': [{'timeout': {'default': None, 'required': False, 'type': 'INT'}}]}
             paramlist = data[button_id]
             mandatory = False 
@@ -414,7 +412,7 @@ class Command(Static):
                 if 'timeout' in payload:    #Default timeout is 5s: not enough to boot!
                     t = int(payload['timeout'])
                 else:
-                    t = 60
+                    t = 180                 #3 minutes should be enough for anything                 
                 #Sends the command to nanorc (asynchronously, to avoid freezing)
                 async with httpx.AsyncClient() as client:
                     r2 = await client.post(f'{self.hostname}/nanorcrest/command', auth=("fooUsr", "barPass"), data=payload, timeout=t)
@@ -444,7 +442,7 @@ class InputWindow(Widget):
         self.hostname = hostname
 
     def compose(self) -> ComposeResult:
-        r = requests.get((f'{self.hostname}/nanorcrest/command'), auth=("fooUsr", "barPass"))
+        r = requests.get(f'{self.hostname}/nanorcrest/command', auth=("fooUsr", "barPass"))
         data = r.json()     #json has format {'boot': [{'timeout': {'default': None, 'required': False, 'type': 'INT'}}]}
         paramlist = data[self.command]
         self.params = {k:v for d in paramlist for k, v in d.items()}    #We turn the list of dicts into one dict for convenience 
@@ -501,7 +499,7 @@ class InputWindow(Widget):
             if 'timeout' in payload:
                 t = int(payload['timeout'])
             else:
-                t = 60
+                t = 180
 
             async with httpx.AsyncClient() as client:
                 r = await client.post(f'{self.hostname}/nanorcrest/command', auth=("fooUsr", "barPass"), data=payload, timeout=t)
@@ -517,7 +515,7 @@ class InputWindow(Widget):
             self.remove()
 
         if button_id == "cancel":
-            status_obj.receive_active_change(True)
+            status_obj.receive_active_change(True).get
             command_obj.receive_active_change(True)
             self.remove()
         
@@ -572,6 +570,3 @@ if __name__ == "__main__":
 #TODO get rid of the foouser stuff since it's insecure (get auth from dotnanorc like with the logbook)
 #TODO Make the logs scroll again
 #TODO Buttons disappear while commands are being sent (not like we were using them though)
-#TODO should all requests be asynchronous?
-
-#TODO Make the command box not be narrow
