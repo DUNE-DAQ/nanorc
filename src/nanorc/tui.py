@@ -566,7 +566,3 @@ class NanoRCTUI(App):
 if __name__ == "__main__":
     app = NanoRCTUI()
     app.run()
-
-#TODO get rid of the foouser stuff since it's insecure (get auth from dotnanorc like with the logbook)
-#TODO Make the logs scroll again
-#TODO Buttons disappear while commands are being sent (not like we were using them though)
