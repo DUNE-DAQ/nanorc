@@ -117,15 +117,14 @@ class LogDisplay(Static):
         def __init__(self, sender: MessageTarget) -> None:
             super().__init__(sender)
 
-    def __init__(self, log_queue, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.log_queue = log_queue
         self.handler = RichHandler()
         self.search_mode = False
         self.searched_logs = ''
     
     def on_mount(self) -> None:
-        s = self.vertical_scrollbar
+        pass
 
     def watch_logs(self, logs:str, searched_logs:str) -> None:
         if self.search_mode:
@@ -161,9 +160,8 @@ class LogDisplay(Static):
         self.update(Text(self.logs))                    #We render the logs as rich text
     
 class Logs(Static):
-    def __init__(self, log_queue, hostname, **kwargs):
+    def __init__(self, hostname, **kwargs):
         super().__init__(**kwargs)
-        self.log_queue = log_queue
         self.hostname = hostname
     
     def compose(self) -> ComposeResult:
@@ -175,7 +173,7 @@ class Logs(Static):
             classes='horizontalbuttonscontainer'
         )
 
-        yield LogDisplay(self.log_queue)
+        yield LogDisplay()
 
     async def on_button_pressed (self, event: Button.Pressed) -> None:
         button_id = event.button.id
@@ -322,7 +320,7 @@ class Command(Static):
     commands = reactive([])
 
     class NewLog(Message):    
-        '''The message that informs the log queue of a new entry'''
+        '''The message that informs the log widget of a new entry'''
         def __init__(self, sender: MessageTarget, text:str) -> None:
             self.text = text
             super().__init__(sender)
@@ -425,7 +423,7 @@ class Command(Static):
                    
 class InputWindow(Widget):
     class NewLog(Message):    
-        '''The message that informs the log queue of a new entry'''
+        '''The message that informs the log widget of a new entry'''
         def __init__(self, sender: MessageTarget, text:str) -> None:
             self.text = text
             super().__init__(sender)
@@ -523,9 +521,6 @@ class NanoRCTUI(App):
     def __init__(self, host, rest_port, banner, **kwargs):
         super().__init__(**kwargs)
         self.mylog = logging.getLogger("NanoRCTUI")
-        self.log_queue = queue.Queue(-1)
-        self.queue_handler = QueueHandler(self.log_queue)
-        self.mylog.addHandler(self.queue_handler)
         self.hostname = f'http://{host}:{rest_port}'
 
     async def on_command_new_log(self, message:Command.NewLog) -> None:
@@ -553,7 +548,7 @@ class NanoRCTUI(App):
             Status   (hostname = self.hostname, classes='container'),
             Command  (hostname = self.hostname, classes='container', id='command'),
             TreeView (hostname = self.hostname, classes='container', id='tree'),
-            Logs     (log_queue=self.log_queue, hostname = self.hostname, classes='container', id='log'),
+            Logs     (hostname = self.hostname, classes='container', id='log'),
             id = 'app-grid'
         )
         
@@ -566,8 +561,6 @@ if __name__ == "__main__":
 
 #TODO get rid of the foouser stuff since it's insecure (get auth from dotnanorc like with the logbook)
 #TODO Make the logs scroll again
-#TODO Get rid of logqueue maybe
-#TODO command sequences don't send logs properly
 #TODO Buttons disappear while commands are being sent (not like we were using them though)
 #TODO should all requests be asynchronous?
 
