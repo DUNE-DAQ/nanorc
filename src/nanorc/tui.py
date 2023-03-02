@@ -125,29 +125,18 @@ class LogDisplay(Static):
         self.searched_logs = ''
     
     def on_mount(self) -> None:
-        self.set_interval(0.1, self.update_logs) # execute update_logs every second
         s = self.vertical_scrollbar
-    
-    def update_logs(self) -> None:
-        while True: # drain the queue of logs
-            try:
-                record = self.log_queue.get(block=False)
-                if r.json() == "I'm busy!":
-                    return
-                text = self.handler.render_message(record, record.msg)
-                self.logs = f'{text}\n' + self.logs
-            except:
-                break
 
     def watch_logs(self, logs:str, searched_logs:str) -> None:
         if self.search_mode:
             self.emit_no_wait(self.SearchAgain(self)) #Send a message up to the parent
             self.update(searched_logs)
         else:
-            self.update(logs)
+            self.update(Text(logs))
     
     def delete_logs(self) -> None:
         self.logs = ""
+        self.update(Text(self.logs))
 
     def save_logs(self) -> None:
         data = self.logs
@@ -167,9 +156,9 @@ class LogDisplay(Static):
             pass
 
     async def receive_log(self, the_log):
-        md = Text(the_log)              #Renders the message into rich text
-        self.logs = f'{md}\n' + self.logs
-        self.update(self.logs)
+        the_log_r = '\n'.join(the_log.split('\n')[::-1]) #Split the logs up at newlines, reverse the list, then recombine into a string
+        self.logs = f'{the_log_r}\n' + self.logs
+        self.update(Text(self.logs))                    #We render the logs as rich text
     
 class Logs(Static):
     def __init__(self, log_queue, hostname, **kwargs):
@@ -185,12 +174,7 @@ class Logs(Static):
             Button("Clear logs", id="delete_logs"),
             classes='horizontalbuttonscontainer'
         )
-        '''
-        yield Vertical(
-            LogDisplay(self.log_queue),
-            id='verticallogs'
-        )
-        '''
+
         yield LogDisplay(self.log_queue)
 
     async def on_button_pressed (self, event: Button.Pressed) -> None:
@@ -215,10 +199,10 @@ class Logs(Static):
             logdisplay.search_mode = True
             task = asyncio.create_task(self.filter_logs(logdisplay, message))
             logdisplay.searched_logs = await(task)
-            logdisplay.update(logdisplay.searched_logs)
+            logdisplay.update(Text(logdisplay.searched_logs))
         else:
             logdisplay.search_mode = False
-            logdisplay.update(logdisplay.logs)
+            logdisplay.update(Text(logdisplay.logs))
 
     async def filter_logs(self, logdisplay, term: str):
         loglist = logdisplay.logs.split("\n")                                       #Splits the log string into a list of logs
@@ -363,7 +347,7 @@ class Command(Static):
         self.commands = [key for key in r.json()]   #Command is a dict of currently allowed commands and some associated data, this gets the keys
 
     def watch_commands(self, commands:list[str]) -> None:
-        second_line = ["exclude", "include"]
+        second_line = ["exclude", "include", "pin_threads"]
         box1 = self.query(Horizontal)[0]
         box2 = self.query(Horizontal)[1]
 
@@ -379,18 +363,15 @@ class Command(Static):
         for c in self.commands:
             if c in second_line:
                 continue
-            if c == "abort":
-                box1.mount(Button('Abort',variant='error', id='abort'))  #Abort button is red
             else:
                 box1.mount(Button(c.replace('_', ' ').capitalize(), id=c))
         #Generate 2nd line
         for c in self.commands:
             if c not in second_line:
                 continue
-            if c == "abort":
-                box2.mount(Button('Abort',variant='error', id='abort'))  #Abort button is red
             else:
                 box2.mount(Button(c.replace('_', ' ').capitalize(), id=c))
+        box2.mount(Button('Abort',variant='error', id='abort'))  #Abort button is red
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         """Event handler called when a button is pressed."""
@@ -588,5 +569,6 @@ if __name__ == "__main__":
 #TODO Get rid of logqueue maybe
 #TODO command sequences don't send logs properly
 #TODO Buttons disappear while commands are being sent (not like we were using them though)
+#TODO should all requests be asynchronous?
 
 #TODO Make the command box not be narrow
