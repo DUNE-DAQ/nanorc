@@ -55,9 +55,8 @@ TitleBox{
 }
 
 #verticallogs {
-    height: 80%;
-    overflow-y: scroll;
-    background: green 80%;
+    height: 100%;
+    overflow-y: auto;
 }
 
 #verticaltree {

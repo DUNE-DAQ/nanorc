@@ -168,7 +168,7 @@ class Logs(Static):
             Button("Clear logs", id="delete_logs"),
             classes='horizontalbuttonscontainer'
         )
-        yield Horizontal(LogDisplay(classes='verticallogs'))
+        yield Vertical(LogDisplay(), classes='verticallogs')
 
     async def on_button_pressed (self, event: Button.Pressed) -> None:
         button_id = event.button.id
