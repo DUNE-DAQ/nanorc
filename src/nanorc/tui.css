@@ -1,6 +1,7 @@
+/* (#) means select by id. (.) means select by CSS class. If there is nothing, it selects by python class. */
 #app-grid {
     layout: grid;
-    grid-size: 5 4;
+    grid-size: 5 10;
     grid-columns: 1fr;
     grid-rows: 1fr;
     grid-gutter: 1;
@@ -10,43 +11,50 @@ Button {
     width: 18;
     margin:1;
 }
+TitleBox{
+    /* width: 30; */
+}
 RunNumDisplay {
     border:hidden;
     margin:0;
     padding:0;
 }
-RunInfo {
+
+#runinfo {
     column-span:1;
-    row-span:2;
+    row-span:4;
     layout: vertical;
     margin:0;
     padding:0;
 }
 
-TitleBox{
-    /* width: 30; */
-}
+
 #command {
     column-span: 3;
-    row-span: 2
+    row-span: 4;
 }
 
 #log {
     column-span: 3;
-    row-span: 3;
+    row-span: 6;
+    height: 100%;
+}
+
+#status {
+    column-span:1;
+    row-span:4;
 }
 
 #tree {
     column-span: 2;
-    row-span: 3;
-    align: left bottom;
+    row-span: 6;
+    height: 100%;
 }
 
 #verticalbuttoncontainer {
     margin:0;
     padding:0;
     border: hidden;
-    /* height:10% */
 }
 
 #verticalruninfo {
@@ -54,9 +62,8 @@ TitleBox{
     padding:0;
 }
 
-#verticallogs {
-    height: 100%;
-    overflow-y: auto;
+.verticallogs {
+    border: dashed dodgerblue;
 }
 
 #verticaltree {

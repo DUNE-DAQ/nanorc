@@ -111,7 +111,7 @@ class RunInfo(Static):
         #yield RunNumDisplay(id="runbox", classes="redtextbox")
         yield RunNumDisplay(classes="redtextbox")
         
-class LogDisplay(Label):
+class LogDisplay(Static):
     logs = reactive('')
 
     class SearchAgain(Message):    
@@ -162,13 +162,17 @@ class Logs(Static):
     
     def compose(self) -> ComposeResult:
         yield TitleBox('Logs')
+        
         yield Input(placeholder='Search logs')
         yield Horizontal(
             Button("Save logs", id="save_logs"),
             Button("Clear logs", id="delete_logs"),
             classes='horizontalbuttonscontainer'
+            )
+        yield Vertical(
+            LogDisplay(),
+            classes='verticallogs'
         )
-        yield Vertical(LogDisplay(), classes='verticallogs')
 
     async def on_button_pressed (self, event: Button.Pressed) -> None:
         button_id = event.button.id
@@ -552,8 +556,8 @@ class NanoRCTUI(App):
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
         yield Container(
-            RunInfo  (hostname = self.hostname, classes='container'),
-            Status   (hostname = self.hostname, classes='container'),
+            RunInfo  (hostname = self.hostname, classes='container', id='runinfo'),
+            Status   (hostname = self.hostname, classes='container', id='status'),
             Command  (hostname = self.hostname, classes='container', id='command'),
             TreeView (hostname = self.hostname, classes='container', id='tree'),
             Logs     (hostname = self.hostname, classes='container', id='log'),
