@@ -16,10 +16,19 @@ _If you want to run with Kubernetes support, the "Kubernetes support" section is
 
 First, set up a working area according to [the daq-buildtools instructions](https://dune-daq-sw.readthedocs.io/en/latest/packages/daq-buildtools/).
 
-Get the example data file:
+Information can be found in `daqconf` [wiki](https://github.com/DUNE-DAQ/daqconf/wiki), or in [here](https://dune-daq-sw.readthedocs.io/en/latest/packages/daqconf/InstructionsForCasualUsers/), following is to generate a configuration and run nanorc only.
+
+Get the example data file (TODO: asset manager and configuration - likely to change for v4.0.0):
 
 ```bash
 curl -o frames.bin -O https://cernbox.cern.ch/index.php/s/0XzhExSIMQJUsp0/download
+```
+
+Generate a hardware map, with the name `HardwareMap.txt`:
+```text
+# DRO_SourceID DetLink DetSlot DetCrate DetID DRO_Host DRO_Card DRO_SLR DRO_Link 
+100 0 4 6 3 localhost 0 0 0
+101 1 4 6 3 localhost 0 0 1
 ```
 
 Generate a configuration:
