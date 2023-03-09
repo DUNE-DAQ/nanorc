@@ -284,6 +284,7 @@ class TreeView(Static):
             r = await client.get(f'{self.hostname}/nanorcrest/tree', auth=("fooUsr", "barPass"))
         if r.json() == "I'm busy!":
             return
+        #raise ValueError(r.json())
         #Format is {'children': [...], 'name': 'foonode'} where the elements of children have the same structure
         importer = DictImporter()
         data = importer.import_(r.json())
@@ -297,6 +298,22 @@ class TreeView(Static):
                 state_str += "ERROR - "
                 style = 'bold red'
                 working = False
+
+            pathstring = ""
+            for n in node.path:     #The path is provided as a tuple of nodes, with the parents first
+                pathstring = pathstring + '.' + n.name
+
+            async with httpx.AsyncClient() as client:       #Checks the state of each node
+                fullpath = f'{self.hostname}/nanorcrest/node/' + pathstring
+                r = await client.get(fullpath, auth=("fooUsr", "barPass"))
+                node_data = r.json()
+
+                if 'process_state' in node_data:    #Only app nodes have this one
+                    if node_data['process_state'] != "alive":
+                        state_str += f"{node_data['process_state']} - "
+                        style = 'bold red'
+                        working = False 
+
             state_str += f"{node.state}"
             if not node.included:
                 state_str += " - excluded"

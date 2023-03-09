@@ -66,7 +66,7 @@ class node(Resource):
 class tree(Resource):
     @auth.login_required
     def get(self):
-        wanted = ["name", "included", "errored", "state"]      
+        wanted = ["name", "included", "errored", "state", "path"]      
         if rc_context.worker_thread and rc_context.worker_thread.is_alive():
             return "I'm busy!"
         if rc_context.rc.topnode:
