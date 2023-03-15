@@ -287,7 +287,7 @@ class SSHProcessManager(object):
                 _bg=True,
                 _bg_exc=False,
                 _new_session=True,
-                # _preexec_fn=on_parent_exit(signal.SIGTERM),
+                _preexec_fn=on_parent_exit(signal.SIGTERM),
             )
             self.watch(name, proc)
             desc.proc = proc
