@@ -206,7 +206,7 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
 
     if tui:
         from .tui import NanoRCTUI
-        tui = NanoRCTUI(host=host, rest_port=rest_port, banner=Panel.fit(grid))
+        tui = NanoRCTUI(host=host, rest_port=rest_port, timeout=rc.timeout, banner=Panel.fit(grid))
         tui.run()
         cleanup_rc()
         ctx.exit(rc.return_code)
