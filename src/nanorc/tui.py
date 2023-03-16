@@ -554,16 +554,20 @@ class InputWindow(Widget):
             status_obj.receive_active_change(True)
             command_obj.receive_active_change(True)
             self.remove()
+
+from importlib import resources
+import nanorc
         
 class NanoRCTUI(App):
-    CSS_PATH = __file__[:-2] + "css"      #Gets the full path for a file called tui.css in the same folder as tui.py
+    CSS_PATH = resources.files(nanorc).joinpath('tui.css')
     BINDINGS = [
         ("d", "toggle_dark", "Toggle dark mode"),
         ("i", "toggle_inputs", "Toggle whether optional inputs are taken")
-        ]
+    ]
 
     def __init__(self, host, rest_port, timeout, banner, **kwargs):
         super().__init__(**kwargs)
+        
         self.mylog = logging.getLogger("NanoRCTUI")
         self.hostname = f'http://{host}:{rest_port}'
         global network_timeout
