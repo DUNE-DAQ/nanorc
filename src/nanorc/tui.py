@@ -562,7 +562,7 @@ class NanoRCTUI(App):
     CSS_PATH = resources.files(nanorc).joinpath('tui.css')
     BINDINGS = [
         ("d", "toggle_dark", "Toggle dark mode"),
-        ("i", "toggle_inputs", "Toggle whether optional inputs are taken")
+        ("i", "toggle_inputs", "Toggle expert mode")
     ]
 
     def __init__(self, host, rest_port, timeout, banner, **kwargs):
