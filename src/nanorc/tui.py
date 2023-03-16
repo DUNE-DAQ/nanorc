@@ -63,7 +63,7 @@ class RunInfo(Static):
                 self.runtext = Markdown(f'# Run info\nNumber: {self.runnum}\n\nType: {self.runtype}')
             else:                                       #Between runs
                 self.runtext = Markdown(f'# Run info\nLast Number: {self.runnum}\n\nLast Type: {self.runtype}')
-            
+
         self.change_colour(run_num_display)
         run_num_display.update(self.runtext)
 
@@ -112,11 +112,11 @@ class RunInfo(Static):
     def compose(self) -> ComposeResult:
         #yield RunNumDisplay(id="runbox", classes="redtextbox")
         yield RunNumDisplay(classes="redtextbox")
-        
+
 class LogDisplay(Static):
     logs = reactive('')
 
-    class SearchAgain(Message):    
+    class SearchAgain(Message):
         '''The message that tells the searchbar to update itself'''
         def __init__(self, sender: MessageTarget) -> None:
             super().__init__(sender)
@@ -133,7 +133,7 @@ class LogDisplay(Static):
             self.update(searched_logs)
         else:
             self.update(Text(logs))
-    
+
     def delete_logs(self) -> None:
         self.logs = ""
         self.update(Text(self.logs))
@@ -143,7 +143,7 @@ class LogDisplay(Static):
         t = datetime.datetime.now()
         t_str = t.strftime("%Y-%m-%d-%Hh%Mm%Ss")
         filename = f"logs_{t_str}.txt"
-        try: 
+        try:
             with open(filename, "x") as f:
                 f.write(data)
             f.close()
@@ -154,15 +154,15 @@ class LogDisplay(Static):
         the_log_r = '\n'.join(the_log.split('\n')[::-1]) #Split the logs up at newlines, reverse the list, then recombine into a string
         self.logs = f'{the_log_r}\n' + self.logs
         self.update(Text(self.logs))                    #We render the logs as rich text
-    
+
 class Logs(Static):
     def __init__(self, hostname, **kwargs):
         super().__init__(**kwargs)
         self.hostname = hostname
-    
+
     def compose(self) -> ComposeResult:
         yield TitleBox('Logs')
-        
+
         yield Input(placeholder='Search logs')
         yield Horizontal(
             Button("Save logs", id="save_logs"),
@@ -188,7 +188,7 @@ class Logs(Static):
         '''To get the right name, we convert from CamelCase to snake_case'''
         textbox = self.query_one(Input)
         await self.begin_search(textbox.value)
-        
+
     async def begin_search(self, message:str) -> None:
         '''This function is called when the logs update, and when the user types in the box'''
         logdisplay = self.query_one(LogDisplay)
@@ -204,7 +204,7 @@ class Logs(Static):
     async def filter_logs(self, logdisplay, term: str):
         loglist = logdisplay.logs.split("\n")                                       #Splits the log string into a list of logs
         #Gets a list of all logs that contain term as a substring (case insensitive)
-        searchedlist = [log for log in loglist if term.lower() in log.lower()]   
+        searchedlist = [log for log in loglist if term.lower() in log.lower()]
         return "\n".join(searchedlist)                                              #Reformats the list as a string with newlines
 
     async def deliver_message(self, text):
@@ -228,7 +228,7 @@ class Status(Static):
         info = r.json()                 #dictionary of information about the topnode
         if info == "I'm busy!":
             return
-        
+
         self.rcstatus = info['state']
 
     def watch_rcstatus(self, rcstatus:str) -> None:
@@ -270,15 +270,15 @@ class TreeDisplay(Static): pass
 
 class TreeView(Static):
     rctree = reactive('none')
-    
+
     def __init__(self, hostname, **kwargs):
         super().__init__(**kwargs)
         self.hostname = hostname
-        
+
     def compose(self) -> ComposeResult:
         yield TitleBox("Apps")
         yield TreeDisplay()
-    
+
     async def update_rctree(self) -> None:
         async with httpx.AsyncClient() as client:
             r = await client.get(f'{self.hostname}/nanorcrest/tree', auth=auth)
@@ -312,7 +312,7 @@ class TreeView(Static):
                     if node_data['process_state'] != "alive":
                         state_str += f"{node_data['process_state']} - "
                         style = 'bold red'
-                        working = False 
+                        working = False
 
             state_str += f"{node.state}"
             if not node.included:
@@ -337,7 +337,7 @@ class TreeView(Static):
 class Command(Static):
     commands = reactive([])
 
-    class NewLog(Message):    
+    class NewLog(Message):
         '''The message that informs the log widget of a new entry'''
         def __init__(self, sender: MessageTarget, text:str) -> None:
             self.text = text
@@ -347,7 +347,7 @@ class Command(Static):
         super().__init__(**kwargs)
         self.hostname = hostname
         self.active = True
-        
+
     def on_mount(self) -> None:
         self.set_interval(0.1, self.update_buttons)
 
@@ -413,7 +413,7 @@ class Command(Static):
 
             data = r1.json()         #json has format {'boot': [{'timeout': {'default': None, 'required': False, 'type': 'INT'}}]}
             paramlist = data[button_id]
-            mandatory = False 
+            mandatory = False
             for p in paramlist:
                 for key in p:       #Should be just one of these
                     info = p[key]
@@ -427,7 +427,7 @@ class Command(Static):
                     break
             status_obj.receive_active_change(False)
             #The box must be shown if there are mandatory arguments. It also can be requested by pressing 'i' to switch modes.
-            if mandatory or alwaysAsk:               
+            if mandatory or alwaysAsk:
                 self.app.mount(InputWindow(hostname=self.hostname, command=button_id, id="pop_up"))
             else:
                 payload = {'command': button_id}
@@ -451,18 +451,18 @@ class Command(Static):
                     raise ValueError(r2.json())
                 self.active = True
                 status_obj.receive_active_change(True)
-            
+
 
     def receive_active_change(self, new_active:bool) -> None:
         self.active = new_active
-                   
+
 class InputWindow(Widget):
-    class NewLog(Message):    
+    class NewLog(Message):
         '''The message that informs the log widget of a new entry'''
         def __init__(self, sender: MessageTarget, text:str) -> None:
             self.text = text
             super().__init__(sender)
-    
+
     def __init__(self, hostname, command, **kwargs):
         super().__init__(**kwargs)
         self.command = command
@@ -472,21 +472,33 @@ class InputWindow(Widget):
         r = requests.get(f'{self.hostname}/nanorcrest/command', auth=auth)
         data = r.json()     #json has format {'boot': [{'timeout': {'default': None, 'required': False, 'type': 'INT'}}]}
         paramlist = data[self.command]
-        self.params = {k:v for d in paramlist for k, v in d.items()}    #We turn the list of dicts into one dict for convenience 
+        self.params = {k:v for d in paramlist for k, v in d.items()}    #We turn the list of dicts into one dict for convenience
+
+        button_list = []
+
+        for k,v in self.params.items():
+            if v['required']:
+                b = Input(placeholder=k, id=k)
+                b.styles.background = 'red'
+                button_list.append(b)
+            elif alwaysAsk:
+                button_list.append(Input(placeholder=k, id=k))
+
+
         yield Vertical(
-            *[Input(placeholder=key, id=key) for key in self.params],
+            *button_list,
             Horizontal(
                 Button("Execute Command", id="go"),
                 Button('Cancel',variant='error', id='cancel'),
                 classes = "horizontalbuttonscontainer"
-            ), 
+            ),
             Static(id='errordisplay')
         )
-    
+
     def validate_input(self, inputs):
         params_out = {}
         for i in inputs:
-                if i.value == "":     
+                if i.value == "":
                     if self.params[i.id]['required']:                           #We can't allow a required field to be empty!
                         return f"Required parameter \"{i.id}\" is missing!"     #The attempt at sending a command is over
                 else:
@@ -508,7 +520,7 @@ class InputWindow(Widget):
                     params_out[i.id] = i.value
         return params_out
 
-    
+
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         button_id = event.button.id
         inputs = self.query(Input)
@@ -557,7 +569,7 @@ class InputWindow(Widget):
 
 from importlib import resources
 import nanorc
-        
+
 class NanoRCTUI(App):
     CSS_PATH = resources.files(nanorc).joinpath('tui.css')
     BINDINGS = [
@@ -567,7 +579,7 @@ class NanoRCTUI(App):
 
     def __init__(self, host, rest_port, timeout, banner, **kwargs):
         super().__init__(**kwargs)
-        
+
         self.mylog = logging.getLogger("NanoRCTUI")
         self.hostname = f'http://{host}:{rest_port}'
         global network_timeout
@@ -586,7 +598,7 @@ class NanoRCTUI(App):
     def action_toggle_dark(self) -> None:
         """An action to toggle dark mode."""
         self.dark = not self.dark
-    
+
     def action_toggle_inputs(self) -> None:
         global alwaysAsk
         alwaysAsk = not alwaysAsk
@@ -601,10 +613,10 @@ class NanoRCTUI(App):
             Logs     (hostname = self.hostname, classes='container', id='log'),
             id = 'app-grid'
         )
-        
+
         yield Header(show_clock=True)
-        yield Footer()  
-        
+        yield Footer()
+
 if __name__ == "__main__":
     app = NanoRCTUI()
     app.run()
