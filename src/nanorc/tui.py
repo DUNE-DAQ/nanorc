@@ -431,18 +431,19 @@ class Command(Static):
                 self.app.mount(InputWindow(hostname=self.hostname, command=button_id, id="pop_up"))
             else:
                 payload = {'command': button_id}
-                if button_id == "boot":     #Boot is being weird and taking longer than its timeout somehow, so we have cheated
-                    boot_time = 55
-                else:
-                    boot_time = 0
                 if 'timeout' in payload:    #Default timeout is 5s: not enough to boot!
-                    #We add 5 to the timeout: if nanorc reaches the timeout, we don't want the http to timeout before nanorc sends the response informing of the error
-                    t = int(payload['timeout']) + 5 + boot_time
+                    #We add 5 to the timeout: if nanorc reaches the timeout, we want the request to have time to report back the error.
+                    t = int(payload['timeout']) + 5
                 else:
-                    t = network_timeout + boot_time     #We default to CLI timeout (+5)
-                #Sends the command to nanorc (asynchronously, to avoid freezing)
-                async with httpx.AsyncClient() as client:
-                    r2 = await client.post(f'{self.hostname}/nanorcrest/command', auth=auth, data=payload, timeout=t)
+                    t = network_timeout     #We default to CLI timeout (+5)
+                #Boot is being weird and taking longer than its timeout somehow, so we have cheated by disabling the read timeout
+                if button_id == "boot":
+                    async with httpx.AsyncClient() as client:
+                        timeout = httpx.Timeout(t, read=None)
+                        r2 = await client.post(f'{self.hostname}/nanorcrest/command', auth=auth, data=payload, timeout=timeout)
+                else:
+                    async with httpx.AsyncClient() as client:
+                        r2 = await client.post(f'{self.hostname}/nanorcrest/command', auth=auth, data=payload, timeout=t)
 
                 if "logs" in r2.json():
                     cmd_log = r2.json()['logs']                        #Other fields are "form" and "return_code"
