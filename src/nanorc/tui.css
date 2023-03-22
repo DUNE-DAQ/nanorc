@@ -23,9 +23,9 @@ RunNumDisplay {
 #runinfo {
     column-span:1;
     row-span:4;
-    layout: vertical;
-    margin:0;
-    padding:0;
+    /* layout: vertical; */
+    /* margin:0; */
+    /* padding:0; */
 }
 
 
