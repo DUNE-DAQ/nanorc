@@ -276,8 +276,7 @@ class AppCommander:
             } if self.proxy else None
         )
 
-
-        self.log.info(f"Ack to {self.app}: {ack.status_code}")
+        self.log.debug(f"Ack to {self.app}: {ack.status_code}")
         self.sent_cmd = cmd_id
 
 
@@ -297,7 +296,7 @@ class AppCommander:
         try:
             # self.log.info(f"Checking for answers from {self.app} {self.sent_cmd}")
             r = self.response_queue.get(block=(timeout>0), timeout=timeout)
-            self.log.info(f"Received reply from {self.app} to {self.sent_cmd}")
+            self.log.debug(f"Received reply from {self.app} to {self.sent_cmd}")
             self.sent_cmd = None
 
         except queue.Empty:

@@ -227,15 +227,15 @@ class StatefulNode(NodeMixin):
 
     def _on_enter_callback(self, event):
         command = event.event.name
-        self.log.info(f"'{self.name}' received command '{command}'")
+        self.log.debug(f"'{self.name}' received command '{command}'")
         source_state = event.transition.source
         force = event.kwargs.get('force')
 
         if command in self.order:
-            self.log.info(f'Propagating to the included children nodes in the order {self.order[command]}')
+            self.log.debug(f'Propagating to the included children nodes in the order {self.order[command]}')
         else:
             self.order[command] = [c.name for c in self.children]
-            self.log.info(f'Propagating to children nodes in the order: {self.order[command]}')
+            self.log.debug(f'Propagating to children nodes in the order: {self.order[command]}')
 
         status = ErrorCode.Success
         failed = []
@@ -243,7 +243,7 @@ class StatefulNode(NodeMixin):
         for cn in self.order[command]:
             child = [c for c in self.children if c.name == cn][0]
             if not child.included: continue
-            self.log.info(f'Sending {command} to {child.name}')
+            self.log.debug(f'Sending {command} to {child.name}')
             try:
                 child.trigger(command, **event.kwargs)
                 for _ in range(event.kwargs["timeout"]):

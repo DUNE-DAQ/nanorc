@@ -16,6 +16,7 @@ from typing import Union, NoReturn
 from .fsm import FSM
 import os.path
 from .statefulnode import StatefulNode, ErrorCode, CanExecuteReturnVal
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeRemainingColumn, TimeElapsedColumn
 
 log = logging.getLogger("transitions")
 log.setLevel(logging.ERROR)
@@ -376,7 +377,7 @@ class SubsystemNode(StatefulNode):
         exit_state = self.get_destination(command).upper()
 
         log = f"Sending {command} to the subsystem {self.name}"
-        self.log.info(log)
+        self.log.debug(log)
 
         appset = list(self.children)
         failed = []
@@ -414,30 +415,44 @@ class SubsystemNode(StatefulNode):
                     del appset[i]
 
         ignore = []
-        for child_node in appset:
-            data = self.cfgmgr.generate_data_for_module(event.kwargs.get('overwrite_data'))
-            if not child_node.included:
-                self.log.info(f'Node {child_node.name} is excluded! NOT sending {command} to it!')
-                continue
-            self.log.debug(f'Sending {command} to {child_node.name}')
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            console=self.console,
+        ) as progress:
+            total = progress.add_task("[yellow]# Acks      received", total=len(appset))
 
-            entry_state = child_node.state.upper()
-            try:
-                child_node.trigger(command)
-                ## APP now in *_ing
-                child_node.sup.send_command(
-                    cmd_id = command,
-                    cmd_data = data,
-                    entry_state=entry_state,
-                    exit_state=exit_state
-                )
-            except Exception as e:
-                if force:
-                    self.log.error(f'Failed to send \'{command}\' to \'{child_node.name}\', --force was specified so continuing anyway')
-                    ignore+=[child_node.name]
-                else:
-                    self.log.error(f'Failed to send \'{command}\' to \'{child_node.name}\'')
-                    raise e
+            completed = 0
+            for child_node in appset:
+                data = self.cfgmgr.generate_data_for_module(event.kwargs.get('overwrite_data'))
+                if not child_node.included:
+                    self.log.info(f'Node {child_node.name} is excluded! NOT sending {command} to it!')
+                    continue
+                self.log.debug(f'Sending {command} to {child_node.name}')
+
+                entry_state = child_node.state.upper()
+
+                try:
+                    child_node.trigger(command)
+                    ## APP now in *_ing
+                    child_node.sup.send_command(
+                        cmd_id = command,
+                        cmd_data = data,
+                        entry_state = entry_state,
+                        exit_state = exit_state
+                    )
+                    completed += 1
+                    progress.update(total, completed=completed)
+
+                except Exception as e:
+                    if force:
+                        self.log.error(f'Failed to send \'{command}\' to \'{child_node.name}\', --force was specified so continuing anyway')
+                        ignore+=[child_node.name]
+                    else:
+                        self.log.error(f'Failed to send \'{command}\' to \'{child_node.name}\'')
+                        raise e
 
 
         for chuck in ignore:
@@ -445,47 +460,58 @@ class SubsystemNode(StatefulNode):
                 if chuck == app.name:
                     del appset[i]
         start = datetime.now()
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            console=self.console,
+        ) as progress:
+            n_apps = len(appset)
+            total = progress.add_task("[yellow]# Responses received", total = n_apps)
 
-        for _ in range(timeout*10):
-            if len(appset)==0: break
-            done = []
-            for child_node in appset:
-                if not child_node.included: continue
-
-                if not child_node.sup.desc.proc.is_alive() or not child_node.sup.commander.ping():
-                    failed.append(child_node.name)
-                    child_node.to_error(
-                        command = command,
-                    )
-                    done += [child_node]
+            for _ in range(timeout*10):
+                if len(appset)==0:
+                    progress.update(total, completed = n_apps)
                     break
+                done = []
+                for child_node in appset:
+                    if not child_node.included: continue
 
-                try:
-                    r = child_node.sup.check_response()
-                except NoResponse:
-                    continue
+                    if not child_node.sup.desc.proc.is_alive() or not child_node.sup.commander.ping():
+                        failed.append(child_node.name)
+                        child_node.to_error(
+                            command = command,
+                        )
+                        done += [child_node]
+                        break
 
-                done += [child_node]
-                if r['success']:
-                    child_node.trigger("end_"+command) # this is all dummy
-                else:
-                    response = {
-                        "node": child_node.name,
-                        "status_code" : r,
-                        "state": child_node.state,
-                        "command": command,
-                        "error": r,
-                    }
-                    failed.append(child_node.name)
-                    child_node.to_error(
-                        command=command,
-                        text=r['result']
-                    )
+                    try:
+                        r = child_node.sup.check_response()
+                    except NoResponse:
+                        continue
 
-            for d in done:
-                appset.remove(d)
+                    done += [child_node]
+                    if r['success']:
+                        child_node.trigger("end_"+command) # this is all dummy
+                    else:
+                        response = {
+                            "node": child_node.name,
+                            "status_code" : r,
+                            "state": child_node.state,
+                            "command": command,
+                            "error": r,
+                        }
+                        failed.append(child_node.name)
+                        child_node.to_error(
+                            command=command,
+                            text=r['result']
+                        )
 
-            time.sleep(0.1)
+                for d in done:
+                    appset.remove(d)
+                    progress.update(total, completed = len(done))
+                time.sleep(0.1)
 
         response= {}
         if failed:
