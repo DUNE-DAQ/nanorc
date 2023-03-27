@@ -397,7 +397,10 @@ class Command(Static):
         if self.active:
             button_id = event.button.id
             if button_id == 'abort':
+                # print(self.app)
+                # self.app.exit()
                 sys.exit(0)
+                
             if button_id == 'quit':
                 try:                                    #Try to shutdown
                     payload = {'command': button_id}
@@ -405,6 +408,7 @@ class Command(Static):
                         r2 = await client.post(f'{self.hostname}/nanorcrest/command', auth=auth, data=payload, timeout=60)
                 except:
                     sys.exit(0)                         #If it fails then close the TUI anyway
+                # self.app.exit()
                 sys.exit(0)                             #If it succeeds close the TUI
 
             #Get all allowed commands and their inputs
@@ -603,6 +607,10 @@ class NanoRCTUI(App):
         global alwaysAsk
         alwaysAsk = not alwaysAsk
 
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id in ['abort', 'quit']:
+            self.exit()
+    
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
         yield Container(

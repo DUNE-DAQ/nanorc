@@ -274,6 +274,18 @@ class run_data(Resource):
 def index():
     return "Best thing since light saber"
 
+def shutdown_server():
+    func = request.environ.get('werkzeug.server.shutdown')
+    if func is None:
+        raise RuntimeError('Not running with the Werkzeug Server')
+    func()
+
+class shutdown(Resource):
+    @auth.login_required
+    def get(self):
+        print('shutting down')
+        shutdown_server()
+        return 'Server shutting down...'
 
 class RestApi:
     def __init__(self, rc_context, host, port):
@@ -290,6 +302,7 @@ class RestApi:
         self.api.add_resource(fsm,          '/nanorcrest/fsm')
         self.api.add_resource(command,      '/nanorcrest/command')
         self.api.add_resource(run_data,     '/nanorcrest/run_data')
+        self.api.add_resource(shutdown,     '/nanorcrest/shutdown')
         self.app.add_url_rule('/', view_func=index)
 
     def run(self):

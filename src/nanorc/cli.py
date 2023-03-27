@@ -207,9 +207,20 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
     if tui:
         from .tui import NanoRCTUI
         tui = NanoRCTUI(host=host, rest_port=rest_port, timeout=rc.timeout, banner=Panel.fit(grid))
+        obj.rc.ls_thread()
+        print('starting TUI')
         tui.run()
+        import requests
+        try:
+                r = requests.get(f'{host}:{rest_port}/nanorcrest/shutdown',auth=('fooUsr', 'barPass'))
+        except:
+                pass
+        rest_thread.join()
+        obj.rc.ls_thread()
         cleanup_rc()
+        obj.rc.ls_thread()
         ctx.exit(rc.return_code)
+        obj.rc.ls_thread()
 
 
 
