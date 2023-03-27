@@ -165,8 +165,8 @@ class Logs(Static):
 
         yield Input(placeholder='Search logs')
         yield Horizontal(
-            Button("Save logs", id="save_logs"),
-            Button("Clear logs", id="delete_logs"),
+            Button("Save logs", id="save_logs", variant='primary'),
+            Button("Clear logs", id="delete_logs", variant='warning'),
             classes='horizontalbuttonscontainer'
             )
         yield Vertical(
@@ -382,13 +382,13 @@ class Command(Static):
             if c in second_line:
                 continue
             else:
-                box1.mount(Button(c.replace('_', ' ').capitalize(), id=c))
+                box1.mount(Button(c.replace('_', ' ').capitalize(), id=c, variant='primary'))
         #Generate 2nd line
         for c in self.commands:
             if c not in second_line:
                 continue
             else:
-                box2.mount(Button(c.replace('_', ' ').capitalize(), id=c))
+                box2.mount(Button(c.replace('_', ' ').capitalize(), id=c, variant='primary'))
         box2.mount(Button('Quit', id='quit'))
         box2.mount(Button('Abort',variant='error', id='abort'))  #Abort button is red
 
@@ -489,7 +489,7 @@ class InputWindow(Widget):
         yield Vertical(
             *button_list,
             Horizontal(
-                Button("Execute Command", id="go"),
+                Button("Execute Command", id="go", variant='success'),
                 Button('Cancel',variant='error', id='cancel'),
                 classes = "horizontalbuttonscontainer"
             ),
@@ -523,7 +523,7 @@ class InputWindow(Widget):
                                 choices_as_str = self.params[i.id]['type'][7:-1]        #This gets the list part of "Choice([a,b,c,d])"
                                 choices = eval(choices_as_str)                          #Turn the string into a real list
                                 if i.value not in choices:
-                                    return f"{i.value} is not a valid input for \"{i.id}\". Input should be one of the following: {choices_as_str}." 
+                                    return f"{i.value} is not a valid input for \"{i.id}\". Input should be one of the following: {choices_as_str}."
                     params_out[i.id] = i.value
         return params_out
 
