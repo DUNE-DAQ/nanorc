@@ -201,7 +201,12 @@ class NanoRC:
         )
         if canexec == CanExecuteReturnVal.InvalidTransition:
             self.return_code = node_path.return_code.value
-            self.log.info(f"Cannot execute {command}, reason: {str(canexec)}")
+            error_str = f"I cannot execute {command}, from state {node_path.state}"
+            error_str += f"\nTransitions allowed are:"
+            for tr in node_path.fsm.transitions_cfg:
+                if tr['source'] == node_path.state:
+                    error_str += f'\n - {tr["trigger"]}'
+            self.log.error(error_str)
             return
         elif canexec != CanExecuteReturnVal.CanExecute:
             if not force:
