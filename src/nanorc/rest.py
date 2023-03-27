@@ -123,7 +123,10 @@ def parse_argument(form, ctx):
                         else:
                             raise ValueError("Not a valid boolean")
                 case _:
-                    raise RuntimeError("Unhandled Parameter Type")
+                    if "Choice" in str(param.type):
+                        value = str(value)
+                    else:
+                        raise RuntimeError("Unhandled Parameter Type")
 
         ### <hack>
         if param.name == 'timeout':
