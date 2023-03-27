@@ -522,8 +522,7 @@ class InputWindow(Widget):
                             if "Choice" in self.params[i.id]['type']:
                                 choices_as_str = self.params[i.id]['type'][7:-1]        #This gets the list part of "Choice([a,b,c,d])"
                                 choices = eval(choices_as_str)                          #Turn the string into a real list
-                                value = str(value)
-                                if value not in choices:
+                                if i.value not in choices:
                                     return f"{i.value} is not a valid input for \"{i.id}\". Input should be one of the following: {choices_as_str}." 
                     params_out[i.id] = i.value
         return params_out
