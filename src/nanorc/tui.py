@@ -389,7 +389,7 @@ class Command(Static):
                 continue
             else:
                 box2.mount(Button(c.replace('_', ' ').capitalize(), id=c, variant='primary'))
-        box2.mount(Button('Quit', id='quit'))
+        box2.mount(Button('Quit', id='quit', variant='primary'))
         box2.mount(Button('Abort',variant='error', id='abort'))  #Abort button is red
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
