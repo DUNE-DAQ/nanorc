@@ -147,7 +147,7 @@ class ConfigManager:
         if not os.path.exists(conf_path):
             raise RuntimeError(f"ERROR: {conf_path} does not exist!")
 
-        external_connections = self.boot['external_connections']
+        external_connections = []
 
         self.tmp = tempfile.TemporaryDirectory(
             dir=os.getcwd(),
@@ -212,6 +212,11 @@ class ConfigManager:
             }
 
         #port offseting
+        if "services" in boot:
+            for app in boot["services"]:
+                port = boot['services'][app]['port']
+                newport = port + port_offset
+                boot['services'][app]['port'] = newport
         for app in boot["apps"]:
             port = boot['apps'][app]['port']
             newport = port + port_offset
