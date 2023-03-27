@@ -271,6 +271,17 @@ From here, using nanorc is just about the same as in the terminal:
 
 **Note that this information will also be shown as output to the terminal.**
 
+## How to run the TUI
+
+To use the TUI (Terminal User Interface), add the --tui option when running nanorc. No proxy is required in this case.
+
+![TUI](TUI.png)
+
+Again, using nanorc is similar to the terminal:
+
+* Transitions between states are done with the buttons in the top right: press I on the keyboard to toggle whether optional inputs are taken.
+* Logs are displayed in the bottom right, and can be searched by typing in the box above them.
+
 ## Kubernetes support
 
 This page describes the functionality which is supported within Kubernetes in v3.1.0.
