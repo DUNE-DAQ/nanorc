@@ -363,13 +363,13 @@ def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool, cmd_args:di
         cmd = seq_cmd['cmd']
         optional = seq_cmd['optional']
         canexec = rc.can_execute(cmd, quiet=True, check_children=False, check_inerror=False)
-        
+
         if canexec == CanExecuteReturnVal.InvalidTransition:
             if optional:
                 continue
             else:
                 break
-        
+
         canexec = rc.can_execute(cmd, check_inerror=True, check_dead=True, quiet=True, check_children=True)
 
         if canexec != CanExecuteReturnVal.CanExecute and not force:
@@ -385,10 +385,11 @@ def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool, cmd_args:di
         seq_func(**cmd_args)
 
         check_rc(ctx, rc)
-        rc.status()
 
         if rc.return_code != 0 and not force:
             break
 
         if last_cmd != cmd:
             time.sleep(wait)
+    rc.status()
+
