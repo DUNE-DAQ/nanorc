@@ -201,7 +201,12 @@ class NanoRC:
         )
         if canexec == CanExecuteReturnVal.InvalidTransition:
             self.return_code = node_path.return_code.value
-            self.log.info(f"Cannot execute {command}, reason: {str(canexec)}")
+            error_str = f"I cannot execute {command}, from state {node_path.state}"
+            error_str += f"\nTransitions allowed are:"
+            for tr in node_path.fsm.transitions_cfg:
+                if tr['source'] == node_path.state:
+                    error_str += f'\n - {tr["trigger"]}'
+            self.log.error(error_str)
             return
         elif canexec != CanExecuteReturnVal.CanExecute:
             if not force:
@@ -226,6 +231,7 @@ class NanoRC:
         if not self.topnode:
             return
 
+        self.console.print('\n')
         if self.runs:
             print_run_info(self.runs[-1], self.console)
         print_status(apparatus_id=self.apparatus_id, topnode=self.topnode, console=self.console, partition=self.partition)
@@ -373,7 +379,9 @@ class NanoRC:
             if self.cfgsvr:
                 text+=f", saving run data in {cfg_save_dir}"
 
+            self.console.print(' ')
             self.console.rule(f"[bold magenta]{text}[/bold magenta]")
+            self.console.print(' ')
         else:
             self.log.error(f"There was an error when starting the run #{run}:")
             self.log.error(f'Response: {self.topnode.response}')
@@ -472,9 +480,13 @@ class NanoRC:
                 self.runs[-1].finish_run()
                 run = self.runs[-1].run_number
             if self.run_num_mgr:
+                self.console.print(' ')
                 self.console.rule(f"[bold magenta]Stopped run #{run}[/bold magenta]")
+                self.console.print(' ')
             else:
+                self.console.print(' ')
                 self.console.rule(f"[bold magenta]Stopped running[/bold magenta]")
+                self.console.print(' ')
 
 
     def change_rate(self, trigger_rate:float, timeout) -> NoReturn:
