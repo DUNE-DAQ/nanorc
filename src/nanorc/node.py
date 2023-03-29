@@ -219,6 +219,7 @@ class SubsystemNode(StatefulNode):
             self.pm.boot(
                 boot_info = boot_info,
                 timeout = timeout,
+                exit_when_parent_dies = event.kwargs.get('exit_when_parent_dies', True),
                 conf_loc = self.cfgmgr.get_conf_location(for_apps=True)
             )
 

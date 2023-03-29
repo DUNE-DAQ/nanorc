@@ -12,3 +12,4 @@ class NanoContext:
         self.console = console
         self.print_traceback = False
         self.rc = None
+        self.use_rest = False

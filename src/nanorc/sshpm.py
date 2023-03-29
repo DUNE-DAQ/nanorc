@@ -32,6 +32,7 @@ def on_parent_exit(signum):
     Return a function to be run in a child process which will trigger
     SIGNAME to be sent when the parent process dies
     """
+
     def set_parent_exit_signal():
         # http://linux.die.net/man/2/prctl
         result = cdll['libc.so.6'].prctl(PR_SET_PDEATHSIG, signum)
@@ -234,7 +235,7 @@ class SSHProcessManager(object):
         desc.conf = app_conf.copy()
         return desc
 
-    def boot(self, boot_info, conf_loc, timeout):
+    def boot(self, boot_info, conf_loc, timeout, exit_when_parent_dies:bool=True):
 
         if self.apps:
             raise RuntimeError(
@@ -264,6 +265,7 @@ class SSHProcessManager(object):
                     _bg=True,
                     _bg_exc=False,
                     _new_session=True,
+                    #_preexec_fn=on_parent_exit(signal.SIGTERM), # should be here too
                 )
                 self.watch(srv_name, proc)
                 desc.proc = proc
@@ -283,11 +285,11 @@ class SSHProcessManager(object):
             ssh_args=desc.ssh_args + [desc.cmd]
             proc = sh.ssh(
                 *ssh_args,
-                _out=file_logger(desc.logfile) if not self.log_path else None,
-                _bg=True,
-                _bg_exc=False,
-                _new_session=True,
-                _preexec_fn=on_parent_exit(signal.SIGTERM),
+                _out = file_logger(desc.logfile) if not self.log_path else None,
+                _bg = True,
+                _bg_exc = False,
+                _new_session = True,
+                _preexec_fn = on_parent_exit(signal.SIGTERM) if exit_when_parent_dies else None,
             )
             self.watch(name, proc)
             desc.proc = proc

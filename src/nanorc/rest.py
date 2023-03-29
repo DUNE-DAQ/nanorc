@@ -66,10 +66,11 @@ class node(Resource):
 class tree(Resource):
     @auth.login_required
     def get(self):
+        wanted = ["name", "included", "errored", "state", "path"]
         if rc_context.worker_thread and rc_context.worker_thread.is_alive():
             return "I'm busy!"
         if rc_context.rc.topnode:
-            exporter = DictExporter(attriter=lambda attrs: [(k, v) for k, v in attrs if k == "name"])
+            exporter = DictExporter(attriter=lambda attrs: [(k, v) for k, v in attrs if k in wanted])
             json_tree = exporter.export(rc_context.rc.topnode)
             resp = make_response(jsonify(json_tree))
             return resp
@@ -106,10 +107,26 @@ def parse_argument(form, ctx):
             value = param.default
 
         if value != None:
-            if str(param.type) == 'INT':
-                value = int(value)
-            elif str(param.type) == 'BOOL':
-                value = True if value == 'true' else False
+            match str(param.type):
+                case 'STRING':
+                    value = str(value)
+                case 'INT':
+                    value = int(value)
+                case 'FLOAT':
+                    value = float(value)
+                case 'BOOL':
+                    if type(value) == str:                          #If we get passed an actual bool then we don't want to do any of this
+                        if value.lower() in ['true', '1']:          #The .lower accounts for the user entering "True"
+                            value = True
+                        elif value.lower() in ['false', '0']:
+                            value = False
+                        else:
+                            raise ValueError("Not a valid boolean")
+                case _:
+                    if "Choice" in str(param.type):
+                        value = str(value)
+                    else:
+                        raise RuntimeError("Unhandled Parameter Type")
 
         ### <hack>
         if param.name == 'timeout':
@@ -214,7 +231,7 @@ class command(Resource):
             rc_context.worker_thread = threading.Thread(
                 target=target,
                 name="command-worker",
-                args=[rc_context.ctx,rc_context],
+                args=[rc_context.ctx,rc_context.obj],
                 kwargs=parse_argument(form, rc_context)
             )
             rc_context.worker_thread.start()
@@ -238,6 +255,23 @@ class command(Resource):
             resp = make_response(jsonify({"Exception": str(e)}))
             return resp
 
+class run_data(Resource):
+    @auth.login_required
+    def get(self):
+        if rc_context.rc.runs != []:
+            resp_data = {
+                'number': rc_context.rc.runs[-1].run_number,
+                'is_running': rc_context.rc.runs[-1].is_running(),
+                'type': rc_context.rc.runs[-1].run_type
+            }
+        else:
+            resp_data = {
+                'number': "null",
+                'is_running': False,
+                'type': "null"
+            }
+        resp = make_response(resp_data)
+        return resp
 
 @auth.login_required
 def index():
@@ -253,11 +287,12 @@ class RestApi:
         self.api = Api(self.app)
         CORS(self.app)
 
-        self.api.add_resource(status,  '/nanorcrest/status')
-        self.api.add_resource(node,    '/nanorcrest/node/<path>')
-        self.api.add_resource(tree,    '/nanorcrest/tree')
-        self.api.add_resource(fsm,     '/nanorcrest/fsm')
-        self.api.add_resource(command, '/nanorcrest/command')
+        self.api.add_resource(status,       '/nanorcrest/status')
+        self.api.add_resource(node,         '/nanorcrest/node/<path>')
+        self.api.add_resource(tree,         '/nanorcrest/tree')
+        self.api.add_resource(fsm,          '/nanorcrest/fsm')
+        self.api.add_resource(command,      '/nanorcrest/command')
+        self.api.add_resource(run_data,     '/nanorcrest/run_data')
         self.app.add_url_rule('/', view_func=index)
 
     def run(self):
