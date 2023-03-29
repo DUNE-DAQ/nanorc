@@ -66,7 +66,7 @@ class node(Resource):
 class tree(Resource):
     @auth.login_required
     def get(self):
-        wanted = ["name", "included", "errored", "state", "path"]      
+        wanted = ["name", "included", "errored", "state", "path"]
         if rc_context.worker_thread and rc_context.worker_thread.is_alive():
             return "I'm busy!"
         if rc_context.rc.topnode:
@@ -231,7 +231,7 @@ class command(Resource):
             rc_context.worker_thread = threading.Thread(
                 target=target,
                 name="command-worker",
-                args=[rc_context.ctx,rc_context],
+                args=[rc_context.ctx,rc_context.obj],
                 kwargs=parse_argument(form, rc_context)
             )
             rc_context.worker_thread.start()

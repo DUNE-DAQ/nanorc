@@ -81,7 +81,8 @@ def pin_threads(ctx, obj:NanoContext, pin_thread_file, timeout:int):
 @click.pass_obj
 @click.pass_context
 def boot(ctx, obj, timeout:int):
-    obj.rc.boot(timeout=timeout)
+
+    obj.rc.boot(timeout=timeout, exit_when_parent_dies = not obj.use_rest) # berrrrk
     check_rc(ctx,obj.rc)
     obj.rc.status()
 
@@ -363,13 +364,13 @@ def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool, cmd_args:di
         cmd = seq_cmd['cmd']
         optional = seq_cmd['optional']
         canexec = rc.can_execute(cmd, quiet=True, check_children=False, check_inerror=False)
-        
+
         if canexec == CanExecuteReturnVal.InvalidTransition:
             if optional:
                 continue
             else:
                 break
-        
+
         canexec = rc.can_execute(cmd, check_inerror=True, check_dead=True, quiet=True, check_children=True)
 
         if canexec != CanExecuteReturnVal.CanExecute and not force:
