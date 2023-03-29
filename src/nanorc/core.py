@@ -231,6 +231,7 @@ class NanoRC:
         if not self.topnode:
             return
 
+        self.console.print('\n')
         if self.runs:
             print_run_info(self.runs[-1], self.console)
         print_status(apparatus_id=self.apparatus_id, topnode=self.topnode, console=self.console, partition=self.partition)

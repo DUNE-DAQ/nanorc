@@ -360,6 +360,11 @@ def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool, cmd_args:di
     import time
     last_cmd = sequence[-1]['cmd']
 
+    rc.console.print(f'\nExecuting command sequence ({command}):')
+    for s in sequence:
+        rc.console.print(f" - \'{s['cmd']}\'")
+    rc.console.print("\n")
+
     for seq_cmd in sequence:
         cmd = seq_cmd['cmd']
         optional = seq_cmd['optional']
@@ -377,13 +382,14 @@ def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool, cmd_args:di
             rc.log.error(f"Cannot execute '{cmd}' in the '{command}' reason: {str(canexec)}, you may be able to use --force")
             break
 
-        rc.console.print(f'\n[underline]Executing \'{cmd}\'[/underline]\n')
+        rc.console.print(f'Executing \'{cmd}\'')
         seq_func = getattr(rc, cmd, None)
         if not seq_func:
             rc.log.error(f"Function {cmd} doesn't exist in nanorc.core!")
             if not force: break
 
         seq_func(**cmd_args)
+        rc.console.print(f'DONE executing \'{cmd}\'!\n')
 
         check_rc(ctx, rc)
 
