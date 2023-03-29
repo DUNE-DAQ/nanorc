@@ -242,13 +242,14 @@ class NanoRC:
         self.return_code = print_node(node=self.topnode, console=self.console, leg=leg)
 
 
-    def boot(self, timeout:int) -> NoReturn:
+    def boot(self, timeout:int, exit_when_parent_dies:bool=True) -> NoReturn:
         """
         Boot applications
         """
         self.execute_command(
             "boot",
             partition=self.partition,
+            exit_when_parent_dies = exit_when_parent_dies,
             timeout=timeout,
             ssh_conf=self.ssh_conf,
             log_path=self.log_path,

@@ -48,13 +48,14 @@ from nanorc.nano_context import NanoContext
 @click.option('--kerberos/--no-kerberos', default=False, help='Whether you want to use kerberos for communicating between processes')
 @click.option('--pm', type=str, default="ssh://", help='Process manager, can be: ssh://, kind://, or k8s://np04-srv-015:31000, for example', callback=argval.validate_pm)
 @click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn webui')
+@click.option('--tui/--no-tui', is_flag=True, default=False, help='whether to use TUI')
 @click.option('--partition-number', type=int, default=0, help='Which partition number to run', callback=argval.validate_partition_number)
 @click.argument('cfg_dir', type=str, callback=argval.validate_conf)
 @click.argument('user', type=str)
 @click.argument('partition-label', type=str, callback=argval.validate_partition)
 @click.pass_obj
 @click.pass_context
-def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, dotnanorc, kerberos, timeout, partition_number, partition_label, web, pm, cfg_dir, user):
+def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, dotnanorc, kerberos, timeout, partition_number, partition_label, web, tui, pm, cfg_dir, user):
 
 
 
@@ -70,7 +71,8 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
     grid.add_row("  but trust it and it will betray you!")
     grid.add_row("Use it with care, user!")
 
-    obj.console.print(Panel.fit(grid))
+    if not tui:
+        obj.console.print(Panel.fit(grid))
 
     port_offset = 0 + partition_number * 500
     rest_port = 5005 + partition_number
@@ -81,6 +83,8 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
 
     rest_thread  = threading.Thread()
     webui_thread = threading.Thread()
+    if web and tui:
+        raise RuntimeError("cant have TUI and GUI at the same time")
     try:
         dotnanorc = os.path.expanduser(dotnanorc)
         obj.console.print(f"[blue]Loading {dotnanorc}[/blue]")
@@ -138,7 +142,7 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
         add_common_cmds(ctx.command, end_of_run_cmds=False)
         add_custom_cmds(ctx.command, rc.execute_custom_command, rc.custom_cmd)
 
-        if web:
+        if web or tui:
             host = socket.gethostname()
 
             rc_context.obj = obj
@@ -154,30 +158,31 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
             rest_thread.start()
             obj.console.log(f"Started RESTAPI")
 
-            webui_thread = None
-            obj.console.log(f'Starting up Web UI on {host}:{webui_port}')
-            webui = WebServer(host, webui_port, host, rest_port)
-            webui_thread = threading.Thread(target=webui.run, name='NanoRC_WebUI')
-            webui_thread.start()
-            obj.console.log(f"")
-            obj.console.log(f"")
-            obj.console.log(f"")
-            obj.console.log(f"")
-            grid = Table(title='Web NanoRC', show_header=False, show_edge=False)
-            grid.add_column()
-            grid.add_row(f"Started Web UI, you can now connect to: [blue]{host}:{webui_port}[/blue],")
-            if 'np04' in host:
-                grid.add_row(f"You probably need to set up a SOCKS proxy to lxplus:")
-                grid.add_row("[blue]ssh -N -D 8080 your_cern_uname@lxtunnel.cern.ch[/blue] # on a different terminal window on your machine")
-                grid.add_row(f'Make sure you set up browser SOCKS proxy with port 8080 too,')
-                grid.add_row('on Chrome, \'Hotplate localhost SOCKS proxy setup\' works well).')
-            grid.add_row()
-            grid.add_row(f'[red]To stop this, ctrl-c [/red][bold red]twice[/bold red] (that will kill the REST and WebUI threads).')
-            obj.console.print(Panel.fit(grid))
-            obj.console.log(f"")
-            obj.console.log(f"")
-            obj.console.log(f"")
-            obj.console.log(f"")
+            if web:
+                webui_thread = None
+                obj.console.log(f'Starting up Web UI on {host}:{webui_port}')
+                webui = WebServer(host, webui_port, host, rest_port)
+                webui_thread = threading.Thread(target=webui.run, name='NanoRC_WebUI')
+                webui_thread.start()
+                obj.console.log(f"")
+                obj.console.log(f"")
+                obj.console.log(f"")
+                obj.console.log(f"")
+                grid = Table(title='Web NanoRC', show_header=False, show_edge=False)
+                grid.add_column()
+                grid.add_row(f"Started Web UI, you can now connect to: [blue]{host}:{webui_port}[/blue],")
+                if 'np04' in host:
+                    grid.add_row(f"You probably need to set up a SOCKS proxy to lxplus:")
+                    grid.add_row("[blue]ssh -N -D 8080 your_cern_uname@lxtunnel.cern.ch[/blue] # on a different terminal window on your machine")
+                    grid.add_row(f'Make sure you set up browser SOCKS proxy with port 8080 too,')
+                    grid.add_row('on Chrome, \'Hotplate localhost SOCKS proxy setup\' works well).')
+                grid.add_row()
+                grid.add_row(f'[red]To stop this, ctrl-c [/red][bold red]twice[/bold red] (that will kill the REST and WebUI threads).')
+                obj.console.print(Panel.fit(grid))
+                obj.console.log(f"")
+                obj.console.log(f"")
+                obj.console.log(f"")
+                obj.console.log(f"")
 
     except Exception as e:
         logging.getLogger("cli").exception("Failed to build NanoRC")
@@ -199,6 +204,13 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
     if web:
         rest_thread.join()
         webui_thread.join()
+
+    if tui:
+        from .tui import NanoRCTUI
+        tui = NanoRCTUI(host=host, rest_port=rest_port, timeout=rc.timeout, banner=Panel.fit(grid))
+        tui.run()
+        cleanup_rc()
+        ctx.exit(rc.return_code) 
 
 @np04cli.command('change_user')
 @click.argument('user', type=str, default=None)

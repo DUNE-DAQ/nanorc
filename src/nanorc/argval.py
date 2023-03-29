@@ -15,8 +15,8 @@ def validate_path_exists(prompted_path):
 def validate_timeout(ctx, param, timeout):
     if timeout is None:
         return timeout
-    if timeout<=0:
-        raise click.BadParameter('Timeout should be >0')
+    if timeout<10:
+        raise click.BadParameter('Timeout should be >= 10')
     return timeout
 
 def validate_wait(ctx, param, wait):

@@ -659,7 +659,7 @@ class K8SProcessManager(object):
 
 
     #---
-    def boot(self, boot_info, timeout, conf_loc):
+    def boot(self, boot_info, timeout, conf_loc, **kwargs):
 
         if self.apps:
             raise RuntimeError(
