@@ -94,7 +94,6 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
     credentials.user = 'user'
     ctx.command.shell.prompt = f'{credentials.user}@rc> '
 
-    obj.use_rest = web or tui
 
     grid = Table(title='Shonky NanoRC', show_header=False, show_edge=False)
     grid.add_column()

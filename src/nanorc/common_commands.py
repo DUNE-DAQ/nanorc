@@ -81,8 +81,7 @@ def pin_threads(ctx, obj:NanoContext, pin_thread_file, timeout:int):
 @click.pass_obj
 @click.pass_context
 def boot(ctx, obj, timeout:int):
-
-    obj.rc.boot(timeout=timeout, exit_when_parent_dies = not obj.use_rest) # berrrrk
+    obj.rc.boot(timeout=timeout)
     check_rc(ctx,obj.rc)
     obj.rc.status()
 
