@@ -423,7 +423,7 @@ class SubsystemNode(StatefulNode):
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             console=self.console,
         ) as progress:
-            total = progress.add_task("[yellow]# Acks      received", total=len(appset))
+            total = progress.add_task("[yellow]# acks      received", total=len(appset))
 
             completed = 0
             for child_node in appset:
@@ -460,20 +460,29 @@ class SubsystemNode(StatefulNode):
             for i, app in enumerate(appset):
                 if chuck == app.name:
                     del appset[i]
-        start = datetime.now()
+
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeRemainingColumn(),
+            TimeElapsedColumn(),
             console=self.console,
         ) as progress:
             n_apps = len(appset)
-            total = progress.add_task("[yellow]# Responses received", total = n_apps)
+            total = progress.add_task("[yellow]# responses received", total = n_apps)
+            apps_tasks = {
+                a.name: progress.add_task(f"[blue]{a.name}", total=1) for a in appset
+            }
+            timeout_bar = progress.add_task("[yellow]timeout", total = timeout*10)
 
             for _ in range(timeout*10):
+                progress.update(timeout_bar, advance=1)
+
                 if len(appset)==0:
                     progress.update(total, completed = n_apps)
+                    progress.update(timeout_bar, visible=False)
                     break
                 done = []
                 for child_node in appset:
@@ -511,7 +520,9 @@ class SubsystemNode(StatefulNode):
 
                 for d in done:
                     appset.remove(d)
-                    progress.update(total, completed = len(done))
+                    progress.update(apps_tasks[d.name], completed=1)
+                    progress.update(total, completed = n_apps - len(appset))
+
                 time.sleep(0.1)
 
         response= {}
