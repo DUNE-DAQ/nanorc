@@ -235,7 +235,7 @@ class SSHProcessManager(object):
         desc.conf = app_conf.copy()
         return desc
 
-    def boot(self, boot_info, conf_loc, timeout, exit_when_parent_dies:bool=True):
+    def boot(self, boot_info, conf_loc, timeout):
 
         if self.apps:
             raise RuntimeError(
@@ -289,7 +289,7 @@ class SSHProcessManager(object):
                 _bg = True,
                 _bg_exc = False,
                 _new_session = True,
-                _preexec_fn = on_parent_exit(signal.SIGTERM) if exit_when_parent_dies else None,
+                _preexec_fn = on_parent_exit(signal.SIGTERM)
             )
             self.watch(name, proc)
             desc.proc = proc
