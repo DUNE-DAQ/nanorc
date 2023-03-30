@@ -17,6 +17,9 @@ from .fsm import FSM
 import os.path
 from .statefulnode import StatefulNode, ErrorCode, CanExecuteReturnVal
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeRemainingColumn, TimeElapsedColumn
+from .utils import TaskEnqueuerThread, Task
+
+
 
 log = logging.getLogger("transitions")
 log.setLevel(logging.ERROR)
@@ -58,6 +61,7 @@ class SubsystemNode(StatefulNode):
 
         self.cfgmgr = cfgmgr
         self.pm = None
+        self.pm_task_enqueuer = None
         self.listener = None
 
     def can_execute_custom_or_expert(self, command, quiet=False, check_dead=True, check_inerror=True, check_children=True, only_included=True):
@@ -127,7 +131,9 @@ class SubsystemNode(StatefulNode):
                 del data['script_name']
                 for key, val in data.items():
                     script[key].update(val)
-                self.pm.execute_script(script)
+                task = Task('execute_script', script)
+                self.pm_task_enqueuer.enqueue_synchronous(task)
+                # self.pm.execute_script(script)
 
             except Exception as e:
                 self.log.error(f'Couldn\'t execute the thread pinning scripts: {str(e)}')
@@ -209,20 +215,33 @@ class SubsystemNode(StatefulNode):
             "command": "boot",
         }
         try:
+            self.log.info('creating pm enqueuer')
             if self.pm is None:
                 fact = PMFactory(self.cfgmgr, self.console)
                 self.pm = fact.get_pm(event)
+                self.pm_task_enqueuer = TaskEnqueuerThread(self.pm)
+                self.pm_task_enqueuer.start()
 
             timeout = event.kwargs["timeout"]
             boot_info = cp.deepcopy(self.cfgmgr.boot)
             boot_info['env']['DUNEDAQ_PARTITION'] = partition
 
-            self.pm.boot(
+            self.log.info('booting task starting')
+            task = Task(
+                function = 'boot',
                 boot_info = boot_info,
                 timeout = timeout,
-                exit_when_parent_dies = event.kwargs.get('exit_when_parent_dies', True),
+                exit_when_parent_dies = True,
                 conf_loc = self.cfgmgr.get_conf_location(for_apps=True)
             )
+            self.pm_task_enqueuer.enqueue_synchronous(task)
+            self.log.info('booting task ending')
+            # self.pm.boot(
+            #     boot_info = boot_info,
+            #     timeout = timeout,
+            #     exit_when_parent_dies = event.kwargs.get('exit_when_parent_dies', True),
+            #     conf_loc = self.cfgmgr.get_conf_location(for_apps=True)
+            # )
 
         except Exception as e:
             self.log.exception(e)
@@ -324,7 +343,9 @@ class SubsystemNode(StatefulNode):
         thread_pinning = scripts.get('thread_pinning') if scripts else None
         if thread_pinning:
             try:
-                self.pm.execute_script(thread_pinning)
+                # self.pm.execute_script(thread_pinning)
+                task = Task('execute_script', thread_pinning)
+                self.pm_task_enqueuer.enqueue_synchronous(task)
             except Exception as e:
                 self.log.error(f'Couldn\'t execute the thread pinning scripts: {str(e)}')
 
@@ -334,8 +355,12 @@ class SubsystemNode(StatefulNode):
         if self.listener:
             self.listener.terminate()
         if self.pm:
-            self.pm.terminate()
+            task = Task('terminate')
+            self.pm_task_enqueuer.enqueue_synchronous(task)
+            # self.pm.terminate()
             self.pm = None
+            self.pm_task_enqueuer.stop()
+            self.pm_task_enqueuer = None
         self.log.debug(f"DONE Terminate logic of {self.name}")
 
     def on_enter_terminate_ing(self, _) -> NoReturn:
