@@ -13,7 +13,7 @@ You can also do the equivalent by doing `ps a|grep daq_application`, note the fi
                     RuntimeError: Cannot create a response listener!!                                           
            ERROR    json0 went to error!                                                     statefulnode.py:225
 ```
-In this case, you're probably running on the NP04 cluster. If so, you can quit nanorc, and run:
+In this case, you're probably running on the NP04 cluster and you have enabled the web proxy. If so, you can quit nanorc, and run:
 ```bash
 source ~np04daq/bin/web_proxy.sh -u
 ```
