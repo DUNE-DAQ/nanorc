@@ -8,11 +8,25 @@ You'll need to go on each of the servers where the applications where running, r
 You can also do the equivalent by doing `ps a|grep daq_application`, note the first number of the line and run `kill <the-number>`.
 
 ## NanoRC can't start the response listener, what do I do?
-You probably are running on the NP04 cluster with the web proxy. You can quit nanorc, and run:
+...i.e., you see an error message which looks like the following:
+```
+                    RuntimeError: Cannot create a response listener!!                                           
+           ERROR    json0 went to error!                                                     statefulnode.py:225
+```
+In this case, you're probably running on the NP04 cluster. If so, you can quit nanorc, and run:
 ```bash
 source ~np04daq/bin/web_proxy.sh -u
 ```
-and start again.
+Note that if you do start again right away after `source`ing the web proxy file, you may encounter a message such as
+```
+Couldn't execute the function boot on the object, reason: The port <hostname>:<portnumber> is already open, likely by another application, cannot continue
+```
+This port in question is very likely one which is still open from the connectivity service which was started within your previous `nanorc` session. At any rate, you can find what that application is (if it's yours) by going to the host in question and running
+```
+netstat -tulpn | grep <portnumber>
+```
+where the second column will give you the PID of the process. Kill it, and when you've confirmed that it's gone, try again. 
+
 
 ## NanoRC won't boot my apps?
 There are many reasons why this could happen, here are the 2 most common:
