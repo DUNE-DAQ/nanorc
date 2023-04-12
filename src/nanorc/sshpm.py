@@ -171,7 +171,9 @@ class SSHProcessManager(object):
             "APP_WD": os.getcwd(),
             "CONF_LOC": conf_loc,
         }
-
+        if is_port_open(host, app_conf["port"]):
+            raise RuntimeError(f'The port {host}:{app_conf["port"]} is already open, likely by another application, cannot continue')
+        
         if 'update-env' in app_conf:
             for k,v in app_conf['update-env'].items():
                 self.boot_info["env"][k]=v.format(**env_formatter)
@@ -269,7 +271,7 @@ class SSHProcessManager(object):
                 )
                 self.watch(srv_name, proc)
                 desc.proc = proc
-
+                
         for app_name, app_conf in apps.items():
             desc=self.setup_app(app_name, app_conf, conf_loc)
             self.apps[app_name] = desc
@@ -293,7 +295,7 @@ class SSHProcessManager(object):
             )
             self.watch(name, proc)
             desc.proc = proc
-
+        
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -389,9 +391,13 @@ class SSHProcessManager(object):
             pid_file = f"{name}_{desc.port}.pid"
             if os.path.exists(pid_file):
                 with open(pid_file, "r") as pf:
-                    pid=pf.read()
+                    pid=pf.read().replace('\n', '')
                 ssh_args=desc.ssh_args + [f"kill {pid}"]
-                sh.ssh(*ssh_args)
+                try:
+                    sh.ssh(*ssh_args)
+                except Exception as e:
+                    self.log.error(f'Couldn\'t kill the connectivity service on pid {pid}, it may already be dead?')
+                    
         self.services = {}
     def kill(self):
         for name, desc in self.apps.items():
@@ -410,9 +416,12 @@ class SSHProcessManager(object):
             pid_file = f"{name}_{desc.port}.pid"
             if os.path.exists(pid_file):
                 with open(pid_file, "r") as pf:
-                    pid=pf.read()
+                    pid=pf.read().replace('\n', '')
                 ssh_args=desc.ssh_args + [f"kill -9 {pid}"]
-                sh.ssh(*ssh_args)
+                try:
+                    sh.ssh(*ssh_args)
+                except Exception as e:
+                    self.log.error(f'Couldn\'t kill the connectivity service on pid {pid}, it may already be dead?')
         self.services = {}
 
 # Cleanup before exiting

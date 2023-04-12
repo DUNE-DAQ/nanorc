@@ -2,7 +2,7 @@
 
 Poor man's Run Control for DUNE DAQ applications
 
-Pssst! Check out the FAQ [here](FAQ.md)!
+If you're already familiar with nanorc and wish to troubleshoot a problem, skip to the FAQ [here](FAQ.md)
 
 ## How to run me
 
