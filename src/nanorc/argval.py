@@ -79,7 +79,7 @@ def validate_conf(ctx, param, top_cfg):
     if confurl.scheme == 'db':
         return confurl
 
-    raise click.BadParameter(f"TOP_CFG should either be a directory, a json file, or a config service utility with the form confservice://the_conf_name?1 (where the ?1 at the end is optionnal and represents the version). You provided: '{top_cfg}'")
+    raise click.BadParameter(f"TOP_CFG should either be a directory, a json file, or a config service utility with the form db://the_conf_name?1 (where the ?1 at the end is optional and represents the version). You provided: '{top_cfg}'")
 
 
 
