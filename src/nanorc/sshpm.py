@@ -176,13 +176,13 @@ class SSHProcessManager(object):
         
         if 'update-env' in app_conf:
             for k,v in app_conf['update-env'].items():
-                self.boot_info["env"][k]=v.format(**env_formatter)
+                self.boot_info["env"][k]=v.format(**env_formatter) if type(v) is str else v
 
         exec_vars_cp = cp.deepcopy(self.boot_info['exec'][app_conf['exec']]['env'])
         exec_vars = {}
 
         for k,v in exec_vars_cp.items():
-            exec_vars[k]=v.format(**env_formatter)
+            exec_vars[k]=v.format(**env_formatter) if type(v) is str else v
 
         app_vars = {}
         app_vars.update(env_vars)
