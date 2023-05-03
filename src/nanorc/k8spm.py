@@ -187,14 +187,16 @@ class K8SProcessManager(object):
                 protocol = "TCP",
                 container_port = cmd_port,
             )]
+
         for c in connections:
             uri = urlparse(c['uri'])
-            if uri.hostname != "0.0.0.0": continue
+            if uri.hostname != app_name: continue
+            name = c['id']['uid'].replace(".", "").replace("_", "").replace("$","").replace("{", "").replace("}", "")[-15:]
+            self.log.debug(f'Opening port {uri.port} (named {name}) in {app_name}\'s container')
 
             ret += [
                 client.V1ContainerPort(
-                    # My sympathy for the nwmgr took yet another hit here
-                    name = c['uid'].lower().replace(".", "").replace("_", "").replace("$","").replace("{", "").replace("}", "")[-15:],
+                    name = name,
                     protocol = uri.scheme.upper(),
                     container_port = uri.port,
                 )]
@@ -212,12 +214,13 @@ class K8SProcessManager(object):
 
         for c in connections:
             uri = urlparse(c['uri'])
-            if uri.hostname != "0.0.0.0": continue
+            if uri.hostname != app_name: continue
+            name = c['id']['uid'].replace(".", "").replace("_", "").replace("$","").replace("{", "").replace("}", "")[-15:]
+            self.log.debug(f'Creating service {uri.port} (named {name}) in {app_name}\'s container')
 
             ret += [
                 client.V1ServicePort(
-                    # My sympathy for the nwmgr took yet another hit here
-                    name = c['uid'].lower().replace(".", "").replace("_", "").replace("$","").replace("{", "").replace("}", "")[-15:],
+                    name = name,
                     protocol = uri.scheme.upper(),
                     target_port = uri.port,
                     port = uri.port,
@@ -345,8 +348,8 @@ class K8SProcessManager(object):
             namespace: str,
             run_as: dict = None):
 
-        info_str  = f"Creating \"{namespace}:{name}\" daq application"
-        debug_str = "(image: \"{app_boot_info['image']}\""
+        info_str  = f"Creating \"{namespace}:{name}\" DAQ App"
+        debug_str = f"image: \"{app_boot_info['image']}\""
         if app_boot_info['resources']:
             debug_str += f' resources: {app_boot_info["resources"]}'
         if app_boot_info['mounted_dirs']:
@@ -357,7 +360,6 @@ class K8SProcessManager(object):
             debug_str+=f' affinity={app_boot_info["affinity"]}'
         if app_boot_info['anti-affinity']:
             debug_str+=f' anti-affinity={app_boot_info["anti-affinity"]}'
-        debug_str+=')'
 
         use_felix = False
         for k in app_boot_info['resources']:
@@ -511,7 +513,7 @@ class K8SProcessManager(object):
             )
         )
 
-        self.log.debug(pod)
+        #self.log.debug(pod)
 
         # Creation of the pod in specified namespace
         try:
@@ -531,7 +533,7 @@ class K8SProcessManager(object):
                 selector = {"app": app_label}
             )
         )  # V1Service
-        self.log.debug(service)
+        #self.log.debug(service)
 
         try:
             resp = self._core_v1_api.create_namespaced_service(namespace, service)
@@ -560,7 +562,7 @@ class K8SProcessManager(object):
             )
         )  # V1Service
 
-        self.log.debug(service)
+        #self.log.debug(service)
         try:
             resp = self._core_v1_api.create_namespaced_service(namespace, service)
         except Exception as e:
@@ -583,7 +585,7 @@ class K8SProcessManager(object):
                 )
             ]
         )
-        self.log.debug(endpoints)
+        #self.log.debug(endpoints)
 
         try:
             self._core_v1_api.create_namespaced_endpoints(namespace, endpoints)
