@@ -202,6 +202,24 @@ def run_stop(ctx, obj, wait:int, **kwargs):
         cmd_args = kwargs
     )
 
+@click.command('stop_run')
+@accept_wait()
+@add_run_end_parameters()
+@click.pass_obj
+@click.pass_context
+def stop_run(ctx, obj, wait:int, **kwargs):
+    obj.console.print('[yellow]\'stop_run\' is now deprecated, use \'run-stop\' instead[/yellow]')
+    execute_cmd_sequence(
+        ctx = ctx,
+        rc = obj.rc,
+        command = 'run_stop',
+        force = kwargs['force'],
+        wait = wait,
+        cmd_args = kwargs
+    )
+    obj.console.print('[yellow]\'stop_run\' is now deprecated, use \'run-stop\' instead[/yellow]')
+
+
 @click.command()
 @accept_path()
 @click.option('--force', default=False, is_flag=True)
@@ -324,6 +342,7 @@ def add_common_cmds(shell, end_of_run_cmds=True):
     if end_of_run_cmds:
         shell.add_command(drain_dataflow      , 'drain_dataflow'      )
         shell.add_command(run_stop            , 'run-stop'            )
+        shell.add_command(stop_run            , 'stop_run'            )
         shell.add_command(shutdown            , 'shutdown'            )
     # shell.add_command(ls_thread       , 'ls_thread'       )
 

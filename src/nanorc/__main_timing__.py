@@ -163,7 +163,7 @@ def timingcli(ctx, obj, traceback, pm, loglevel, log_path, cfg_dumpdir, kerberos
         ctx.exit(rc.return_code)
 
 
-from nanorc.common_commands import status, boot, conf, scrap, wait, terminate, start_shell, run_stop, shutdown
+from nanorc.common_commands import status, boot, conf, scrap, wait, terminate, start_shell, run_stop, stop_run, shutdown
 timingcli.add_command(status, 'status')
 timingcli.add_command(boot, 'boot')
 timingcli.add_command(conf, 'conf')
@@ -172,6 +172,7 @@ timingcli.add_command(wait, 'wait')
 timingcli.add_command(terminate, 'terminate')
 timingcli.add_command(start_shell, 'shell')
 timingcli.add_command(run_stop, 'run-stop')
+timingcli.add_command(stop_run, 'stop_run')
 timingcli.add_command(shutdown, 'shutdown')
 
 @timingcli.command('start')
@@ -206,6 +207,15 @@ def run_start(ctx, obj, wait:int, timeout):
         }
     )
 
+@timingcli.command('start_run')
+@accept_timeout(None)
+@accept_wait()
+@click.pass_obj
+@click.pass_context
+def start_run(ctx, obj, wait:int, timeout):
+    obj.console.print('[yellow]\'start_run\' is now deprecated, use \'run-start\' instead[/yellow]')
+    ctx.forward(run_start)
+    obj.console.print('[yellow]\'start_run\' is now deprecated, use \'run-start\' instead[/yellow]')
 
 @timingcli.command('stop')
 @accept_timeout(None)

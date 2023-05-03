@@ -252,6 +252,15 @@ def run_start(ctx, obj, wait:int, **kwargs):
         cmd_args = start_defaults_overwrite(kwargs)
     )
 
+@cli.command('start_run')
+@add_run_start_parameters()
+@accept_wait()
+@click.pass_obj
+@click.pass_context
+def start_run(ctx, obj, wait:int, **kwargs):
+    obj.console.print('[yellow]\'start_run\' is now deprecated, use \'run-start\' instead[/yellow]')
+    ctx.forward(run_start)
+    obj.console.print('[yellow]\'start_run\' is now deprecated, use \'run-start\' instead[/yellow]')
 
 @cli.command('start')
 @add_run_start_parameters()
