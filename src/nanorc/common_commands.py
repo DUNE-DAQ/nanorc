@@ -187,16 +187,16 @@ def shutdown(ctx, obj, wait:int, **kwargs):
         cmd_args = kwargs
     )
 
-@click.command()
+@click.command('run-stop')
 @accept_wait()
 @add_run_end_parameters()
 @click.pass_obj
 @click.pass_context
-def stop_run(ctx, obj, wait:int, **kwargs):
+def run_stop(ctx, obj, wait:int, **kwargs):
     execute_cmd_sequence(
         ctx = ctx,
         rc = obj.rc,
-        command = 'stop_run',
+        command = 'run_stop',
         force = kwargs['force'],
         wait = wait,
         cmd_args = kwargs
@@ -323,7 +323,7 @@ def add_common_cmds(shell, end_of_run_cmds=True):
     shell.add_command(start_shell         , 'start_shell'         )
     if end_of_run_cmds:
         shell.add_command(drain_dataflow      , 'drain_dataflow'      )
-        shell.add_command(stop_run            , 'stop_run'            )
+        shell.add_command(run_stop            , 'run-stop'            )
         shell.add_command(shutdown            , 'shutdown'            )
     # shell.add_command(ls_thread       , 'ls_thread'       )
 

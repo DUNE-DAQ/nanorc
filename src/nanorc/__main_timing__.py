@@ -154,7 +154,7 @@ def timingcli(ctx, obj, traceback, pm, loglevel, log_path, cfg_dumpdir, kerberos
     if web:
         rest_thread.join()
         webui_thread.join()
-    
+
     if tui:
         from .tui import NanoRCTUI
         tui = NanoRCTUI(host=host, rest_port=rest_port, timeout=rc.timeout, banner=Panel.fit(grid))
@@ -163,7 +163,7 @@ def timingcli(ctx, obj, traceback, pm, loglevel, log_path, cfg_dumpdir, kerberos
         ctx.exit(rc.return_code)
 
 
-from nanorc.common_commands import status, boot, conf, scrap, wait, terminate, start_shell, stop_run, shutdown
+from nanorc.common_commands import status, boot, conf, scrap, wait, terminate, start_shell, run_stop, shutdown
 timingcli.add_command(status, 'status')
 timingcli.add_command(boot, 'boot')
 timingcli.add_command(conf, 'conf')
@@ -171,7 +171,7 @@ timingcli.add_command(scrap, 'scrap')
 timingcli.add_command(wait, 'wait')
 timingcli.add_command(terminate, 'terminate')
 timingcli.add_command(start_shell, 'shell')
-timingcli.add_command(stop_run, 'stop_run')
+timingcli.add_command(run_stop, 'run-stop')
 timingcli.add_command(shutdown, 'shutdown')
 
 @timingcli.command('start')
@@ -183,17 +183,17 @@ def start(ctx, obj, timeout:int):
     check_rc(ctx,obj.rc)
     obj.rc.status()
 
-@timingcli.command('start_run')
+@timingcli.command('run-start')
 @accept_timeout(None)
 @accept_wait()
 @click.pass_obj
 @click.pass_context
-def start_run(ctx, obj, wait:int, timeout):
+def run_start(ctx, obj, wait:int, timeout):
 
     execute_cmd_sequence(
         ctx = ctx,
         rc = obj.rc,
-        command = 'start_run',
+        command = 'run_start',
         wait = wait,
         force = False,
         cmd_args = {

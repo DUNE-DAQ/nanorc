@@ -235,18 +235,18 @@ def start_defaults_overwrite(kwargs):
     return kwargs
 
 
-@cli.command('start_run')
+@cli.command('run-start')
 @add_run_start_parameters()
 @accept_wait()
 @click.pass_obj
 @click.pass_context
-def start_run(ctx, obj, wait:int, **kwargs):
+def run_start(ctx, obj, wait:int, **kwargs):
     obj.rc.run_num_mgr.set_run_number(kwargs['run_num'])
     kwargs['node_path'] = None
     execute_cmd_sequence(
         ctx = ctx,
         rc = obj.rc,
-        command = 'start_run',
+        command = 'run_start',
         wait = wait,
         force = False,
         cmd_args = start_defaults_overwrite(kwargs)

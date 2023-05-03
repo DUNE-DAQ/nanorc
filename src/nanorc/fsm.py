@@ -17,11 +17,11 @@ class FSM(Machine):
                 # { 'trigger': 'to_error',  'source': '*',           'dest': 'error'      }
             ]
             self.command_sequences = {
-                'start_run': [
+                'run_start': [
                     {'cmd': 'conf',  'optional': True },
                     {'cmd': 'start', 'optional': False},
                 ],
-                'stop_run' : [
+                'run_stop' : [
                     {'cmd': 'stop', 'optional': False},
                 ],
                 'shutdown' : [
@@ -52,12 +52,12 @@ class FSM(Machine):
                 # { 'trigger': 'to_error',             'source': '*',                       'dest': 'error'                  }
             ]
             self.command_sequences = {
-                'start_run': [
+                'run_start': [
                     {'cmd': 'conf',            'optional': True },
                     {'cmd': 'start',           'optional': False},
                     {'cmd': 'enable_triggers', 'optional': False}
                 ],
-                'stop_run' : [
+                'run_stop' : [
                     {'cmd': 'disable_triggers',     'optional': True },
                     {'cmd': 'drain_dataflow',       'optional': False},
                     {'cmd': 'stop_trigger_sources', 'optional': False},

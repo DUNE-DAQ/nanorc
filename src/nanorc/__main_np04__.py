@@ -210,7 +210,7 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
         tui = NanoRCTUI(host=host, rest_port=rest_port, timeout=rc.timeout, banner=Panel.fit(grid))
         tui.run()
         cleanup_rc()
-        ctx.exit(rc.return_code) 
+        ctx.exit(rc.return_code)
 
 @np04cli.command('change_user')
 @click.argument('user', type=str, default=None)
@@ -262,19 +262,19 @@ def is_authenticated():
     return True
 
 
-@np04cli.command('start_run')
+@np04cli.command('run-start')
 @add_run_start_parameters()
 @accept_wait()
 @click.pass_obj
 @click.pass_context
-def start_run(ctx, obj, wait:int, **kwargs):
+def run_start(ctx, obj, wait:int, **kwargs):
     if not is_authenticated(): return
 
     kwargs['node_path'] = None
     execute_cmd_sequence(
         ctx = ctx,
         rc = obj.rc,
-        command = 'start_run',
+        command = 'run_start',
         wait = wait,
         force = False,
         cmd_args = start_defaults_overwrite(kwargs)
@@ -300,18 +300,18 @@ def message(obj, message):
     obj.rc.message(message)
 
 
-@np04cli.command('stop_run')
+@np04cli.command('run-stop')
 @accept_wait()
 @add_run_end_parameters()
 @click.pass_obj
 @click.pass_context
-def stop_run(ctx, obj, wait:int, **kwargs):
+def run_stop(ctx, obj, wait:int, **kwargs):
     if not is_authenticated(): return
 
     execute_cmd_sequence(
         ctx = ctx,
         rc = obj.rc,
-        command = 'stop_run',
+        command = 'run_stop',
         force = kwargs['force'],
         wait = wait,
         cmd_args = kwargs
