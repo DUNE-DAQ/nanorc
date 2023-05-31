@@ -21,6 +21,14 @@ def dict_raise_on_duplicates(ordered_pairs):
             d[k]=v
     return d
 
+class ConfigManagerCreationFailed(Exception):
+    """The creation of a configuration node failed """
+    pass
+    def __init__(self, node):
+        self.node = node
+        super().__init__(f"Failded to build configuration manager for node '{node}'")
+
+
 class TreeBuilder:
     def extract_json_to_nodes(self, js, mother, fsm_conf) -> StatefulNode:
         for n,d in js.items():
@@ -34,14 +42,19 @@ class TreeBuilder:
                 self.extract_json_to_nodes(d, child, fsm_conf = fsm_conf)
 
             elif isinstance(d, ParseResult):
+                try:
+                    cfgmgr = ConfigManager(
+                            log = self.log,
+                            resolve_hostname = self.resolve_hostname,
+                            config = d,
+                            port_offset = self.port_offset+self.subsystem_port_offset)
+                except Exception as e:
+                    raise ConfigManagerCreationFailed(n) from e
+                
                 node = SubsystemNode(
                     name = n,
                     log = self.log,
-                    cfgmgr = ConfigManager(
-                        log = self.log,
-                        resolve_hostname = self.resolve_hostname,
-                        config = d,
-                        port_offset = self.port_offset+self.subsystem_port_offset),
+                    cfgmgr = cfgmgr,
                     console=self.console,
                     fsm_conf = fsm_conf,
                     parent = mother)
