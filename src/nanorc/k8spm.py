@@ -782,6 +782,16 @@ class K8SProcessManager(object):
                 "connections"     : self.connections.get(app_name, []),
             }
 
+            from urllib.parse import urlparse
+            conf = urlparse(conf_loc)
+            if conf.scheme == 'file':
+                app_boot_info['mounted_dirs'] += [{
+                    'in_pod_location': conf.path,
+                    'name': 'confdir',
+                    'read_only': True,
+                    'physical_location': conf.path
+                }]
+
             if rte_script:
                 unwanted_env = ['PATH', 'LD_LIBRARY_PATH', 'CET_PLUGIN_PATH','DUNEDAQ_SHARE_PATH']
                 for var in unwanted_env:
