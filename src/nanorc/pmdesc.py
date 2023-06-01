@@ -63,6 +63,7 @@ class PMFactory:
             return K8SProcessManager(
                 console = self.console,
                 connections = connections,
+                log_path = event.kwargs.get('log_path'),
                 cluster_config = event.kwargs['pm']
             )
         else:

@@ -65,7 +65,7 @@ class K8sProcess(object):
 
 
 class K8SProcessManager(object):
-    def __init__(self, console: Console, cluster_config, connections):
+    def __init__(self, console: Console, cluster_config, connections, log_path=None):
         """A Kubernetes Process Manager
 
         Args:
@@ -73,6 +73,7 @@ class K8SProcessManager(object):
         """
         super(K8SProcessManager, self).__init__()
         self.log = logging.getLogger(__name__)
+        self.log_path = log_path
         self.connections = connections
         self.mount_cvmfs = True
         self.console = console
@@ -782,7 +783,37 @@ class K8SProcessManager(object):
                 "connections"     : self.connections.get(app_name, []),
             }
 
+            if not self.log_path:
+                self.log_path = f'{os.getcwd()}/logs'
+                if not os.path.exists(self.log_path):
+                    os.mkdir(self.log_path)
+
+            app_boot_info['mounted_dirs'] += [{
+                'in_pod_location': '/logs',
+                'name': 'logdir',
+                'read_only': False,
+                'physical_location': self.log_path
+            }]
+            from datetime import datetime
+
+            now = datetime.now() # current date and time
+            date_time = now.strftime("%Y-%m-%d_%H%M%S")
+            log_file_localhost = f'log_{date_time}_{app_name}_{app_conf["port"]}.txt'
+
             from urllib.parse import urlparse
+            trace = app_env.get('TRACE_FILE')
+            if trace:
+                trace_dir = f'{os.getcwd()}/trace'
+                if not os.path.exists(trace_dir): os.mkdir(trace_dir)
+                trace_uri = urlparse(trace)
+                tpath = os.path.dirname(trace_uri.path)
+                app_boot_info['mounted_dirs'] += [{
+                    'in_pod_location': tpath,
+                    'name': 'tracedir',
+                    'read_only': False,
+                    'physical_location': trace_dir
+                }]
+
             conf = urlparse(conf_loc)
             if conf.scheme == 'file':
                 app_boot_info['mounted_dirs'] += [{
@@ -809,6 +840,7 @@ class K8SProcessManager(object):
                 }]
                 app_boot_info['command'] = ['/bin/bash', '-c']
                 app_boot_info['args'] = [f'which daq_application; ldd `which daq_application`; {app_cmd[0]} {" ".join(app_args)}']
+                app_boot_info['args'] = ["{ "+app_boot_info['args'][0] +"; } &> /logs/"+log_file_localhost]
 
             if self.cluster_config.is_kind:
                 # discard most of the nice features of k8s if we use kind
