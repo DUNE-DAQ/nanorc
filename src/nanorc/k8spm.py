@@ -751,13 +751,6 @@ class K8SProcessManager(object):
             if not app_img:
                 raise RuntimeError("You need to specify an image in the configuration!")
 
-            ## ? Maybe?
-            unwanted_env = ['PATH', 'LD_LIBRARY_PATH', 'CET_PLUGIN_PATH','DUNEDAQ_SHARE_PATH']
-            for var in unwanted_env:
-                if var in app_env:
-                    del app_env[var]
-
-
             ## This is meant to mean:
             # if the image is of form pocket_dune_bla (without version postfix)
             # or if the first letter of the version starts with N
@@ -788,10 +781,24 @@ class K8SProcessManager(object):
                 "node-selection"  : app_conf.get('node-selection', []),
                 "connections"     : self.connections.get(app_name, []),
             }
+
             if rte_script:
-                # pffff
+                unwanted_env = ['PATH', 'LD_LIBRARY_PATH', 'CET_PLUGIN_PATH','DUNEDAQ_SHARE_PATH']
+                for var in unwanted_env:
+                    if var in app_env:
+                        del app_env[var]
                 app_boot_info['command'] = ['/bin/bash', '-c']
                 app_boot_info['args'] = [f'source {rte_script} && {app_cmd[0]} {" ".join(app_args)}']
+            else:
+                install_dir = os.getenv('DBT_INSTALL_DIR')
+                app_boot_info['mounted_dirs'] += [{
+                    'in_pod_location': install_dir,
+                    'name': 'swdir',
+                    'read_only': True,
+                    'physical_location': install_dir
+                }]
+                app_boot_info['command'] = ['/bin/bash', '-c']
+                app_boot_info['args'] = [f'which daq_application; ldd `which daq_application`; {app_cmd[0]} {" ".join(app_args)}']
 
             if self.cluster_config.is_kind:
                 # discard most of the nice features of k8s if we use kind
