@@ -735,7 +735,8 @@ class K8SProcessManager(object):
             exec_vars = {}
 
             for k,v in exec_vars_cp.items():
-                exec_vars[k]=v.format(**env_formatter)
+                exec_vars[k]=v.format(**env_formatter) if type(v) is str else v
+
 
             app_env = {}
             app_env.update(env_vars)
