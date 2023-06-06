@@ -47,7 +47,7 @@ class TreeBuilder:
                             log = self.log,
                             resolve_hostname = self.resolve_hostname,
                             config = d,
-                            session = self.session
+                            session = self.session,
                             port_offset = self.port_offset+self.subsystem_port_offset)
                 except Exception as e:
                     raise ConfigManagerCreationFailed(n) from e
