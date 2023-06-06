@@ -31,7 +31,7 @@ def parse_string(string_to_format:str, dico:dict={}) -> str:
 
 class SessionNamespaceIncompatible(Exception):
     def __init__(self, namespace, session):
-        super().__init__(f'Session ({session}) and namespace ({namespace}) incompatible')
+        super().__init__(f'Session "{session}" and namespace "{namespace}" (in your configuration) incompatible ')
 
 class ConfigManager:
 
