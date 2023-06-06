@@ -38,7 +38,7 @@ class TreeBuilder:
                     parent=mother,
                     console=self.console,
                     fsm_conf = fsm_conf)
-                
+
                 self.extract_json_to_nodes(d, child, fsm_conf = fsm_conf)
 
             elif isinstance(d, ParseResult):
@@ -47,10 +47,11 @@ class TreeBuilder:
                             log = self.log,
                             resolve_hostname = self.resolve_hostname,
                             config = d,
+                            session = self.session
                             port_offset = self.port_offset+self.subsystem_port_offset)
                 except Exception as e:
                     raise ConfigManagerCreationFailed(n) from e
-                
+
                 node = SubsystemNode(
                     name = n,
                     log = self.log,
@@ -69,14 +70,15 @@ class TreeBuilder:
             ret.update(node.get_custom_commands())
         return ret
 
-    def __init__(self, log, top_cfg, resolve_hostname, fsm_conf, console, port_offset):
+    def __init__(self, log, top_cfg, resolve_hostname, fsm_conf, console, port_offset, session):
+        self.session = session
         self.log = log
         self.resolve_hostname = resolve_hostname
         self.fsm_conf = fsm_conf
         self.port_offset = port_offset
         self.subsystem_port_offset = 0
         self.subsystem_port_increment = 50
-        
+
         if top_cfg.scheme == 'file':
             apparatus_id = Path(top_cfg.path).name
             data = {
