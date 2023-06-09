@@ -100,6 +100,10 @@ def svc(json_dir, name, port, verbose):
   from pathlib import Path
 
   conf_data[name] = get_json_recursive(Path(json_dir))
+    header = {
+    'Accept' : 'application/json',
+    'Content-Type':'application/json'
+   }
 
   start_service(port)
 
