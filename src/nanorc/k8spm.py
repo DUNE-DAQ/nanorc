@@ -788,10 +788,19 @@ class K8SProcessManager(object):
                 "node-selection"  : app_conf.get('node-selection', []),
                 "connections"     : self.connections.get(app_name, []),
             }
-            if rte_script:
-                # pffff
-                app_boot_info['command'] = ['/bin/bash', '-c']
-                app_boot_info['args'] = [f'source {rte_script} && {app_cmd[0]} {" ".join(app_args)}']
+
+            self.console.print(env_formatter)
+
+            new_dirs=[]
+            for md in app_boot_info["mounted_dirs"]:
+                dico = {k:(v.format(**env_formatter) if type(v) is str else v) for k,v in md.items()}
+                new_dirs += [dico]
+
+            app_rte_script = rte_script.format(**env_formatter) if type(rte_script) is str else rte_script
+
+            app_boot_info["mounted_dirs"] = new_dirs
+            app_boot_info['command'] = ['/bin/bash', '-c']
+            app_boot_info['args'] = [f'source {app_rte_script} && {app_cmd[0]} {" ".join(app_args)}']
 
             if self.cluster_config.is_kind:
                 # discard most of the nice features of k8s if we use kind
