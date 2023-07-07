@@ -28,9 +28,14 @@ def parse_string(string_to_format:str, dico:dict={}) -> str:
 
     return string_to_format
 
+
+class SessionNamespaceIncompatible(Exception):
+    def __init__(self, namespace, session):
+        super().__init__(f'Session "{session}" and namespace "{namespace}" (in your configuration) incompatible ')
+
 class ConfigManager:
 
-    def __init__(self, log, config, resolve_hostname=True, port_offset=0):
+    def __init__(self, log, config, resolve_hostname=True, port_offset=0, session=None):
         super().__init__()
         self.conf_dirs = []
         self.resolve_hostname = resolve_hostname
@@ -97,6 +102,11 @@ class ConfigManager:
                 port_offset = self.port_offset
             )
             self.custom_commands = self._get_custom_commands_from_dirs(conf_path)
+
+        if session and self.boot.get('k8s_namespace', None):
+            if session != self.boot['k8s_namespace']:
+                raise SessionNamespaceIncompatible(self.boot['k8s_namespace'], session)
+
 
     def _import_data(self, cfg_path: dict) -> None:
         data = {}

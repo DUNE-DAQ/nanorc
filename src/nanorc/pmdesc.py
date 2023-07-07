@@ -56,7 +56,7 @@ class PMFactory:
                 connections[app] = []
                 # please hide all this configuration details from me!
                 for connection in data['init']['connections']:
-                    if connection["service_type"] == "kQueue": # this is burnin my eyes
+                    if connection["connection_type"] == "kQueue": # this is burnin my eyes
                         continue
                     connections[app].append(connection)
 

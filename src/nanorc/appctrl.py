@@ -232,9 +232,11 @@ class AppCommander:
 
         if not self.proxy:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(1)
         else:
             s = socks.socksocket(socket.AF_INET, socket.SOCK_STREAM)
             s.set_proxy(socks.SOCKS5, self.proxy[0], self.proxy[1])
+            s.settimeout(1)
         try:
             s.connect((self.app_host, self.app_port))
             s.shutdown(2)

@@ -58,7 +58,9 @@ class NanoRC:
             console=self.console,
             fsm_conf=fsm_cfg,
             resolve_hostname = pm.use_sshpm(),
-            port_offset=self.port_offset)
+            port_offset=self.port_offset,
+            session = partition_label,
+        )
         self.partition = partition_label
 
         self.custom_cmd = self.cfg.get_custom_commands()

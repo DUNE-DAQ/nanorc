@@ -21,6 +21,14 @@ def dict_raise_on_duplicates(ordered_pairs):
             d[k]=v
     return d
 
+class ConfigManagerCreationFailed(Exception):
+    """The creation of a configuration node failed """
+    pass
+    def __init__(self, node):
+        self.node = node
+        super().__init__(f"Failded to build configuration manager for node '{node}'")
+
+
 class TreeBuilder:
     def extract_json_to_nodes(self, js, mother, fsm_conf) -> StatefulNode:
         for n,d in js.items():
@@ -30,18 +38,24 @@ class TreeBuilder:
                     parent=mother,
                     console=self.console,
                     fsm_conf = fsm_conf)
-                
+
                 self.extract_json_to_nodes(d, child, fsm_conf = fsm_conf)
 
             elif isinstance(d, ParseResult):
+                try:
+                    cfgmgr = ConfigManager(
+                            log = self.log,
+                            resolve_hostname = self.resolve_hostname,
+                            config = d,
+                            session = self.session,
+                            port_offset = self.port_offset+self.subsystem_port_offset)
+                except Exception as e:
+                    raise ConfigManagerCreationFailed(n) from e
+
                 node = SubsystemNode(
                     name = n,
                     log = self.log,
-                    cfgmgr = ConfigManager(
-                        log = self.log,
-                        resolve_hostname = self.resolve_hostname,
-                        config = d,
-                        port_offset = self.port_offset+self.subsystem_port_offset),
+                    cfgmgr = cfgmgr,
                     console=self.console,
                     fsm_conf = fsm_conf,
                     parent = mother)
@@ -56,14 +70,15 @@ class TreeBuilder:
             ret.update(node.get_custom_commands())
         return ret
 
-    def __init__(self, log, top_cfg, resolve_hostname, fsm_conf, console, port_offset):
+    def __init__(self, log, top_cfg, resolve_hostname, fsm_conf, console, port_offset, session):
+        self.session = session
         self.log = log
         self.resolve_hostname = resolve_hostname
         self.fsm_conf = fsm_conf
         self.port_offset = port_offset
         self.subsystem_port_offset = 0
         self.subsystem_port_increment = 50
-        
+
         if top_cfg.scheme == 'file':
             apparatus_id = Path(top_cfg.path).name
             data = {
