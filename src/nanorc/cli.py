@@ -66,6 +66,14 @@ def updateLogLevel(loglevel):
         sh_command_logger = logging.getLogger(sh.__name__)
         # sh_command_logger.propagate = False
         sh_command_logger.setLevel(sh_command_level)
+
+        # Can't deal with that much logging, K8s!
+        import kubernetes.client.rest as k8srest
+        k8s_command_level = logging.INFO
+        k8s_command_logger = logging.getLogger(k8srest.__name__)
+        # sh_command_logger.propagate = False
+        k8s_command_logger.setLevel(k8s_command_level)
+
         for handler in sh_command_logger.handlers:
             handler.setLevel(sh_command_level)
 
