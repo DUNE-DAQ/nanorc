@@ -10,7 +10,7 @@ You can also do the equivalent by doing `ps a|grep daq_application`, note the fi
 ## NanoRC can't start the response listener, what do I do?
 ...i.e., you see an error message which looks like the following:
 ```
-                    RuntimeError: Cannot create a response listener!!                                           
+                    RuntimeError: Cannot create a response listener!!
            ERROR    json0 went to error!                                                     statefulnode.py:225
 ```
 In this case, you're probably running on the NP04 cluster and you have enabled the web proxy. If so, you can quit nanorc, and run:
@@ -25,7 +25,7 @@ This port in question is very likely one which is still open from the connectivi
 ```
 netstat -tulpn | grep <portnumber>
 ```
-where the second column will give you the PID of the process. Kill it, and when you've confirmed that it's gone, try again. 
+where the second column will give you the PID of the process. Kill it, and when you've confirmed that it's gone, try again.
 
 
 ## NanoRC won't boot my apps?
@@ -69,3 +69,33 @@ Run nanorc like this:
 DUNEDAQ_ERS_DEBUG_LEVEL=10 nanorc conf/ partition_name
 ```
 This will put all the `TLOG_DEBUG` printout of level <= 10 to print.
+
+
+## I want to send arbitrary data to my application
+For that, you can use expert commands. You need to write a json file with the following structure:
+```json
+{
+    "id": "command_id",
+    "entry_state": "initial",
+    "exit_state": "initial",
+    "data": {
+        ...some data
+    }
+}
+```
+- The `id` entry is the name of the command you have registered on your module (`register_command` calls for example [here](https://github.com/DUNE-DAQ/fdreadoutmodules/blob/24b728ce657842b3e06b621922a7a34229ec734c/plugins/FDDataLinkHandler.cpp#L80)).
+- `entry` and `exist` state are not necessary (or can be "any"). If you specify them, they need to be the _same_ and nanorc will check that the application is in a correct state.
+- `data` is the data you are sending to the application. I needs to be keyed with module, etc, just like any configuration data.
+
+Next, after booting your application with nanorc you can do:`
+```bash
+expert_command /config/config/app the-file.json
+```
+Where `the-file.json` is the file you have just created above.and `config/config/app` is the full path of the application you want to send this command to. So for example if you have started nanorc as such:`
+```bash
+nanorc config session-name
+```
+the expert command could be:`
+```bash
+expert_command /config/config/rulocalhosteth0 the-file.json
+```

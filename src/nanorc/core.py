@@ -34,7 +34,7 @@ moo.otypes.load_types('rcif/cmd.jsonnet')
 moo.otypes.load_types('cmdlib/cmd.jsonnet')
 import dunedaq.rcif.cmd as rccmd  # AddressedCmd,
 import dunedaq.cmdlib.cmd as cmd  # AddressedCmd,
-
+from .node import ApplicationNode
 
 
 class NanoRC:
@@ -166,7 +166,7 @@ class NanoRC:
                 schema="string",
                 dtype='string')
             # check this out, this is dumping raw json into a string
-            obj = cmd_data(json.dumps(data['data']))
+            obj = cmd_data(json.dumps(data.get('data', {})))
             d = cmd.Data(obj)
             data_cp = cp.deepcopy(data)
             data_cp['data'] = d
