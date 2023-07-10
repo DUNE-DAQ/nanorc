@@ -168,9 +168,18 @@ def get_json_recursive(path):
             data['boot'] = json.load(f)
 
     for filename in os.listdir(path):
-        if os.path.isfile(path/filename) and filename[-5:] == ".info":
+        if os.path.isfile(path/filename):
+            file_base, _ = os.path.splitext(filename)
             with open(path/filename,'r') as f:
-                data['config_info'] = json.load(f)
+                try:
+                    data[file_base] = json.load(f)
+                except:
+                    print(f'WARNING: ignoring non-json file: {path/filename}')
+        elif os.path.isdir(path/filename):
+            data[filename] = get_json_recursive(path/filename)
+
+    if not os.path.isdir(path/'data'):
+        return data
 
     for filename in os.listdir(path/"data"):
         with open(path/'data'/filename,'r') as f:
