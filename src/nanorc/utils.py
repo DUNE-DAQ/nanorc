@@ -6,6 +6,7 @@ from multiprocessing import Process
 from flask import request
 import logging
 
+
 class FlaskManager(threading.Thread):
     def __init__(self, name, app, port):
         threading.Thread.__init__(self)
@@ -157,6 +158,34 @@ class TaskEnqueuerThread(threading.Thread):
 
             time.sleep(0.1)
 
+def get_json_recursive(path):
+    import json, os
+
+    data = {}
+    boot = path/"boot.json"
+    if os.path.isfile(boot):
+        with open(boot,'r') as f:
+            data['boot'] = json.load(f)
+
+    for filename in os.listdir(path):
+        if os.path.isfile(path/filename) and filename[-5:] == ".info":
+            with open(path/filename,'r') as f:
+                data['config_info'] = json.load(f)
+
+    for filename in os.listdir(path/"data"):
+        with open(path/'data'/filename,'r') as f:
+            app_cmd = filename.replace('.json', '').split('_')
+            app = app_cmd[0]
+            cmd = "_".join(app_cmd[1:])
+
+            if not app in data:
+                data[app] = {
+                    cmd: json.load(f)
+                }
+            else:
+                data[app][cmd]=json.load(f)
+
+    return data
 
 def main():
     class some_object():
