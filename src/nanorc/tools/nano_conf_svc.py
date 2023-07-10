@@ -11,38 +11,13 @@ console = Console()
 def svc(json_dir, name, port):
     from nanorc.confserver import ConfServer
 
-    cs = ConfServer()
-    cs.start_conf_service(port)
-    while not cs.is_ready():
-        console.print("Confservice is not quite ready yet")
-        from time import sleep
-        sleep(0.1)
+    cs = ConfServer(port)
 
     console.print("Confservice is ready!")
 
-    #global conf_data
-    from nanorc.argval import validate_conf_name
-    from pathlib import Path
-    validate_conf_name({}, {}, name)
-    #session['conf_data'][name] = s
-    from nanorc.utils import get_json_recursive
-    from requests import post, get
-    header = {
-        'Accept' : 'application/json',
-        'Content-Type':'application/json'
-    }
+    cs.add_configuration(name, json_dir)
 
-    import json
-    try:
-        r = post(
-            f'http://0.0.0.0:{port}/configuration?name={name}',
-            headers=header,
-            data=json.dumps(get_json_recursive(Path(json_dir)))
-        )
-        console.print(f'Added \'{name}\' content:\n{r.json()}')
-    except Exception as e:
-        console.print(f'Added \'{name}\' insertion failed:\n{str(e)}')
-
+    from requests import get
     try:
         r = get(
             f'http://0.0.0.0:{port}/configuration?name={name}'

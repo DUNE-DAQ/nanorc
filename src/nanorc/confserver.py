@@ -36,11 +36,21 @@ class ConfigurationEndpoint(Resource):
         data = self.conf_data.get(name)
         return make_response(jsonify(data))
 
-class ConfServer:
-    def __init__(self):
-        self.log = logging.getLogger('nano-conf-service')
+class ConfigUploadFailed(Exception):
+    """Couldn't upload the configuration """
+    pass
+    def __init__(self, name, path):
+        self.name = name
+        self.path = path
+        super().__init__(f"Couldn't upload the configuration {self.name} in {self.path} to nanorc's internal configuration server")
 
-    def start_conf_service(self, port):
+class ConfServer:
+    def __init__(self, port):
+        self.log = logging.getLogger('nano-conf-service')
+        self._start_conf_service(port)
+        self.port = port
+
+    def _start_conf_service(self, port):
         from flask import Flask
         from flask_restful import Api
 
@@ -61,9 +71,33 @@ class ConfServer:
         )
 
         self.manager.start()
+        while not self.manager.is_ready():
+            from time import sleep
+            sleep(0.1)
 
-    def is_ready(self):
-        return self.manager.is_ready()
+    def add_configuration(self, name, path):
+        from nanorc.argval import validate_conf_name
+        from pathlib import Path
+        validate_conf_name({}, {}, name)
+        from requests import post
+        header = {
+            'Accept' : 'application/json',
+            'Content-Type':'application/json'
+        }
+        import json
+        from nanorc.utils import get_json_recursive
+
+        try:
+            r = post(
+                f'http://0.0.0.0:{self.port}/configuration?name={name}',
+                headers=header,
+                data=json.dumps(get_json_recursive(Path(path)))
+            )
+        except Exception as e:
+            raise ConfigUploadFailed(name, path) from e
+
+        if not r.json()['success']:
+            raise ConfigUploadFailed(name, path)
 
     def terminate(self):
         self.manager.stop()
