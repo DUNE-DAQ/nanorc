@@ -6,44 +6,9 @@ import click
 from rich.console import Console
 import importlib.resources as resources
 from nanorc import confdata
+from nanorc.argval import validate_conf_name
 
 console = Console()
-def validate_conf_name(ctx, param, conf_name):
-  import re
-
-  pat = re.compile(r'[a-z0-9]([-a-z0-9]*[a-z0-9])?')
-  ## Nanorc-12334 allowed (with hyphen) This is straight from k8s error message when the partition name isn't right
-  if not re.fullmatch(pat, conf_name):
-    raise click.BadParameter(f'Name {conf_name} should be alpha-numeric-hyphen! Make sure you name has the form [a-z0-9]([-a-z0-9]*[a-z0-9])?')
-  return conf_name
-
-def get_json_recursive(path):
-  data = {}
-  boot = path/"boot.json"
-  if os.path.isfile(boot):
-    with open(boot,'r') as f:
-      data['boot'] = json.load(f)
-
-  for filename in os.listdir(path):
-    if os.path.isfile(path/filename) and filename[-5:] == ".info":
-      with open(path/filename,'r') as f:
-        data['config_info'] = json.load(f)
-
-  for filename in os.listdir(path/"data"):
-    with open(path/'data'/filename,'r') as f:
-      app_cmd = filename.replace('.json', '').split('_')
-      app = app_cmd[0]
-      cmd = "_".join(app_cmd[1:])
-
-      if not app in data:
-        data[app] = {
-          cmd: json.load(f)
-        }
-      else:
-        data[app][cmd]=json.load(f)
-
-
-  return data
 
 
 @click.command()
@@ -61,7 +26,7 @@ def upload_conf(url, json_dir, name, verbose):
     docid=0
     version=0
     coll_name=0
-
+    from nanorc.utils import get_json_recursive
     conf_data = get_json_recursive(Path(json_dir))
 
     header = {
