@@ -157,8 +157,18 @@ class TaskEnqueuerThread(threading.Thread):
                 raise e
 
             time.sleep(0.1)
+def get_random_string(length):
+    import random
+    import string
+    letters = string.ascii_lowercase
+    return ''.join(random.choice(letters) for i in range(length))
 
 def get_json_recursive(path):
+    from pathlib import Path
+
+    if not path is Path:
+        path = Path(path)
+
     import json, os
 
     data = {}
@@ -176,6 +186,7 @@ def get_json_recursive(path):
                 except:
                     print(f'WARNING: ignoring non-json file: {path/filename}')
         elif os.path.isdir(path/filename):
+            if filename == 'data':continue # this one is special and handled below
             data[filename] = get_json_recursive(path/filename)
 
     if not os.path.isdir(path/'data'):
@@ -195,6 +206,26 @@ def get_json_recursive(path):
                 data[app][cmd]=json.load(f)
 
     return data
+
+
+def parse_string(string_to_format:str, dico:dict={}) -> str:
+    from string import Formatter
+    fieldnames = [fname for _, fname, _, _ in Formatter().parse(string_to_format) if fname]
+
+    if len(fieldnames)>1:
+        raise RuntimeError(f"Too many fields in string {string_to_format}")
+    elif len(fieldnames)==0:
+        return string_to_format
+
+    fieldname = fieldnames[0]
+    try:
+        string_to_format = string_to_format.format(**dico)
+    except Exception as e:
+        raise RuntimeError(f"Couldn't substitute {fieldname}. Aborting") from e
+
+    return string_to_format
+
+
 
 def main():
     class some_object():
