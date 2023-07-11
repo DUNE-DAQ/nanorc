@@ -79,7 +79,10 @@ class ConfigManager:
         attributes_for_k8s = [
             'boot.exec.daq_application_k8s',
         ]
-        attributes_for_ssh = []
+        attributes_for_ssh = [
+            'boot.hosts-ctrl',
+            'boot.hosts-data'
+        ]
 
         def key_present(key, jsond):
             keys = key.split('.')
