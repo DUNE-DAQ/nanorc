@@ -86,17 +86,13 @@ class ConfigManager:
 
         def key_present(key, jsond):
             keys = key.split('.')
-            print(keys)
-            print(jsond.keys())
             primary = keys[0]
 
             if len(keys) == 1:
                 ret = primary in jsond
-                print(f'keys == 1 {ret}')
                 return ret
 
             rest = '.'.join(keys[1:])
-            print(f'prim: {primary}, rest: {rest}')
             if primary in jsond:
                 return key_present(rest, jsond[primary])
             return False
