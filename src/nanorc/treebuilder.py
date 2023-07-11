@@ -37,18 +37,21 @@ class TreeBuilder:
                     name=n,
                     parent=mother,
                     console=self.console,
-                    fsm_conf = fsm_conf)
+                    fsm_conf = fsm_conf
+                )
 
                 self.extract_json_to_nodes(d, child, fsm_conf = fsm_conf)
 
             elif isinstance(d, ParseResult):
                 try:
                     cfgmgr = ConfigManager(
-                            log = self.log,
-                            resolve_hostname = self.resolve_hostname,
-                            config = d,
-                            session = self.session,
-                            port_offset = self.port_offset+self.subsystem_port_offset)
+                        log = self.log,
+                        process_manager_description = self.process_manager_description,
+                        config_url = d,
+                        session = self.session,
+                        port_offset = self.port_offset+self.subsystem_port_offset,
+                        upload_to = self.conf_server
+                    )
                 except Exception as e:
                     raise ConfigManagerCreationFailed(n) from e
 
@@ -58,7 +61,8 @@ class TreeBuilder:
                     cfgmgr = cfgmgr,
                     console=self.console,
                     fsm_conf = fsm_conf,
-                    parent = mother)
+                    parent = mother
+                )
                 self.subsystem_port_offset += self.subsystem_port_increment
             else:
                 self.log.error(f"ERROR processing the tree {n}: {d} I don't know what that's supposed to mean?")
@@ -70,14 +74,19 @@ class TreeBuilder:
             ret.update(node.get_custom_commands())
         return ret
 
-    def __init__(self, log, top_cfg, resolve_hostname, fsm_conf, console, port_offset, session):
+    def terminate(self):
+        self.conf_server.terminate()
+
+    def __init__(self, log, top_cfg, process_manager_description, fsm_conf, console, port_offset, session):
         self.session = session
         self.log = log
-        self.resolve_hostname = resolve_hostname
+        self.process_manager_description = process_manager_description
         self.fsm_conf = fsm_conf
         self.port_offset = port_offset
         self.subsystem_port_offset = 0
         self.subsystem_port_increment = 50
+        from .confserver import ConfServer
+        self.conf_server = ConfServer(8547+port_offset)
 
         if top_cfg.scheme == 'file':
             apparatus_id = Path(top_cfg.path).name

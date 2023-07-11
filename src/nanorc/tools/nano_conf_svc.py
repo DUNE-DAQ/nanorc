@@ -15,7 +15,7 @@ def svc(json_dir, name, port):
 
     console.print("Confservice is ready!")
 
-    cs.add_configuration(name, json_dir)
+    cs.add_configuration_directory(name, json_dir)
 
     from requests import get
     try:

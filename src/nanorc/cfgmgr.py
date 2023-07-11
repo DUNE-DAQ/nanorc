@@ -1,115 +1,168 @@
-from string import Template
 import os.path
 import os
 import tempfile
 import json
-from pathlib import Path
-import copy
+import copy as cp
 import socket
 import requests
 import importlib.resources as resources
 from . import confdata
 from urllib.parse import urlparse
 
-def parse_string(string_to_format:str, dico:dict={}) -> str:
-    from string import Formatter
-    fieldnames = [fname for _, fname, _, _ in Formatter().parse(string_to_format) if fname]
-
-    if len(fieldnames)>1:
-        raise RuntimeError(f"Too many fields in string {string_to_format}")
-    elif len(fieldnames)==0:
-        return string_to_format
-
-    fieldname = fieldnames[0]
-    try:
-        string_to_format = string_to_format.format(**dico)
-    except Exception as e:
-        raise RuntimeError(f"Couldn't find the IP of {fieldname}. Aborting") from e
-
-    return string_to_format
-
-
 class SessionNamespaceIncompatible(Exception):
-    def __init__(self, namespace, session):
-        super().__init__(f'Session "{session}" and namespace "{namespace}" (in your configuration) incompatible ')
+    def __init__(self, namespace, session, conf):
+        super().__init__(f'Session "{session}" and namespace "{namespace}" (in your configuration "{conf}") incompatible')
+
+
+class WrongConfigurationType(Exception):
+    def __init__(self, conf, pm):
+        super().__init__(f'The configuration "{conf.geturl()}" is incompatible with the "{pm}" process manager')
+
 
 class ConfigManager:
 
-    def __init__(self, log, config, resolve_hostname=True, port_offset=0, session=None):
+    def __init__(self, log, config_url, process_manager_description, port_offset=0, session=None, upload_to=None):
         super().__init__()
-        self.conf_dirs = []
-        self.resolve_hostname = resolve_hostname
+        self.process_manager_description = process_manager_description
         self.log = log
         self.conf_str = ''
         self.boot = {}
         self.port_offset = port_offset
-        self.tmp = None # hack
         self.scheme = None
         self.expected_std_cmds = ['init', 'conf']
+        self.conf_server = upload_to
+        self.conf_data, self.config_query_string = self.fetch_configuration(config_url)
+        self.log.debug(f'"{config_url.geturl()}" content: {list(self.conf_data.keys())}')
 
-        self.scheme = config.scheme+'://'
-        if config.scheme == 'db':
-            self.log.info(f'Using the configuration service to grab \'{config.netloc}\'')
+        self._ensure_conf_pm_consistency(
+            self.conf_data,
+            self.process_manager_description,
+            config_url
+        )
+        self._ensure_conf_session_consistency(
+            self.conf_data,
+            session,
+            config_url
+        )
 
-            conf_service={}
-            with resources.path(confdata, "config_service.json") as p:
-                conf_service = json.load(open(p,'r'))
-            url = conf_service['socket']
+        self.boot = self._load_boot(
+            self.conf_data,
+            port_offset,
+            resolve_hostname = not process_manager_description.use_k8spm()
+        )
+        self._log_diff('NanoRC\'s boot parsing', self.boot, self.conf_data['boot'])
 
-            version = config.query
-            conf_name = config.netloc
-            r = None
-            request_uri = ""
-            if version:
-                self.log.info(f'Using version {version} of \'{conf_name}\'.')
-                self.conf_str = url+'/retrieveVersion?name='+conf_name+'&version='+version
-            else:
-                self.log.info(f'Using latest version of \'{conf_name}\'.')
-                self.conf_str = url+'/retrieveLast?name='+conf_name
+        if not process_manager_description.use_k8spm():
+            new_data = self._offset_ports(self.conf_data)
+            self._log_diff('NanoRC\'s port offsetting', self.conf_data, new_data)
+            self.conf_data = new_data
 
-            try:
-                self.log.debug(f'Configuration request: http://{self.conf_str}')
-                r = requests.get("http://"+self.conf_str)
-                if r.status_code == 200:
-                    config = r.json()
-                    self.boot = self.load_boot(config['boot'], self.port_offset, False)
-                    self.boot['response_listener']['port'] += self.port_offset
-                    # hack
-                    self.data = config
-                else:
-                    raise RuntimeError(f'Couldn\'t get the configuration {conf_name}')
-            except Exception as e:
-                if r:
-                    self.log.error(f'Couldn\'t get the configuration from the conf service (http://{self.conf_str})\nService response: {json.loads(r.text).get("message",r.text)}\nException: {str(e)}')
-                else:
-                    self.log.error(f'Something went horribly wrong while getting http://{self.conf_str}\nException: {str(e)}')
-                exit(1)
-            self.custom_commands = self._get_custom_commands_from_dict(self.data)
-        else:
-            self.scheme = 'file://'
-            conf_path = os.path.expandvars(config.path)
+            new_data = self._resolve_hostnames(self.conf_data)
+            self._log_diff('NanoRC\'s host resolution', self.conf_data, new_data)
+            self.conf_data = new_data
 
-            if not (os.path.exists(conf_path) and os.path.isdir(conf_path)):
-                raise RuntimeError(f"'{conf_path}' does not exist or is not a directory")
+        self.custom_commands = self._get_custom_commands_from_dict(self.conf_data)
+        from nanorc.utils import get_random_string
+        config_url._replace(scheme = '')
+        config_url = config_url.geturl().replace('_', '-').replace('/', '').replace(':', '').replace('.', '')+'-'+get_random_string(5) # ensure no 2 config will be the same
+        self.conf_server.add_configuration_data(config_url, self.conf_data)
+        self.conf_url = f'{self.conf_server.get_conf_address_prefix()}?name={config_url}'
 
-            boot = self._import_data(Path(conf_path)/'boot.json')
-            self.boot = self.load_boot(boot, self.port_offset, True)
-            self.boot['response_listener']['port'] += self.port_offset
-            self.conf_str = self._resolve_dir_and_save_to_tmpdir(
-                conf_path = Path(conf_path)/'data',
-                hosts_ctrl = self.boot["hosts-ctrl"],
-                hosts_data = self.boot["hosts-data"],
-                port_offset = self.port_offset
-            )
-            self.custom_commands = self._get_custom_commands_from_dirs(conf_path)
+    def _log_diff(self, title, dict_new, dict_old):
+        from deepdiff import DeepDiff
+        dd = DeepDiff(dict_new, dict_old)
+        dd = dd.to_json()
+        self.log.debug(f'{title}:\n{json.dumps(json.loads(dd), indent=4)}')
 
-        if session and self.boot.get('k8s_namespace', None):
+
+    def _ensure_conf_pm_consistency(self, data, pm, conf_name):
+        attributes_for_k8s = [
+            'boot.exec.daq_application_k8s',
+        ]
+        attributes_for_ssh = []
+
+        def key_present(key, jsond):
+            keys = key.split('.')
+            print(keys)
+            print(jsond.keys())
+            primary = keys[0]
+
+            if len(keys) == 1:
+                ret = primary in jsond
+                print(f'keys == 1 {ret}')
+                return ret
+
+            rest = '.'.join(keys[1:])
+            print(f'prim: {primary}, rest: {rest}')
+            if primary in jsond:
+                return key_present(rest, jsond[primary])
+            return False
+
+        if pm.use_k8spm():
+            for k8s_attr in attributes_for_k8s:
+                if not key_present(k8s_attr, data):
+                    raise WrongConfigurationType(conf_name, 'k8s')
+
+        if pm.use_sshpm():
+            for ssh_attr in attributes_for_ssh:
+                if not key_present(ssh_attr, data):
+                    raise WrongConfigurationType(conf_name, 'ssh')
+
+
+    def _ensure_conf_session_consistency(self, data, session, conf_name):
+        if session and data.get('boot', {}).get('k8s_namespace', None):
             if session != self.boot['k8s_namespace']:
-                raise SessionNamespaceIncompatible(self.boot['k8s_namespace'], session)
+                raise SessionNamespaceIncompatible(self.boot['k8s_namespace'], session, conf_name)
 
 
-    def _import_data(self, cfg_path: dict) -> None:
-        data = {}
+    def fetch_configuration(self, config_url):
+        if config_url.scheme == 'db':
+            return self.fetch_from_configuration_db_service(config_url)
+        else:
+            return self.fetch_from_file_system(config_url)
+
+
+    def fetch_from_configuration_db_service(self,config_url):
+        self.log.info(f'Using the configuration service to grab \'{config_url.netloc}\'')
+
+        conf_service={}
+        with resources.path(confdata, "config_service.json") as p:
+            conf_service = json.load(open(p,'r'))
+        svc_url = conf_service['socket']
+
+        version = config_url.query
+        conf_name = config_url.netloc
+        r = None
+
+        if version:
+            self.log.info(f'Using version {version} of \'{conf_name}\'.')
+            conf_query_str = svc_url+'/retrieveVersion?name='+conf_name+'&version='+version
+        else:
+            self.log.info(f'Using latest version of \'{conf_name}\'.')
+            conf_query_str = svc_url+'/retrieveLast?name='+conf_name
+
+        try:
+            self.log.debug(f'Configuration request: http://{conf_query_str}')
+            r = requests.get("http://"+conf_query_str)
+            if r.status_code == 200:
+                return (r.json(), conf_query_str)
+            else:
+                raise RuntimeError(f'Couldn\'t get the configuration {conf_name} from {svc_url}')
+
+        except Exception as e:
+            if r:
+                self.log.error(f'Couldn\'t get the configuration from the conf service (http://{self.conf_str})\nService response: {json.loads(r.text).get("message",r.text)}\nException: {str(e)}')
+            else:
+                self.log.error(f'Something went horribly wrong while getting http://{self.conf_str}\nException: {str(e)}')
+            exit(1)
+
+
+    def fetch_from_file_system(self,config_url):
+        from .utils import get_json_recursive
+        return (get_json_recursive(config_url.path), f'file://{config_url.path}')
+
+
+    def _import_data(self, cfg_path: dict) -> dict:
         if not os.path.exists(cfg_path):
             raise RuntimeError(f"ERROR: {cfg_path} not found")
 
@@ -122,30 +175,32 @@ class ConfigManager:
     def _get_custom_commands_from_dict(self, data:dict):
         from collections import defaultdict
         custom_cmds = defaultdict(list)
-        for app in data.keys():
-            if data.get('conf'):
-                for key, value in data[app].items():
-                    if key in self.expected_std_cmds: continue # normal command
-                    custom_cmds[key].append(value)
+
+        for app_name, app_data in data.items():
+            if app_data is not dict: continue
+            for command_name, command_data in app_data.items():
+                if command_name in self.expected_std_cmds:
+                    continue
+                custom_cmds[app_name].append(command_data)
 
         return custom_cmds
 
 
-    def _get_custom_commands_from_dirs(self, path:str):
-        from collections import defaultdict
-        custom_cmds = defaultdict(list)
-        for cmd_file in os.listdir(path+'/data'):
-            std_cmd_flag = False
-            for std_cmd in self.expected_std_cmds:
-                if std_cmd+".json" in cmd_file:
-                    std_cmd_flag = True
-                    break # just a normal command
+    # def _get_custom_commands_from_dirs(self, path:str):
+    #     from collections import defaultdict
+    #     custom_cmds = defaultdict(list)
+    #     for cmd_file in os.listdir(path+'/data'):
+    #         std_cmd_flag = False
+    #         for std_cmd in self.expected_std_cmds:
+    #             if std_cmd+".json" in cmd_file:
+    #                 std_cmd_flag = True
+    #                 break # just a normal command
 
-            if std_cmd_flag:
-                continue
+    #         if std_cmd_flag:
+    #             continue
 
-            cmd_name = '_'.join(cmd_file.split('_')[1:]).replace('.json', '')
-            custom_cmds[cmd_name].append(json.load(open(path+'/data/'+cmd_file, 'r')))
+    #         cmd_name = '_'.join(cmd_file.split('_')[1:]).replace('.json', '')
+    #         custom_cmds[cmd_name].append(json.load(open(path+'/data/'+cmd_file, 'r')))
 
         return custom_cmds
 
@@ -153,69 +208,71 @@ class ConfigManager:
         return self.custom_commands
 
 
-    def _resolve_dir_and_save_to_tmpdir(self, conf_path, hosts_ctrl:dict, hosts_data:dict, port_offset:int=0) -> None:
-        if not os.path.exists(conf_path):
-            raise RuntimeError(f"ERROR: {conf_path} does not exist!")
+    def _resolve_hostnames(self, conf_data):
+        conf_port_host_resolved = cp.deepcopy(conf_data)
 
-        external_connections = []
+        hosts = self.boot.get('hosts-data',{})
+        from nanorc.utils import parse_string
 
-        self.tmp = tempfile.TemporaryDirectory(
-            dir=os.getcwd(),
-            prefix='nanorc-flatconf-',
-        )
-
-        for original_file in os.listdir(conf_path):
-            data = self._import_data(conf_path/original_file)
-            self.log.debug(f"Original connections in '{conf_path/original_file}':")
-            data = self._resolve_hostnames(data, hosts_data)
-            if port_offset:
-                self.log.debug(f"Offsetting the ports by {port_offset}, new connections:")
-                data = self._offset_ports(data, external_connections)
-
-            with open(os.path.join(self.tmp.name, original_file), 'w') as parsed_file:
-                json.dump(data, parsed_file, indent=4, sort_keys=True)
-
-        return os.path.join(os.getcwd(), self.tmp.name)
-
-    def _resolve_hostnames(self, data, hosts):
-
-        if not "connections" in data:
-            return data
-
-        for connection in data['connections']:
-            if "queue://" in connection['uri']:
+        for app_data in conf_port_host_resolved.values():
+            if app_data is not dict:
                 continue
 
-            origuri = connection['uri']
-            connection['uri'] = parse_string(connection['uri'], hosts)
-            self.log.debug(f" - '{connection['id']['uid']}': {connection['uri']} ({origuri})")
-        return data
+            if not 'init' in app_data:
+                continue
+            init_data = app_data['init']
+
+            if not "connections" in init_data:
+                return conf_data
+
+            for connection in init_data['connections']:
+                if "queue://" in connection['uri']:
+                    continue
+
+                origuri = connection['uri']
+                connection['uri'] = parse_string(connection['uri'], hosts)
+                self.log.debug(f" - '{connection['id']['uid']}': {connection['uri']} ({origuri})")
+
+        return conf_port_host_resolved
 
 
-    def _offset_ports(self, data, external_connections):
+    def _offset_ports(self, conf_data):
+        conf_port_offset = cp.deepcopy(conf_data)
+        external_connections = self.boot.get('external_connections', [])
 
-        if not "connections" in data:
-            return data
-
-        for connection in data['connections']:
-            if "queue://" in connection['uri']:
+        for app_data in conf_port_offset.values():
+            if app_data is not dict:
                 continue
 
-            if not connection['id']['uid'] in external_connections:
-                try:
-                    port = urlparse(connection['uri']).port
-                    newport = port + self.port_offset
-                    connection['uri'] = connection['uri'].replace(str(port), str(newport))
-                    self.log.debug(f" - '{connection['id']['uid']}': {connection['uri']}")
-                except Exception as e:
-                    self.log.debug(f" - '{connection['id']['uid']}' port wasn\'t offset")
+            if not 'init' in app_data:
+                continue
 
-        return data
+            init_data = app_data['init']
+
+            if not "connections" in init_data:
+                continue
+
+            for connection in init_data['connections']:
+                if "queue://" in connection['uri']:
+                    continue
+
+                if not connection['id']['uid'] in external_connections:
+                    try:
+                        port = urlparse(connection['uri']).port
+                        newport = port + self.port_offset
+                        connection['uri'] = connection['uri'].replace(str(port), str(newport))
+                        self.log.debug(f" - '{connection['id']['uid']}': {connection['uri']}")
+                    except Exception as e:
+                        self.log.debug(f" - '{connection['id']['uid']}' ('{connection['uri']}') port wasn\'t offset, reason: {str(e)}")
+
+        return conf_port_offset
 
 
 
-    def load_boot(self, boot, port_offset, resolve_hostname):
-        if self.resolve_hostname:
+    def _load_boot(self, config, port_offset, resolve_hostname):
+        boot = cp.deepcopy(config['boot'])
+
+        if resolve_hostname:
             boot["hosts-ctrl"] = {
                 n: (h if (not h in ("localhost", "127.0.0.1")) else socket.gethostname())
                 for n, h in boot["hosts-ctrl"].items()
@@ -285,17 +342,10 @@ class ConfigManager:
         return boot
 
 
-    def __del__(self):
-        if self.tmp:
-            self.tmp.cleanup()
-
     def get_conf_location(self, for_apps) -> str:
-        if self.scheme == 'db://':
-            if for_apps: return self.scheme+self.conf_str
-            else:        return "http://"+self.conf_str
-        elif self.scheme == 'file://':
-            if for_apps: return self.scheme+self.conf_str
-            else:        return self.conf_str
+        if for_apps: return "db://"+self.conf_url
+        else:        return "http://"+self.conf_url
+
 
     def generate_data_for_module(self, data: dict=None, module:str="") -> dict:
         """
@@ -322,35 +372,3 @@ class ConfigManager:
                 }
             ]
         }
-
-
-if __name__ == "__main__":
-    from os.path import dirname, join
-    from rich.console import Console
-    from rich.pretty import Pretty
-    from rich.traceback import Traceback
-
-    console = Console()
-    try:
-        cfg = ConfigManager(join(dirname(__file__), "examples", "minidaqapp"))
-    except Exception as e:
-        console.print(Traceback())
-
-    console.print("Boot data :boot:")
-    console.print(Pretty(cfg.boot))
-
-    console.print("Init data :boot:")
-    console.print(Pretty(cfg.init))
-
-    console.print("Conf data :boot:")
-    console.print(Pretty(cfg.conf))
-
-    console.print("Start data :runner:")
-    console.print(Pretty(cfg.start))
-    console.print("Start order :runner:")
-    console.print(Pretty(cfg.start_order))
-
-    console.print("Stop data :busstop:")
-    console.print(Pretty(cfg.stop))
-    console.print("Stop order :busstop:")
-    console.print(Pretty(cfg.stop_order))

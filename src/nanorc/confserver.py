@@ -38,34 +38,50 @@ class ConfigurationEndpoint(Resource):
 
 class ConfigUploadFailed(Exception):
     """Couldn't upload the configuration """
-    pass
-    def __init__(self, name, path):
+    def __init__(self, name):
         self.name = name
-        self.path = path
-        super().__init__(f"Couldn't upload the configuration {self.name} in {self.path} to nanorc's internal configuration server")
+        super().__init__(f"Couldn't upload the configuration {self.name} to nanorc's internal configuration server")
+
+class ConfigurationNotPresent(Exception):
+    """Couldn't update the configuration """
+    def __init__(self, name):
+        self.name = name
+        super().__init__(f"Couldn't update the configuration {self.name} to nanorc's internal configuration server, the configuration is not present in the internal store")
+
+class ConfigurationAlreadyPresent(Exception):
+    """Couldn't upload the configuration """
+    pass
+    def __init__(self, name):
+        self.name = name
+        super().__init__(f"Couldn't add the configuration {self.name} to nanorc's internal configuration server, the configuration is already present in the internal store")
 
 class ConfServer:
     def __init__(self, port):
         self.log = logging.getLogger('nano-conf-service')
-        self._start_conf_service(port)
+        self.config_data = {}
+        self.uploaded_name = set()
         self.port = port
+        self._start_conf_service()
 
-    def _start_conf_service(self, port):
+    def get_conf_address_prefix(self):
+        import socket
+        return f'{socket.gethostname()}:{self.port}/configuration'
+
+    def _start_conf_service(self):
         from flask import Flask
         from flask_restful import Api
 
         self.app = Flask('nano-conf-svc')
         self.api = Api(self.app)
-        config_data = {}
         self.api.add_resource(
             ConfigurationEndpoint, "/configuration",
             methods = ['GET', 'POST'],
-            resource_class_kwargs = {"config_data":config_data}
+            resource_class_kwargs = {"config_data":self.config_data}
         )
 
         from .utils import FlaskManager
         self.manager = FlaskManager(
-            port = port,
+            port = self.port,
             app = self.app,
             name = "nano-conf-svc"
         )
@@ -75,29 +91,58 @@ class ConfServer:
             from time import sleep
             sleep(0.1)
 
-    def add_configuration(self, name, path):
-        from nanorc.argval import validate_conf_name
-        from pathlib import Path
-        validate_conf_name({}, {}, name)
+    def _upload_data(self, name,data):
         from requests import post
         header = {
             'Accept' : 'application/json',
             'Content-Type':'application/json'
         }
         import json
-        from nanorc.utils import get_json_recursive
 
         try:
             r = post(
                 f'http://0.0.0.0:{self.port}/configuration?name={name}',
                 headers=header,
-                data=json.dumps(get_json_recursive(Path(path)))
+                data=json.dumps(data)
             )
         except Exception as e:
-            raise ConfigUploadFailed(name, path) from e
+            raise ConfigUploadFailed(name) from e
 
         if not r.json()['success']:
-            raise ConfigUploadFailed(name, path)
+            raise ConfigUploadFailed(name)
 
+
+    def add_configuration_data(self, name, data):
+        from nanorc.argval import validate_conf_name
+        validate_conf_name({}, {}, name)
+
+        if name in self.uploaded_name:
+            raise ConfigurationAlreadyPresent(name)
+
+        self._upload_data(name, data)
+        self.uploaded_name.add(name)
+
+    def update_configuration_data(self, name, data):
+        from nanorc.argval import validate_conf_name
+        validate_conf_name({}, {}, name)
+
+        if not name in self.uploaded_name:
+            raise ConfigurationNotPresent(name)
+
+        self._upload_data(name, data)
+
+    def update_configuration_directory(self, name, path):
+        from pathlib import Path
+        from nanorc.utils import get_json_recursive
+        data = get_json_recursive(Path(path))
+        self.update_configuration_data(name,data)
+
+    def add_configuration_directory(self, name, path):
+        from pathlib import Path
+        from nanorc.utils import get_json_recursive
+        data = get_json_recursive(Path(path))
+        self.add_configuration_data(name,data)
+
+        return
     def terminate(self):
         self.manager.stop()
