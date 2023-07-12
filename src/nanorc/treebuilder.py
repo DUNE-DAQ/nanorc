@@ -26,7 +26,7 @@ class ConfigManagerCreationFailed(Exception):
     pass
     def __init__(self, node):
         self.node = node
-        super().__init__(f"Failded to build configuration manager for node '{node}'")
+        super().__init__(f"Failed to build configuration manager for node '{node}'")
 
 
 class TreeBuilder:
