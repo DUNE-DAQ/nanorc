@@ -160,8 +160,22 @@ class SSHProcessManager(object):
         hosts = self.boot_info["hosts-ctrl"]
         rte_script = self.boot_info.get('rte_script')
         env_vars = self.boot_info["env"]
+        dbt_install_dir = os.getenv('DBT_INSTALL_DIR')
 
         host = hosts[app_conf["host"]]
+
+        if rte_script:
+            self.log.info(f'Using the Runtime environment script "{rte_script}"')
+        elif dbt_install_dir:
+            maybe_rte_script = f'{dbt_install_dir}/daq_app_rte.sh'
+            if os.path.isfile(maybe_rte_script):
+                rte_script = maybe_rte_script
+            else:
+                self.log.warning('Cannot find the RTE script in $\{DBT_INSTALL_DIR\}, nanorc will use your env variables to run daq_app')
+                rte_script = None
+        else:
+            from nanorc.utils import get_rte_script
+            rte_script = get_rte_script()
 
         env_formatter = {
             "APP_HOST": host,
@@ -173,7 +187,7 @@ class SSHProcessManager(object):
         }
         if is_port_open(host, app_conf["port"]):
             raise RuntimeError(f'The port {host}:{app_conf["port"]} is already open, likely by another application, cannot continue')
-        
+
         if 'update-env' in app_conf:
             for k,v in app_conf['update-env'].items():
                 self.boot_info["env"][k]=v.format(**env_formatter) if type(v) is str else v
@@ -188,6 +202,11 @@ class SSHProcessManager(object):
         app_vars.update(env_vars)
         app_vars.update(exec_vars)
         env_formatter.update(app_vars)
+
+        if rte_script:
+            from nanorc.utils import strip_env_for_rte
+            app_vars = strip_env_for_rte(app_vars)
+
         args = " ".join([a.format(**env_formatter) for a in self.boot_info['exec'][app_conf['exec']]['args']])
 
         log_file = f'log_{app_name}_{app_conf["port"]}.txt'
@@ -199,7 +218,6 @@ class SSHProcessManager(object):
 
         if rte_script:
             cmd = ';'.join(env_var)+f';source {rte_script};{cmd}'
-
         else:
             cmd = ';'.join(env_var)+';'+cmd
 
@@ -247,12 +265,7 @@ class SSHProcessManager(object):
         # Add a check for env and apps in boot_info keys
         self.boot_info = boot_info
         apps = boot_info["apps"]
-        hosts = boot_info["hosts-ctrl"]
-        rte_script = boot_info.get('rte_script')
-        env_vars = boot_info["env"]
 
-        if rte_script:
-            self.log.info(f'Using the Runtime environment script "{rte_script}"')
 
         self.console.print(f'Looking for services')
         services = boot_info.get("services")
@@ -271,7 +284,7 @@ class SSHProcessManager(object):
                 )
                 self.watch(srv_name, proc)
                 desc.proc = proc
-                
+
         for app_name, app_conf in apps.items():
             desc=self.setup_app(app_name, app_conf, conf_loc)
             self.apps[app_name] = desc
@@ -295,7 +308,7 @@ class SSHProcessManager(object):
             )
             self.watch(name, proc)
             desc.proc = proc
-        
+
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -397,7 +410,7 @@ class SSHProcessManager(object):
                     sh.ssh(*ssh_args)
                 except Exception as e:
                     self.log.error(f'Couldn\'t kill the connectivity service on pid {pid}, it may already be dead?')
-                    
+
         self.services = {}
     def kill(self):
         for name, desc in self.apps.items():

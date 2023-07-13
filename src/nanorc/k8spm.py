@@ -712,9 +712,11 @@ class K8SProcessManager(object):
 
             if not rte_script:
                 maybe_rte_script = f'{dbt_install_dir}/daq_app_rte.sh'
-                if not os.path.isfile(maybe_rte_script):
+                if os.path.isfile(maybe_rte_script):
+                    rte_script = maybe_rte_script
+                else:
                     self.log.warning('Cannot find the RTE script in $\{DBT_INSTALL_DIR\}, nanorc will use your env variables to run daq_app')
-                rte_script = maybe_rte_script
+                    rte_script = None
 
         if not rte_script and not dbt_install_dir:
             from nanorc.utils import get_rte_script
