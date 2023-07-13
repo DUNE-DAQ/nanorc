@@ -447,7 +447,7 @@ class K8SProcessManager(object):
                                         name = "dunedaq-dev-cvmfs",
                                         read_only = True)
                                 ]
-                                if self.mount_cvmfs and app_boot_info['mount_cvmfs_dev'] else []
+                                if self.mount_cvmfs else []
                             ) + (
                                 [
                                     client.V1VolumeMount(
@@ -492,7 +492,7 @@ class K8SProcessManager(object):
                                 host_path = client.V1HostPathVolumeSource(
                                     path = '/cvmfs/dunedaq-development.opensciencegrid.org'))
                         ]
-                        if self.mount_cvmfs and app_boot_info['mount_cvmfs_dev'] else []
+                        if self.mount_cvmfs else []
                     ) + (
                         [
                             client.V1Volume(
@@ -695,8 +695,30 @@ class K8SProcessManager(object):
         env_vars = boot_info["env"]
         rte_script = boot_info.get('rte_script')
 
+        mounted_dirs = []
+
         if rte_script:
             self.log.info(f'Using the Runtime environment script "{rte_script}"')
+
+        dbt_install_dir = os.getenv('DBT_INSTALL_DIR')
+        if dbt_install_dir:
+            mounted_dirs += [{
+                'in_pod_location': dbt_install_dir,
+                'name': 'installdir',
+                'read_only': True,
+                'physical_location': dbt_install_dir
+            }]
+            self.log.info(f'Using the dev area "{dbt_install_dir}"')
+
+            if not rte_script:
+                maybe_rte_script = f'{dbt_install_dir}/daq_app_rte.sh'
+                if not os.path.isfile(maybe_rte_script):
+                    self.log.warning('Cannot find the RTE script in $\{DBT_INSTALL_DIR\}, nanorc will use your env variables to run daq_app')
+                rte_script = maybe_rte_script
+
+        if not rte_script and not dbt_install_dir:
+            from nanorc.utils import get_rte_script
+            rte_script = get_rte_script()
 
         self.partition = boot_info['env']['DUNEDAQ_PARTITION']
 
@@ -707,20 +729,17 @@ class K8SProcessManager(object):
             'uid': os.getuid(),
             'gid': os.getgid(),
         }
-        # pvcs = {}
-        # for app in apps.values():
-        #     app_pvcs=app['pvcs']
-        #     for pvc in app_pvcs:
-        #         claim_name = pvc['claim_name']
 
-        #         if claim_name in pvcs and pvc == pvcs[claim_name]:
-        #             raise RuntimeError(f"The same PVC {claim_name} is defined twice in boot.json, but isn't strictly identical!")
+        log_dir = f'{os.getcwd()}/logs'
+        if not os.path.exists(log_dir):
+            os.mkdir(log_dir)
 
-        #         pvcs[claim_name] = pvc
-
-        # # Create the persistent volume claim
-        # for pvc in pvcs.values():
-        #     self.create_data_pvc(pvc, self.partition)
+        mounted_dirs += [{
+            'in_pod_location': '/logs',
+            'name': 'logdir',
+            'read_only': False,
+            'physical_location': log_dir
+        }]
 
         for app_name in boot_info['order']:
             app_conf = apps[app_name]
@@ -740,7 +759,6 @@ class K8SProcessManager(object):
             for k,v in exec_vars_cp.items():
                 exec_vars[k]=v.format(**env_formatter) if type(v) is str else v
 
-
             app_env = {}
             app_env.update(env_vars)
             app_env.update(exec_vars)
@@ -752,30 +770,13 @@ class K8SProcessManager(object):
             if not app_img:
                 raise RuntimeError("You need to specify an image in the configuration!")
 
-            ## This is meant to mean:
-            # if the image is of form pocket_dune_bla (without version postfix)
-            # or if the first letter of the version starts with N
-            # then, we want to mount /cvmfs/dunedaq-development....
-            # Else we are probably in "full release mode" in which case the name of the version will be v3.0.4, and we don't need to mount it
-            image_and_ver = app_img.split(":")
-            mount_cvmfs_dev = True
-            # if len(image_and_ver)==1:
-            #     mount_cvmfs_dev = True
-            # elif len(image_and_ver)==2:
-            #     if image_and_ver[1] or image_and_ver[1] == "latest":
-            #         mount_cvmfs_dev = (image_and_ver[1][0] == 'N')
-            #     else:
-            #         raise RuntimeError("Malformed image name in boot.json")
-            # else:
-            #     raise RuntimeError("Malformed image name in boot.json")
             app_boot_info = {
-                "env"             : app_env,
+                "env"             : {},
                 "command"         : app_cmd,
                 "args"            : app_args,
                 "image"           : app_img,
                 "cmd_port"        : cmd_port,
-                "mount_cvmfs_dev" : mount_cvmfs_dev,
-                "mounted_dirs"    : app_conf.get('mounted_dirs', []),
+                "mounted_dirs"    : app_conf.get('mounted_dirs', [])+ mounted_dirs,
                 "resources"       : app_conf.get('resources',  {}),
                 "affinity"        : app_conf.get('affinity', []),
                 "anti-affinity"   : app_conf.get('anti-affinity', []),
@@ -783,64 +784,42 @@ class K8SProcessManager(object):
                 "connections"     : self.connections.get(app_name, []),
             }
 
-            if not self.log_path:
-                self.log_path = f'{os.getcwd()}/logs'
-                if not os.path.exists(self.log_path):
-                    os.mkdir(self.log_path)
-
-            app_boot_info['mounted_dirs'] += [{
-                'in_pod_location': '/logs',
-                'name': 'logdir',
-                'read_only': False,
-                'physical_location': self.log_path
-            }]
-            from datetime import datetime
-
-            now = datetime.now() # current date and time
-            date_time = now.strftime("%Y-%m-%d_%H%M%S")
-            log_file_localhost = f'log_{date_time}_{app_name}_{app_conf["port"]}.txt'
-
             from urllib.parse import urlparse
             trace = app_env.get('TRACE_FILE')
+
             if trace:
                 trace_dir = f'{os.getcwd()}/trace'
-                if not os.path.exists(trace_dir): os.mkdir(trace_dir)
+                if not os.path.exists(trace_dir):
+                    os.mkdir(trace_dir)
+
                 trace_uri = urlparse(trace)
-                tpath = os.path.dirname(trace_uri.path)
+                tpath = os.path.dirname(trace_uri.path)#+'trace'
+                #tfile = os.path.basename(trace_uri.path)
+
                 app_boot_info['mounted_dirs'] += [{
                     'in_pod_location': tpath,
                     'name': 'tracedir',
                     'read_only': False,
                     'physical_location': trace_dir
                 }]
+                #app_env['TRACE_FILE'] = f'{tpath}/{tfile}'
 
-            conf = urlparse(conf_loc)
-            if conf.scheme == 'file':
-                app_boot_info['mounted_dirs'] += [{
-                    'in_pod_location': conf.path,
-                    'name': 'confdir',
-                    'read_only': True,
-                    'physical_location': conf.path
-                }]
+            from datetime import datetime
+
+            now = datetime.now() # current date and time
+            date_time = now.strftime("%Y-%m-%d_%H%M%S")
+            log_file = f'log_{date_time}_{app_name}_{app_conf["port"]}.txt'
 
             if rte_script:
-                unwanted_env = ['PATH', 'LD_LIBRARY_PATH', 'CET_PLUGIN_PATH','DUNEDAQ_SHARE_PATH']
-                for var in unwanted_env:
-                    if var in app_env:
-                        del app_env[var]
+                from nanorc.utils import strip_env_for_rte
+                app_boot_info["env"] = strip_env_for_rte(app_env)
                 app_boot_info['command'] = ['/bin/bash', '-c']
-                app_boot_info['args'] = [f'source {rte_script} && {app_cmd[0]} {" ".join(app_args)}']
+                app_boot_info['args'] = [f'{{ source {rte_script} && {app_cmd} {" ".join(app_args)} ; }} | tee /logs/{log_file}']
             else:
-                install_dir = os.getenv('DBT_INSTALL_DIR')
-                app_boot_info['mounted_dirs'] += [{
-                    'in_pod_location': install_dir,
-                    'name': 'swdir',
-                    'read_only': True,
-                    'physical_location': install_dir
-                }]
                 app_boot_info['command'] = ['/bin/bash', '-c']
-                app_boot_info['args'] = [f'which daq_application; ldd `which daq_application`; {app_cmd[0]} {" ".join(app_args)}']
-                app_boot_info['args'] = ["{ "+app_boot_info['args'][0] +"; } &> /logs/"+log_file_localhost]
+                app_boot_info['args'] = [f'{{ {app_cmd} {" ".join(app_args)} ; }} | tee /logs/{log_file}']
+
+            app_boot_info["env"] = app_env
 
             if self.cluster_config.is_kind:
                 # discard most of the nice features of k8s if we use kind
