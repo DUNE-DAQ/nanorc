@@ -699,9 +699,15 @@ class K8SProcessManager(object):
 
         if rte_script:
             self.log.info(f'Using the Runtime environment script "{rte_script}"')
+        else:
+            from nanorc.utils import get_rte_script
+            rte_script = get_rte_script()
 
-        dbt_install_dir = os.getenv('DBT_INSTALL_DIR')
-        if dbt_install_dir:
+        from nanorc.utils import release_or_dev
+
+        if release_or_dev() == "dev":
+            dbt_install_dir = os.getenv('DBT_INSTALL_DIR')
+
             mounted_dirs += [{
                 'in_pod_location': dbt_install_dir,
                 'name': 'installdir',
@@ -710,17 +716,6 @@ class K8SProcessManager(object):
             }]
             self.log.info(f'Using the dev area "{dbt_install_dir}"')
 
-            if not rte_script:
-                maybe_rte_script = f'{dbt_install_dir}/daq_app_rte.sh'
-                if os.path.isfile(maybe_rte_script):
-                    rte_script = maybe_rte_script
-                else:
-                    self.log.warning('Cannot find the RTE script in $\{DBT_INSTALL_DIR\}, nanorc will use your env variables to run daq_app')
-                    rte_script = None
-
-        if not rte_script and not dbt_install_dir:
-            from nanorc.utils import get_rte_script
-            rte_script = get_rte_script()
 
         self.partition = boot_info['env']['DUNEDAQ_PARTITION']
 
@@ -812,16 +807,11 @@ class K8SProcessManager(object):
             date_time = now.strftime("%Y-%m-%d_%H%M%S")
             log_file = f'log_{date_time}_{app_name}_{app_conf["port"]}.txt'
 
-            if rte_script:
-                from nanorc.utils import strip_env_for_rte
-                app_boot_info["env"] = strip_env_for_rte(app_env)
-                app_boot_info['command'] = ['/bin/bash', '-c']
-                app_boot_info['args'] = [f'{{ source {rte_script} && {app_cmd} {" ".join(app_args)} ; }} | tee /logs/{log_file}']
-            else:
-                app_boot_info['command'] = ['/bin/bash', '-c']
-                app_boot_info['args'] = [f'{{ {app_cmd} {" ".join(app_args)} ; }} | tee /logs/{log_file}']
+            from nanorc.utils import strip_env_for_rte
+            app_boot_info["env"] = strip_env_for_rte(app_env)
+            app_boot_info['command'] = ['/bin/bash', '-c']
+            app_boot_info['args'] = [f'{{ source {rte_script} && {app_cmd} {" ".join(app_args)} ; }} | tee /logs/{log_file}']
 
-            app_boot_info["env"] = app_env
 
             if self.cluster_config.is_kind:
                 # discard most of the nice features of k8s if we use kind

@@ -38,16 +38,19 @@ def release_or_dev():
     return 'rel'
 
 def get_rte_script():
-    from os import path
+    from os import path,getenv
+    script = ''
+    if release_or_dev() == 'rel':
+        ver = get_version()
+        releases_dir = get_releases_dir()
+        script = path.join(releases_dir, ver, 'daq_app_rte.sh')
 
-    ver = get_version()
-    releases_dir = get_releases_dir()
-
-    script = path.join(releases_dir, ver, 'daq_app_rte.sh')
+    else:
+        dbt_install_dir = getenv('DBT_INSTALL_DIR')
+        script = path.join(dbt_install_dir, 'daq_app_rte.sh')
 
     if not path.exists(script):
         raise RuntimeError(f'Couldn\'t understand where to find the rte script tentative: {script}')
-
     return script
 
 
