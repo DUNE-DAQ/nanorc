@@ -3,6 +3,7 @@ from .k8spm import K8SProcessManager
 from .sshpm import SSHProcessManager
 from urllib import parse
 
+
 class pm_desc:
     def __init__(self, pm_arg):
         self.arg = pm_arg
@@ -50,7 +51,7 @@ class PMFactory:
         if pm.use_k8spm():
             # Yes, we need the list of connections here
             connections = {}
-            for app, data in self.cfgmgr.data.items():
+            for app, data in self.cfgmgr.conf_data.items():
                 if not isinstance(data, dict): continue
                 if not 'init' in data: continue
                 connections[app] = []

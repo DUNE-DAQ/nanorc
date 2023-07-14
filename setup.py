@@ -33,6 +33,7 @@ setup(
         "PySocks",
         "anytree",
         "transitions",
+        "deepdiff",
     ],
     extras_require={"develop": [
         "ipdb",

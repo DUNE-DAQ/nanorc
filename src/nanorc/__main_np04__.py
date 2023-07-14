@@ -189,6 +189,7 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
         raise click.Abort()
 
     def cleanup_rc():
+        rc.quit()
         credentials.quit()
         if rc.topnode.state != 'none':
             logging.getLogger("cli").warning("NanoRC context cleanup: Aborting applications before exiting")
@@ -210,7 +211,7 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
         tui = NanoRCTUI(host=host, rest_port=rest_port, timeout=rc.timeout, banner=Panel.fit(grid))
         tui.run()
         cleanup_rc()
-        ctx.exit(rc.return_code) 
+        ctx.exit(rc.return_code)
 
 @np04cli.command('change_user')
 @click.argument('user', type=str, default=None)

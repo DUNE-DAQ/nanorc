@@ -198,6 +198,7 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
         raise click.Abort()
 
     def cleanup_rc():
+        rc.quit()
         if rc.topnode.state != 'none':
             logging.getLogger("cli").warning("NanoRC context cleanup: Aborting applications before exiting")
             rc.abort(timeout=120)

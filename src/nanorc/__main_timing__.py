@@ -141,6 +141,7 @@ def timingcli(ctx, obj, traceback, pm, loglevel, log_path, cfg_dumpdir, kerberos
         raise click.Abort()
 
     def cleanup_rc():
+        rc.quit()
         if rc.topnode.state != 'none': logging.getLogger("cli").warning("NanoRC context cleanup: Terminating RC before exiting")
         rc.abort(timeout=120)
         if rc.return_code:
@@ -154,7 +155,7 @@ def timingcli(ctx, obj, traceback, pm, loglevel, log_path, cfg_dumpdir, kerberos
     if web:
         rest_thread.join()
         webui_thread.join()
-    
+
     if tui:
         from .tui import NanoRCTUI
         tui = NanoRCTUI(host=host, rest_port=rest_port, timeout=rc.timeout, banner=Panel.fit(grid))

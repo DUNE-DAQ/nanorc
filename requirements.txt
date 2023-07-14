@@ -10,3 +10,4 @@ rich==10.14.0
 sh==1.14.1
 graphviz==0.16
 anytree==2.8.0
+deepdiff==6.3.1
