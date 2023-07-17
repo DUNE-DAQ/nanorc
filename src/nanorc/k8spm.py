@@ -192,7 +192,7 @@ class K8SProcessManager(object):
         for c in connections:
             uri = urlparse(c['uri'])
             if uri.hostname != app_name: continue
-            name = c['id']['uid'].replace(".", "").replace("_", "").replace("$","").replace("{", "").replace("}", "")[-15:]
+            name = c['id']['uid'].replace(".", "").replace("_", "").replace("$","").replace("{", "").replace("}", "").lower()[-15:]
             self.log.debug(f'Opening port {uri.port} (named {name}) in {app_name}\'s container')
 
             ret += [
@@ -216,7 +216,7 @@ class K8SProcessManager(object):
         for c in connections:
             uri = urlparse(c['uri'])
             if uri.hostname != app_name: continue
-            name = c['id']['uid'].replace(".", "").replace("_", "").replace("$","").replace("{", "").replace("}", "")[-15:]
+            name = c['id']['uid'].replace(".", "").replace("_", "").replace("$","").replace("{", "").replace("}", "").lower()[-15:]
             self.log.debug(f'Creating service {uri.port} (named {name}) in {app_name}\'s container')
 
             ret += [

@@ -57,8 +57,10 @@ class NanoRC:
             top_cfg=top_cfg,
             console=self.console,
             fsm_conf=fsm_cfg,
-            resolve_hostname = pm.use_sshpm(),
-            port_offset=self.port_offset)
+            process_manager_description = pm,
+            port_offset=self.port_offset,
+            session = partition_label,
+        )
         self.partition = partition_label
 
         self.custom_cmd = self.cfg.get_custom_commands()
@@ -95,6 +97,9 @@ class NanoRC:
 
         self.topnode = self.cfg.get_tree_structure()
         self.console.print(f"Running on the apparatus [bold red]{self.cfg.apparatus_id}[/bold red]:")
+
+    def quit(self):
+        self.cfg.terminate()
 
     def get_command_sequence(self, command:str):
         seq_cmd = self.topnode.fsm.command_sequences.get(command)

@@ -56,6 +56,15 @@ def validate_partition_number(ctx, param, number):
         raise click.BadParameter(f"Partition number should be between 0 and 10 (you fed {number})")
     return number
 
+def validate_conf_name(ctx, param, conf_name):
+    import re
+
+    pat = re.compile(r'[a-z0-9]([-a-z0-9]*[a-z0-9])?')
+    ## Nanorc-12334 allowed (with hyphen) This is straight from k8s error message when the partition name isn't right
+    if not re.fullmatch(pat, conf_name):
+        raise click.BadParameter(f'Name {conf_name} should be alpha-numeric-hyphen! Make sure you name has the form [a-z0-9]([-a-z0-9]*[a-z0-9])?')
+    return conf_name
+
 def validate_partition(ctx, param, partition):
     pat = re.compile(r'[a-z0-9]([-a-z0-9]*[a-z0-9])?') ## Nanorc-12334 allowed (with hyphen) This is straight from k8s error message when the partition name isn't right
     if not re.fullmatch(pat, partition):
@@ -79,7 +88,7 @@ def validate_conf(ctx, param, top_cfg):
     if confurl.scheme == 'db':
         return confurl
 
-    raise click.BadParameter(f"TOP_CFG should either be a directory, a json file, or a config service utility with the form db://the_conf_name?1 (where the ?1 at the end is optional and represents the version). You provided: '{top_cfg}'")
+    raise click.BadParameter(f"Could not find the configuration \'{top_cfg}\' (or this configuration does not have the correct format)")
 
 
 
