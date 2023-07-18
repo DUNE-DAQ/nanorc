@@ -164,7 +164,7 @@ class SSHProcessManager(object):
         host = hosts[app_conf["host"]]
 
         if rte_script:
-            self.log.info(f'Using the Runtime environment script "{rte_script}"')
+            self.log.debug(f'Using the Runtime environment script "{rte_script}"')
         else:
             from nanorc.utils import get_rte_script
             rte_script = get_rte_script()

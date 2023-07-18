@@ -32,7 +32,7 @@ class ConfigManager:
         self.expected_std_cmds = ['init', 'conf']
         self.conf_server = upload_to
         self.conf_data, self.config_query_string = self.fetch_configuration(config_url)
-        self.log.debug(f'"{config_url.geturl()}" content: {list(self.conf_data.keys())}')
+        self.log.debug(f'"{config_url.path}" content: {list(self.conf_data.keys())}')
 
         self._ensure_conf_pm_consistency(
             self.conf_data,
@@ -52,7 +52,7 @@ class ConfigManager:
         )
         self._log_diff('NanoRC\'s boot parsing', self.boot, self.conf_data['boot'])
 
-        if not process_manager_description.use_k8spm():
+        if process_manager_description.use_sshpm():
             new_data = self._offset_ports(self.conf_data)
             self._log_diff('NanoRC\'s port offsetting', self.conf_data, new_data)
             self.conf_data = new_data
@@ -64,7 +64,7 @@ class ConfigManager:
         self.custom_commands = self._get_custom_commands_from_dict(self.conf_data)
         from nanorc.utils import get_random_string
         config_url._replace(scheme = '')
-        config_url = config_url.geturl().replace('_', '-').replace('/', '').replace(':', '').replace('.', '')+'-'+get_random_string(5) # ensure no 2 config will be the same
+        config_url = config_url.path.replace('_', '-').replace('/', '').replace(':', '').replace('.', '')+'-'+get_random_string(5) # ensure no 2 config will be the same
         self.conf_server.add_configuration_data(config_url, self.conf_data)
         self.conf_url = f'{self.conf_server.get_conf_address_prefix()}?name={config_url}'
 
@@ -213,12 +213,13 @@ class ConfigManager:
         hosts = self.boot.get('hosts-data',{})
         from nanorc.utils import parse_string
 
-        for app_data in conf_port_host_resolved.values():
-            if app_data is not dict:
+        for app_name, app_data in conf_port_host_resolved.items():
+            if not type(app_data) == dict:
                 continue
 
             if not 'init' in app_data:
                 continue
+
             init_data = app_data['init']
 
             if not "connections" in init_data:
@@ -232,6 +233,8 @@ class ConfigManager:
                 connection['uri'] = parse_string(connection['uri'], hosts)
                 self.log.debug(f" - '{connection['id']['uid']}': {connection['uri']} ({origuri})")
 
+            conf_port_host_resolved[app_name]['init'] = init_data
+
         return conf_port_host_resolved
 
 
@@ -239,15 +242,14 @@ class ConfigManager:
         conf_port_offset = cp.deepcopy(conf_data)
         external_connections = self.boot.get('external_connections', [])
 
-        for app_data in conf_port_offset.values():
-            if app_data is not dict:
+        for app_name, app_data in conf_port_offset.items():
+            if not type(app_data) == dict:
                 continue
 
             if not 'init' in app_data:
                 continue
 
             init_data = app_data['init']
-
             if not "connections" in init_data:
                 continue
 
@@ -263,6 +265,8 @@ class ConfigManager:
                         self.log.debug(f" - '{connection['id']['uid']}': {connection['uri']}")
                     except Exception as e:
                         self.log.debug(f" - '{connection['id']['uid']}' ('{connection['uri']}') port wasn\'t offset, reason: {str(e)}")
+
+            conf_port_offset[app_name]['init'] = init_data
 
         return conf_port_offset
 

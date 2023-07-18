@@ -1,7 +1,35 @@
 import logging
 from rich.console import Console
 from flask_restful import Resource
-from flask import request, abort, make_response, jsonify
+from flask import request, abort, make_response, jsonify, abort
+
+def extract_data(request, dico, conf_name):
+    app_name = request.args.get('app_name')
+    cmd_name = request.args.get('cmd_name')
+
+    if app_name:
+        app_data = dico.get(app_name)
+        if not app_data:
+            abort(404, description=f"{app_name} app not found in configuration {conf_name}, available are {dico.keys()}")
+        dico = app_data
+
+    if cmd_name:
+        cmd_data = dico.get(cmd_name)
+        if not cmd_data:
+            abort(404, description=f"{cmd_name} app not found in configuration {conf_name}, application {app_name}, available are {dico.keys()}")
+        dico = cmd_data
+
+    if cmd_name and not app_name:
+        cmd_data = dico.get(cmd_name)
+        if not cmd_data:
+            abort(404, description=f"{cmd_name} cmd not found in configuration {conf_name} (did you forget to provide the app_name?)")
+        dico = cmd_data
+
+    res = make_response(jsonify(dico))
+
+    if res.data == b'{}\n':
+        res.status_code = 204
+    return res
 
 class ConfigurationEndpoint(Resource):
     def __init__(self, config_data, *args, **kwargs):
@@ -33,8 +61,7 @@ class ConfigurationEndpoint(Resource):
         if name not in self.conf_data:
             abort(404, description=f'{name} not in configurations store, available configs are: {list(self.conf_data.keys())}')
 
-        data = self.conf_data.get(name)
-        return make_response(jsonify(data))
+        return extract_data(request, self.conf_data[name], name)
 
 class ConfigUploadFailed(Exception):
     """Couldn't upload the configuration """
