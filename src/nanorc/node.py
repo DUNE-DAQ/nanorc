@@ -226,7 +226,7 @@ class SubsystemNode(StatefulNode):
             boot_info = cp.deepcopy(self.cfgmgr.boot)
             boot_info['env']['DUNEDAQ_PARTITION'] = partition
 
-            self.log.info('booting task starting')
+            self.log.info(f'booting task starting {self.cfgmgr.get_conf_location(for_apps=True)}')
             task = Task(
                 function = 'boot',
                 boot_info = boot_info,
