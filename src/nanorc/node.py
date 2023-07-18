@@ -190,12 +190,12 @@ class SubsystemNode(StatefulNode):
             self.listener.flask_manager = self.listener.create_manager()
 
         cmd_name = cmd['id']
-        cmd_payload = cmd['data']
-        cmd_entry_state = cmd['entry_state']
+        cmd_payload = cmd.get('data', {})
+        cmd_entry_state = cmd.get('entry_state', "ANY")
         cmd_exit_state = cmd_entry_state
         node_state = app.state.upper()
 
-        if cmd_entry_state != node_state:
+        if cmd_entry_state != 'ANY' and cmd_entry_state != node_state:
             self.log.error(f'The node is in \'{node_state}\' so I cannot send \'{cmd_name}\', which requires the app to be \'{cmd_entry_state}\'.')
             return {'Failed': 'App in wrong state, cmd not sent'}
         return app.sup.send_command_and_wait(cmd_name,
