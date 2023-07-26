@@ -62,9 +62,11 @@ class ConfigManager:
             self.conf_data = new_data
 
         self.custom_commands = self._get_custom_commands_from_dict(self.conf_data)
-        from nanorc.utils import get_random_string
         config_url._replace(scheme = '')
-        config_url = config_url.path.split('/')[-1].replace('_', '-').replace(':', '').replace('.', '').lower()+'-'+get_random_string(5) # ensure no 2 config will be the same
+        from pathlib import Path
+        p = Path(config_url.geturl())
+        config_url = p.name.replace('_', '-').replace('/', '').replace(':', '').replace('.', '').lower()
+
         self.conf_server.add_configuration_data(config_url, self.conf_data)
         self.conf_url = f'{self.conf_server.get_conf_address_prefix()}?name={config_url}'
 
