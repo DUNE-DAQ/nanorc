@@ -472,7 +472,7 @@ class NanoRC:
             except Exception as e:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
-        if self.cfgsvr:
+        if self.cfgsvr and self.runs:
             self.cfgsvr.save_on_stop(self.runs[-1].run_number)
 
         self.execute_command("drain_dataflow", node_path=None, raise_on_fail=True, timeout=timeout, force=force)
