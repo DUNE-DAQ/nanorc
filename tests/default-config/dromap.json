@@ -1,0 +1,44 @@
+[
+    {
+        "src_id": 100,
+        "geo_id": {
+            "det_id": 3,
+            "crate_id": 1,
+            "slot_id": 0,
+            "stream_id": 0
+        },
+        "kind": "eth",
+        "parameters": {
+            "protocol": "udp",
+            "mode": "fix_rate",
+            "rx_iface": 0,
+            "rx_host": "localhost",
+            "rx_mac": "00:00:00:00:00:00",
+            "rx_ip": "0.0.0.0",
+            "tx_host": "localhost",
+            "tx_mac": "00:00:00:00:00:00",
+            "tx_ip": "0.0.0.0"
+        }
+    },
+    {
+        "src_id": 101,
+        "geo_id": {
+            "det_id": 3,
+            "crate_id": 1,
+            "slot_id": 0,
+            "stream_id": 1
+        },
+        "kind": "eth",
+        "parameters": {
+            "protocol": "udp",
+            "mode": "fix_rate",
+            "rx_iface": 0,
+            "rx_host": "localhost",
+            "rx_mac": "00:00:00:00:00:00",
+            "rx_ip": "0.0.0.0",
+            "tx_host": "localhost",
+            "tx_mac": "00:00:00:00:00:00",
+            "tx_ip": "0.0.0.0"
+        }
+    }
+]

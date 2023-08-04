@@ -1,0 +1,9 @@
+{
+    "apps": {
+        "dataflow0": "data/dataflow0_init",
+        "dfo": "data/dfo_init",
+        "fakehsi": "data/fakehsi_init",
+        "rulocalhostflx0": "data/rulocalhostflx0_init",
+        "trigger": "data/trigger_init"
+    }
+}

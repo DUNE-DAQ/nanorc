@@ -1,0 +1,280 @@
+{
+    "boot": {
+        "base_command_port": 3333,
+        "capture_env_vars": [
+            "TIMING_SHARE",
+            "DETCHANNELMAPS_SHARE"
+        ],
+        "connectivity_service_host": "np04-srv-015",
+        "connectivity_service_interval": 1000,
+        "connectivity_service_port": 15432,
+        "connectivity_service_threads": 2,
+        "disable_trace": false,
+        "ers_impl": "local",
+        "k8s_image": "dunedaq/c8-minimal",
+        "opmon_impl": "local",
+        "pocket_url": "127.0.0.1",
+        "process_manager": "ssh",
+        "start_connectivity_service": true,
+        "use_connectivity_service": true
+    },
+    "ctb_hsi": {
+        "beam_llt_triggers": [],
+        "crt_llt_triggers": [],
+        "fake_trig_1": {
+            "beam_mode": true,
+            "description": "Random trigger that can optionally be set to fire only during beam spill",
+            "enable": false,
+            "fixed_freq": true,
+            "period": 100000
+        },
+        "fake_trig_2": {
+            "beam_mode": true,
+            "description": "Random trigger that can optionally be set to fire only during beam spill",
+            "enable": false,
+            "fixed_freq": true,
+            "period": 100000
+        },
+        "hlt_triggers": [],
+        "host_ctb_hsi": "localhost",
+        "pds_llt_triggers": [],
+        "use_ctb_hsi": false
+    },
+    "daq_common": {
+        "data_rate_slowdown_factor": 10,
+        "data_request_timeout_ms": 1000,
+        "use_data_network": false
+    },
+    "dataflow": {
+        "apps": [
+            {
+                "app_name": "dataflow0",
+                "data_store_mode": "all-per-file",
+                "host_df": "localhost",
+                "max_file_size": 4294967296,
+                "max_trigger_record_window": 0,
+                "output_paths": [
+                    "."
+                ]
+            }
+        ],
+        "enable_tpset_writing": false,
+        "host_dfo": "localhost",
+        "host_tpw": "localhost",
+        "token_count": 10,
+        "tpset_output_file_size": 4294967296,
+        "tpset_output_path": "."
+    },
+    "detector": {
+        "clock_speed_hz": 62500000,
+        "op_env": "swtest",
+        "tpc_channel_map": "PD2HDChannelMap"
+    },
+    "dqm": {
+        "cmap": "HD",
+        "df_algs": "raw std fourier_plane",
+        "df_rate": 10,
+        "enable_dqm": false,
+        "fourier_channel_params": [
+            0,
+            0
+        ],
+        "fourier_plane_params": [
+            600,
+            1000
+        ],
+        "host_dqm": [
+            "localhost"
+        ],
+        "impl": "local",
+        "kafka_address": "",
+        "kafka_topic": "DQM",
+        "max_num_frames": 32768,
+        "raw_params": [
+            60,
+            50
+        ],
+        "rms_params": [
+            0,
+            1000
+        ],
+        "std_params": [
+            10,
+            1000
+        ]
+    },
+    "hsi": {
+        "control_hsi_hw": false,
+        "enable_hardware_state_recovery": true,
+        "enabled_hsi_signals": 1,
+        "host_fake_hsi": "localhost",
+        "host_timing_hsi": "localhost",
+        "hsi_device_id": 0,
+        "hsi_device_name": "",
+        "hsi_endpoint_address": 1,
+        "hsi_endpoint_partition": 0,
+        "hsi_fe_mask": 0,
+        "hsi_hw_connections_file": "${TIMING_SHARE}/config/etc/connections.xml",
+        "hsi_inv_mask": 0,
+        "hsi_re_mask": 0,
+        "hsi_readout_period": 1000,
+        "hsi_signal_emulation_mode": 0,
+        "hsi_source": 1,
+        "mean_hsi_signal_multiplicity": 1,
+        "random_trigger_rate_hz": 1.0,
+        "use_fake_hsi": true,
+        "use_timing_hsi": false
+    },
+    "readout": {
+        "data_files": [
+            {
+                "data_file": "asset://?label=DuneWIB&subsystem=readout",
+                "detector_id": 3
+            }
+        ],
+        "default_data_file": "/cvmfs/dunedaq.opensciencegrid.org/assets/files/9/f/1/frames.bin",
+        "detector_readout_map_file": "./dune_wib_dro_map.json",
+        "dpdk_eal_args": "-l 0-1 -n 3 -- -m [0:1].0 -j",
+        "dpdk_lcores_config": {
+            "default_lcore_id_set": [
+                1,
+                2,
+                3,
+                4
+            ],
+            "exceptions": []
+        },
+        "emulated_data_times_start_with_now": false,
+        "emulator_mode": false,
+        "enable_raw_recording": false,
+        "enable_tpg": false,
+        "fragment_send_timeout_ms": 10,
+        "latency_buffer_size": 499968,
+        "numa_config": {
+            "default_id": 0,
+            "default_latency_numa_aware": false,
+            "default_latency_preallocation": false,
+            "exceptions": []
+        },
+        "raw_recording_output_dir": ".",
+        "thread_pinning_file": "",
+        "tpg_algorithm": "SimpleThreshold",
+        "tpg_channel_mask": [],
+        "tpg_threshold": 120,
+        "use_fake_cards": true,
+        "use_fake_data_producers": false
+    },
+    "timing": {
+        "control_timing_partition": false,
+        "host_tprtc": "localhost",
+        "timing_partition_id": 0,
+        "timing_partition_master_device_name": "",
+        "timing_partition_rate_control_enabled": false,
+        "timing_partition_spill_gate_enabled": false,
+        "timing_partition_trigger_mask": 255,
+        "timing_session_name": ""
+    },
+    "trigger": {
+        "completeness_tolerance": 1,
+        "ctcm_trigger_intervals": [
+            10000000
+        ],
+        "ctcm_trigger_types": [
+            4
+        ],
+        "host_trigger": "localhost",
+        "hsi_trigger_type_passthrough": false,
+        "mlt_buffer_timeout": 100,
+        "mlt_ignore_tc": [],
+        "mlt_max_td_length_ms": 1000,
+        "mlt_merge_overlapping_tcs": true,
+        "mlt_send_timed_out_tds": true,
+        "mlt_td_readout_map": {
+            "c0": {
+                "candidate_type": 0,
+                "time_after": 1001,
+                "time_before": 1000
+            },
+            "c1": {
+                "candidate_type": 1,
+                "time_after": 1001,
+                "time_before": 1000
+            },
+            "c2": {
+                "candidate_type": 2,
+                "time_after": 1001,
+                "time_before": 1000
+            },
+            "c3": {
+                "candidate_type": 3,
+                "time_after": 1001,
+                "time_before": 1000
+            },
+            "c4": {
+                "candidate_type": 4,
+                "time_after": 1001,
+                "time_before": 1000
+            },
+            "c5": {
+                "candidate_type": 5,
+                "time_after": 1001,
+                "time_before": 1000
+            },
+            "c6": {
+                "candidate_type": 6,
+                "time_after": 1001,
+                "time_before": 1000
+            },
+            "c7": {
+                "candidate_type": 7,
+                "time_after": 1001,
+                "time_before": 1000
+            },
+            "c8": {
+                "candidate_type": 8,
+                "time_after": 1001,
+                "time_before": 1000
+            },
+            "c9": {
+                "candidate_type": 9,
+                "time_after": 1001,
+                "time_before": 1000
+            }
+        },
+        "mlt_trigger_bitwords": [],
+        "mlt_use_bitwords": false,
+        "mlt_use_readout_map": false,
+        "tolerate_incompleteness": false,
+        "trigger_activity_config": {
+            "adc_threshold": 10000,
+            "adj_tolerance": 4,
+            "adjacency_threshold": 6,
+            "n_channels_threshold": 8,
+            "prescale": 100,
+            "print_tp_info": false,
+            "trigger_on_adc": false,
+            "trigger_on_adjacency": true,
+            "trigger_on_n_channels": false,
+            "window_length": 10000
+        },
+        "trigger_activity_plugin": "TriggerActivityMakerPrescalePlugin",
+        "trigger_candidate_config": {
+            "adc_threshold": 10000,
+            "adj_tolerance": 4,
+            "adjacency_threshold": 6,
+            "n_channels_threshold": 8,
+            "prescale": 100,
+            "print_tp_info": false,
+            "trigger_on_adc": false,
+            "trigger_on_adjacency": true,
+            "trigger_on_n_channels": false,
+            "window_length": 10000
+        },
+        "trigger_candidate_plugin": "TriggerCandidateMakerPrescalePlugin",
+        "trigger_window_after_ticks": 1000,
+        "trigger_window_before_ticks": 1000,
+        "ttcm_s1": 1,
+        "ttcm_s2": 2,
+        "use_custom_maker": false
+    }
+}

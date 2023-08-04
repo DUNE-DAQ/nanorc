@@ -1,0 +1,16 @@
+{
+    "modules": [
+        {
+            "data": {
+                "general_queue_timeout": 100,
+                "stop_timeout": 10000,
+                "td_send_retries": 5,
+                "thresholds": {
+                    "busy": 10,
+                    "free": 5
+                }
+            },
+            "match": "dfo"
+        }
+    ]
+}

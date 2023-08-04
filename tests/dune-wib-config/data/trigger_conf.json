@@ -1,0 +1,144 @@
+{
+    "modules": [
+        {
+            "data": {
+                "latencybufferconf": {
+                    "latency_buffer_alignment_size": 0,
+                    "latency_buffer_intrinsic_allocator": false,
+                    "latency_buffer_numa_aware": false,
+                    "latency_buffer_numa_node": 0,
+                    "latency_buffer_preallocation": false,
+                    "latency_buffer_size": 10000000,
+                    "source_id": 0
+                },
+                "requesthandlerconf": {
+                    "compression_algorithm": "None",
+                    "det_id": 1,
+                    "enable_raw_recording": false,
+                    "fragment_queue_timeout_ms": 100,
+                    "fragment_send_timeout_ms": 10,
+                    "latency_buffer_size": 10000000,
+                    "num_request_handling_threads": 4,
+                    "output_file": "output.out",
+                    "pop_limit_pct": 0.8,
+                    "pop_size_pct": 0.1,
+                    "request_timeout_ms": 1000,
+                    "source_id": 0,
+                    "stream_buffer_size": 8388608,
+                    "use_o_direct": true,
+                    "warn_about_empty_buffer": true,
+                    "warn_on_timeout": false
+                }
+            },
+            "match": "tc_buf"
+        },
+        {
+            "match": "tctee_ttcm"
+        },
+        {
+            "data": {
+                "hsi_trigger_type_passthrough": false,
+                "s0": {
+                    "signal_type": 0,
+                    "time_after": 1000,
+                    "time_before": 1000
+                },
+                "s1": {
+                    "signal_type": 1,
+                    "time_after": 1000,
+                    "time_before": 1000
+                },
+                "s2": {
+                    "signal_type": 2,
+                    "time_after": 1000,
+                    "time_before": 1000
+                }
+            },
+            "match": "ttcm"
+        },
+        {
+            "data": {
+                "buffer_timeout": 100,
+                "hsi_trigger_type_passthrough": false,
+                "ignore_tc": [],
+                "links": [
+                    {
+                        "element": 0,
+                        "subsystem": "HW_Signals_Interface"
+                    },
+                    {
+                        "element": 0,
+                        "subsystem": "Trigger"
+                    },
+                    {
+                        "element": 100,
+                        "subsystem": "Detector_Readout"
+                    },
+                    {
+                        "element": 101,
+                        "subsystem": "Detector_Readout"
+                    }
+                ],
+                "merge_overlapping_tcs": true,
+                "td_out_of_timeout": true,
+                "td_readout_limit": 62500000,
+                "td_readout_map": {
+                    "c0": {
+                        "candidate_type": 0,
+                        "time_after": 1001,
+                        "time_before": 1000
+                    },
+                    "c1": {
+                        "candidate_type": 1,
+                        "time_after": 1001,
+                        "time_before": 1000
+                    },
+                    "c2": {
+                        "candidate_type": 2,
+                        "time_after": 1001,
+                        "time_before": 1000
+                    },
+                    "c3": {
+                        "candidate_type": 3,
+                        "time_after": 1001,
+                        "time_before": 1000
+                    },
+                    "c4": {
+                        "candidate_type": 4,
+                        "time_after": 1001,
+                        "time_before": 1000
+                    },
+                    "c5": {
+                        "candidate_type": 5,
+                        "time_after": 1001,
+                        "time_before": 1000
+                    },
+                    "c6": {
+                        "candidate_type": 6,
+                        "time_after": 1001,
+                        "time_before": 1000
+                    },
+                    "c7": {
+                        "candidate_type": 7,
+                        "time_after": 1001,
+                        "time_before": 1000
+                    },
+                    "c8": {
+                        "candidate_type": 8,
+                        "time_after": 1001,
+                        "time_before": 1000
+                    },
+                    "c9": {
+                        "candidate_type": 9,
+                        "time_after": 1001,
+                        "time_before": 1000
+                    }
+                },
+                "trigger_bitwords": [],
+                "use_bitwords": false,
+                "use_readout_map": false
+            },
+            "match": "mlt"
+        }
+    ]
+}

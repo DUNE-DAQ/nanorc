@@ -1,0 +1,73 @@
+{
+    "modules": [
+        {
+            "data": {
+                "clock_frequency": 62500000,
+                "enabled_signals": 1,
+                "hsi_device_id": 1,
+                "mean_signal_multiplicity": 1,
+                "signal_emulation_mode": 0,
+                "timestamp_offset": 0,
+                "trigger_rate": 1.0
+            },
+            "match": "fhsig"
+        },
+        {
+            "data": {
+                "latencybufferconf": {
+                    "latency_buffer_alignment_size": 0,
+                    "latency_buffer_intrinsic_allocator": false,
+                    "latency_buffer_numa_aware": false,
+                    "latency_buffer_numa_node": 0,
+                    "latency_buffer_preallocation": false,
+                    "latency_buffer_size": 100000,
+                    "source_id": 0
+                },
+                "rawdataprocessorconf": {
+                    "channel_map_name": "None",
+                    "clock_speed_hz": 62500000,
+                    "crate_id": 0,
+                    "emulator_mode": false,
+                    "enable_tpg": false,
+                    "error_counter_threshold": 100,
+                    "error_reset_freq": 10000,
+                    "link_id": 0,
+                    "postprocess_queue_sizes": 10000,
+                    "slot_id": 0,
+                    "source_id": 0,
+                    "tp_timeout": 218750,
+                    "tpg_algorithm": "SimpleThreshold",
+                    "tpg_channel_mask": [],
+                    "tpg_threshold": 5
+                },
+                "readoutmodelconf": {
+                    "fake_trigger_flag": 0,
+                    "send_partial_fragment_if_available": true,
+                    "source_id": 0,
+                    "source_queue_timeout_ms": 10,
+                    "tpset_min_latency_ticks": 3125000,
+                    "tpset_transmission_rate_hz": 2000
+                },
+                "requesthandlerconf": {
+                    "compression_algorithm": "None",
+                    "det_id": 1,
+                    "enable_raw_recording": false,
+                    "fragment_queue_timeout_ms": 100,
+                    "fragment_send_timeout_ms": 10,
+                    "latency_buffer_size": 100000,
+                    "num_request_handling_threads": 4,
+                    "output_file": "output.out",
+                    "pop_limit_pct": 0.8,
+                    "pop_size_pct": 0.1,
+                    "request_timeout_ms": 1000,
+                    "source_id": 0,
+                    "stream_buffer_size": 8388608,
+                    "use_o_direct": true,
+                    "warn_about_empty_buffer": false,
+                    "warn_on_timeout": true
+                }
+            },
+            "match": "hsi_datahandler"
+        }
+    ]
+}

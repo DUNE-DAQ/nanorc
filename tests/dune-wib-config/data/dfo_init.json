@@ -1,0 +1,51 @@
+{
+    "connections": [
+        {
+            "connection_type": "kSendRecv",
+            "id": {
+                "data_type": "TriggerDecision",
+                "session": "",
+                "uid": "td_to_dfo"
+            },
+            "uri": "tcp://{dfo}:*"
+        },
+        {
+            "connection_type": "kSendRecv",
+            "id": {
+                "data_type": "TriggerDecisionToken",
+                "session": "",
+                "uid": "triginh"
+            },
+            "uri": "tcp://{dfo}:*"
+        }
+    ],
+    "connectivity_service_interval_ms": 1000,
+    "modules": [
+        {
+            "data": {
+                "conn_refs": [
+                    {
+                        "name": "td_connection",
+                        "uid": "td_to_dfo"
+                    },
+                    {
+                        "name": "token_connection",
+                        "uid": "triginh"
+                    },
+                    {
+                        "name": "busy_connection",
+                        "uid": "df_busy_signal"
+                    },
+                    {
+                        "name": "trigger_0_connection",
+                        "uid": "trigger_decision_0"
+                    }
+                ]
+            },
+            "inst": "dfo",
+            "plugin": "DataFlowOrchestrator"
+        }
+    ],
+    "queues": [],
+    "use_connectivity_service": true
+}
