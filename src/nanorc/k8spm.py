@@ -429,31 +429,6 @@ class K8SProcessManager(object):
                                     for mount in app_boot_info['mounted_dirs']
                                 ]
                             )
-                            #   + (
-                            #     [
-                            #         client.V1VolumeMount(
-                            #             mount_path = "/cvmfs/dunedaq.opensciencegrid.org",
-                            #             name = "dunedaq-cvmfs",
-                            #             read_only = True)
-                            #     ]
-                            #     if self.mount_cvmfs else []
-                            # ) + (
-                            #     [
-                            #         client.V1VolumeMount(
-                            #             mount_path = "/cvmfs/dunedaq-development.opensciencegrid.org",
-                            #             name = "dunedaq-dev-cvmfs",
-                            #             read_only = True)
-                            #     ]
-                            #     if self.mount_cvmfs else []
-                            # ) + (
-                            #     [
-                            #         client.V1VolumeMount(
-                            #             mount_path = "/dunedaq/pocket",
-                            #             name = "pocket",
-                            #             read_only = False)
-                            #     ]
-                            #     if self.cluster_config.is_kind else []
-                            # )
                         )
                     )
                 ],
@@ -467,31 +442,6 @@ class K8SProcessManager(object):
                             for mount in app_boot_info['mounted_dirs']
                         ]
                     ) 
-                    # + (
-                    #     [
-                    #         client.V1Volume(
-                    #             name = "dunedaq-cvmfs",
-                    #             host_path = client.V1HostPathVolumeSource(
-                    #                 path = '/cvmfs/dunedaq.opensciencegrid.org'))
-                    #     ]
-                    #     if self.mount_cvmfs else []
-                    # ) + (
-                    #     [
-                    #         client.V1Volume(
-                    #             name = "dunedaq-dev-cvmfs",
-                    #             host_path = client.V1HostPathVolumeSource(
-                    #                 path = '/cvmfs/dunedaq-development.opensciencegrid.org'))
-                    #     ]
-                    #     if self.mount_cvmfs else []
-                    # ) + (
-                    #     [
-                    #         client.V1Volume(
-                    #             name = "pocket",
-                    #             host_path = client.V1HostPathVolumeSource(
-                    #                 path = '/pocket'))
-                    #     ]
-                    #     if self.cluster_config.is_kind else []
-                    # )
                 )
             )
         )
