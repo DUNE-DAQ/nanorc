@@ -1,9 +1,0 @@
-{
-    "apps": {
-        "dataflow0": "data/dataflow0_conf",
-        "dfo": "data/dfo_conf",
-        "fakehsi": "data/fakehsi_conf",
-        "rulocalhosteth0": "data/rulocalhosteth0_conf",
-        "trigger": "data/trigger_conf"
-    }
-}
