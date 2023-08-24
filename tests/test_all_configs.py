@@ -10,7 +10,7 @@ commands = "boot conf start_run 111 wait 60 stop_run scrap terminate".split()
 @pytest.fixture(params = conf_types)
 def perform_all_runs(request):
     '''
-    We generate a config using daqconf_multiru_gen, then run nanorc with it in three different ways.
+    We generate a config using daqconf_multiru_gen, then run nanorc with it in two different ways.
     The error code of the process is used to determine whether everything worked.
     All processes are run in a temporary directory, so as not to fill up the CWD with logs.
     '''
@@ -21,7 +21,6 @@ def perform_all_runs(request):
     os.chdir(temp_dir_name)                                                     #Move into the temp dir.
 
     conf_name = "test-conf"
-    db_name = "integ-test-conf"
     DMG_args = ["daqconf_multiru_gen", "-m", "my_dro_map.json", conf_name]
     subprocess.run(DMG_args)                                                    #Generate a config
     partition_name = f"test-partition-{request.param}"
