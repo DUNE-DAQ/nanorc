@@ -355,20 +355,13 @@ class K8SProcessManager(object):
             debug_str += f' resources: {app_boot_info["resources"]}'
         if app_boot_info['mounted_dirs']:
             debug_str+=f' mounted_dirs (name: inpod->physical)={mount["name"]+": "+mount["in_pod_location"]+"->"+mount["physical_location"] for mount in app_boot_info["mounted_dirs"]}'
+
         if app_boot_info['node-selection']:
             debug_str+=f' node-selection={app_boot_info["node-selection"]}'
         if app_boot_info['affinity']:
             debug_str+=f' affinity={app_boot_info["affinity"]}'
         if app_boot_info['anti-affinity']:
             debug_str+=f' anti-affinity={app_boot_info["anti-affinity"]}'
-
-        use_felix = False
-        for k in app_boot_info['resources']:
-            if "felix.cern/flx" in k: # HACK
-                use_felix = True
-                break
-        if use_felix:
-            info_str += ", which uses FELIX"
 
         self.log.info(info_str)
         self.log.debug(debug_str)
@@ -402,7 +395,10 @@ class K8SProcessManager(object):
                         image = app_boot_info["image"],
                         image_pull_policy= "Always",
                         security_context = client.V1SecurityContext(
-                            privileged = use_felix # HACK
+                            privileged = app_boot_info['privileged'],
+                            capabilities = client.V1Capabilities(
+                                add = app_boot_info['capabilities']
+                            )
                         ),
                         resources = (
                             client.V1ResourceRequirements(
@@ -432,38 +428,6 @@ class K8SProcessManager(object):
                                         read_only = mount['read_only'])
                                     for mount in app_boot_info['mounted_dirs']
                                 ]
-                            ) + (
-                                [
-                                    client.V1VolumeMount(
-                                        mount_path = "/cvmfs/dunedaq.opensciencegrid.org",
-                                        name = "dunedaq-cvmfs",
-                                        read_only = True)
-                                ]
-                                if self.mount_cvmfs else []
-                            ) + (
-                                [
-                                    client.V1VolumeMount(
-                                        mount_path = "/cvmfs/dunedaq-development.opensciencegrid.org",
-                                        name = "dunedaq-dev-cvmfs",
-                                        read_only = True)
-                                ]
-                                if self.mount_cvmfs else []
-                            ) + (
-                                [
-                                    client.V1VolumeMount(
-                                        mount_path = "/dunedaq/pocket",
-                                        name = "pocket",
-                                        read_only = False)
-                                ]
-                                if self.cluster_config.is_kind else []
-                            ) + (
-                                [
-                                    client.V1VolumeMount(
-                                        mount_path = "/dev",
-                                        name = "devfs",
-                                        read_only = False)
-                                ]
-                                if use_felix else []
                             )
                         )
                     )
@@ -477,39 +441,7 @@ class K8SProcessManager(object):
                                     path = mount['physical_location']))
                             for mount in app_boot_info['mounted_dirs']
                         ]
-                    ) + (
-                        [
-                            client.V1Volume(
-                                name = "dunedaq-cvmfs",
-                                host_path = client.V1HostPathVolumeSource(
-                                    path = '/cvmfs/dunedaq.opensciencegrid.org'))
-                        ]
-                        if self.mount_cvmfs else []
-                    ) + (
-                        [
-                            client.V1Volume(
-                                name = "dunedaq-dev-cvmfs",
-                                host_path = client.V1HostPathVolumeSource(
-                                    path = '/cvmfs/dunedaq-development.opensciencegrid.org'))
-                        ]
-                        if self.mount_cvmfs else []
-                    ) + (
-                        [
-                            client.V1Volume(
-                                name = "pocket",
-                                host_path = client.V1HostPathVolumeSource(
-                                    path = '/pocket'))
-                        ]
-                        if self.cluster_config.is_kind else []
-                    ) + (
-                        [
-                            client.V1Volume(
-                                name = "devfs",
-                                host_path = client.V1HostPathVolumeSource(
-                                    path = '/dev'))
-                        ]
-                        if use_felix else []
-                    )
+                    ) 
                 )
             )
         )
@@ -669,6 +601,9 @@ class K8SProcessManager(object):
                 f"ERROR: apps have already been booted {' '.join(self.apps.keys())}. Terminate them all before booting a new set."
             )
 
+
+
+        #NOTE:  Move this out of the k8s pm-----
         if self.cluster_config.is_kind:
             logging.info('Resolving the kind gateway')
             import docker, ipaddress
@@ -690,6 +625,7 @@ class K8SProcessManager(object):
         else:
             self.gateway = socket.gethostbyname(socket.gethostname())
             logging.info(f"K8s gateway: {self.gateway} ({socket.gethostname()})")
+        #---------------------------
 
         apps = boot_info["apps"].copy()
         env_vars = boot_info["env"]
@@ -697,6 +633,7 @@ class K8SProcessManager(object):
 
         mounted_dirs = []
 
+        #NOTE:  Move this out of the k8s pm-----
         if rte_script:
             self.log.info(f'Using the Runtime environment script "{rte_script}"')
         else:
@@ -716,6 +653,17 @@ class K8SProcessManager(object):
             }]
             self.log.info(f'Using the dev area "{dbt_install_dir}"')
 
+            # Check this
+            venv_dir = os.getenv('VIRTUAL_ENV')
+
+            mounted_dirs += [{
+                'in_pod_location': venv_dir,
+                'name': 'venv',
+                'read_only': True,
+                'physical_location': venv_dir
+            }]
+
+        #--------------
 
         self.partition = boot_info['env']['DUNEDAQ_PARTITION']
 
@@ -779,6 +727,8 @@ class K8SProcessManager(object):
                 "anti-affinity"   : app_conf.get('anti-affinity', []),
                 "node-selection"  : app_conf.get('node-selection', []),
                 "connections"     : self.connections.get(app_name, []),
+                "privileged"      : app_conf.get('privileged', False),
+                "capabilities"    : app_conf.get('capabilities', []),
             }
 
             from urllib.parse import urlparse
@@ -800,6 +750,32 @@ class K8SProcessManager(object):
                     'physical_location': trace_dir
                 }]
                 #app_env['TRACE_FILE'] = f'{tpath}/{tfile}'
+
+            if self.mount_cvmfs:
+                app_boot_info['mounted_dirs'] += [
+                    {
+                        'in_pod_location': '/cvmfs/dunedaq.opensciencegrid.org',
+                        'name': 'dunedaq-cvmfs',
+                        'read_only': True,
+                        'physical_location': '/cvmfs/dunedaq.opensciencegrid.org'
+                    },
+                    {
+                        'in_pod_location': '/cvmfs/dunedaq-development.opensciencegrid.org',
+                        'name': 'dunedaq-dev-cvmfs',
+                        'read_only': True,
+                        'physical_location': '/cvmfs/dunedaq-development.opensciencegrid.org'
+                    }
+                ]
+                
+            if self.cluster_config.is_kind:
+                app_boot_info['mounted_dirs'] += [
+                    {
+                        'in_pod_location': '/dunedaq/pocket',
+                        'name': 'pocket',
+                        'read_only': False,
+                        'physical_location': '/pocket'
+                    }
+                ] 
 
             from datetime import datetime
 
