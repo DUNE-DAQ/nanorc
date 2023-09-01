@@ -120,7 +120,18 @@ class K8SProcessManager(object):
             self.log.info(f'Executing {script_data["cmd"]} on {host}.')
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"] + [cmd]
             import sh
-            proc = sh.ssh(ssh_args)
+            from sh import ErrorReturnCode
+            try:
+                proc = sh.ssh(ssh_args)
+            except ErrorReturnCode as e:
+                self.log.error(
+                    e.stdout.decode('ascii')
+                )
+                continue
+            except Exception as e:
+                self.log.critical(
+                    str(e)
+                )
             self.log.info(proc)
 
 
@@ -441,7 +452,7 @@ class K8SProcessManager(object):
                                     path = mount['physical_location']))
                             for mount in app_boot_info['mounted_dirs']
                         ]
-                    ) 
+                    )
                 )
             )
         )
@@ -766,7 +777,7 @@ class K8SProcessManager(object):
                         'physical_location': '/cvmfs/dunedaq-development.opensciencegrid.org'
                     }
                 ]
-                
+
             if self.cluster_config.is_kind:
                 app_boot_info['mounted_dirs'] += [
                     {
@@ -775,7 +786,7 @@ class K8SProcessManager(object):
                         'read_only': False,
                         'physical_location': '/pocket'
                     }
-                ] 
+                ]
 
             from datetime import datetime
 
