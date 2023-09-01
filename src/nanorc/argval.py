@@ -40,7 +40,14 @@ def validate_node_path(ctx, param, prompted_path):
         prompted_path = '/'+prompted_path
 
     hierarchy = prompted_path.split("/")
-    topnode = ctx.obj.rc.topnode
+    
+    try:
+        topnode = ctx.obj.rc.topnode
+    except Exception:
+        try: # If rc context already (from core)
+            topnode = ctx.topnode
+        except Exception as ex:
+            raise click.BadParameter(f"Couldn't find topnode in the context") from ex
 
     r = Resolver('name')
     try:

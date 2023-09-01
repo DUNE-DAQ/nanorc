@@ -226,7 +226,7 @@ def change_rate(ctx, obj, trigger_rate, timeout):
 
 
 @click.command()
-@accept_path(argument=True)
+@click.argument('node-path', type=str)
 @click.option('--resource-name', type=str, default=None)
 @accept_timeout(None)
 @click.pass_obj
@@ -240,7 +240,7 @@ def include(ctx, obj, node_path, resource_name, timeout):
 
 
 @click.command()
-@accept_path(argument=True)
+@click.argument('node-path', type=str)
 @click.option('--resource-name', type=str, default=None)
 @accept_timeout(None)
 @click.pass_obj
@@ -254,7 +254,7 @@ def exclude(ctx, obj, node_path, resource_name, timeout):
 
 
 @click.command()
-@accept_path(argument=True)
+@click.argument('node-path', type=str)
 @click.argument('json_file', type=click.Path(exists=True))
 @accept_timeout(None)
 @click.pass_obj
