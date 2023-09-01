@@ -118,7 +118,7 @@ class K8SProcessManager(object):
 
         for host in hosts:
             self.log.info(f'Executing {script_data["cmd"]} on {host}.')
-            ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"] + [cmd]]
+            ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"] + [cmd]
             import sh
             from sh import ErrorReturnCode
             try:
