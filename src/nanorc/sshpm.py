@@ -111,6 +111,12 @@ class SSHProcessManager(object):
 
     __instances = set()
 
+    @property
+    def ssh_cmd(self):
+        # Force system ssh
+        # Exception handling?
+        return sh.Command('/usr/bin/ssh')
+
     @classmethod
     def kill_all_instances(cls):
         instances = set(cls.__instances)
@@ -237,7 +243,7 @@ class SSHProcessManager(object):
         ssh_test_args = ssh_args+['echo "Knock knock, tricks or treats!"']
 
         try:
-            test_proc = sh.ssh(ssh_test_args)
+            test_proc = self.ssh(ssh_test_args, _env={})
         except Exception as e:
             self.log.error(f'I cannot ssh to {host}:')
             self.log.error(f'ssh {" ".join(ssh_test_args)}')
@@ -279,6 +285,7 @@ class SSHProcessManager(object):
                     _bg=True,
                     _bg_exc=False,
                     _new_session=True,
+                    _env={},
                     #_preexec_fn=on_parent_exit(signal.SIGTERM), # should be here too
                 )
                 self.watch(srv_name, proc)
@@ -297,8 +304,9 @@ class SSHProcessManager(object):
 
         for name, desc in self.apps.items():
             ssh_args=desc.ssh_args + [desc.cmd]
-            proc = sh.ssh(
+            proc = self.ssh(
                 *ssh_args,
+                _env={},
                 _out = file_logger(desc.logfile) if not self.log_path else None,
                 _bg = True,
                 _bg_exc = False,
