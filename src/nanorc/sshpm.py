@@ -243,7 +243,7 @@ class SSHProcessManager(object):
         ssh_test_args = ssh_args+['echo "Knock knock, tricks or treats!"']
 
         try:
-            test_proc = self.ssh(ssh_test_args, _env={})
+            test_proc = self.ssh_cmd(ssh_test_args, _env={})
         except Exception as e:
             self.log.error(f'I cannot ssh to {host}:')
             self.log.error(f'ssh {" ".join(ssh_test_args)}')
@@ -304,7 +304,7 @@ class SSHProcessManager(object):
 
         for name, desc in self.apps.items():
             ssh_args=desc.ssh_args + [desc.cmd]
-            proc = self.ssh(
+            proc = self.ssh_cmd(
                 *ssh_args,
                 _env={},
                 _out = file_logger(desc.logfile) if not self.log_path else None,
