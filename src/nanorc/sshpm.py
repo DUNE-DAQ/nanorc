@@ -2,6 +2,7 @@ import os
 import socket
 import copy as cp
 import sh
+from sh import ErrorReturnCode
 import sys
 import time
 import atexit
@@ -153,7 +154,17 @@ class SSHProcessManager(object):
         for host in hosts:
             self.log.info(f'Executing {script_data["cmd"]} on {host}.')
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"] + [cmd]
-            proc = sh.ssh(ssh_args)
+            try:
+                proc = sh.ssh(ssh_args)
+            except ErrorReturnCode as e:
+                self.log.error(
+                    e.stdout.decode('ascii')
+                )
+                continue
+            except Exception as e:
+                self.log.critical(
+                    str(e)
+                )
             self.log.info(proc)
 
     def setup_app(self, app_name, app_conf, conf_loc):

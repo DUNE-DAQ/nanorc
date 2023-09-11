@@ -19,6 +19,7 @@ from . import confdata
 from rich.traceback import Traceback
 from rich.table import Table
 from .runinfo import start_run, print_run_info
+import nanorc.argval as argval
 
 from datetime import datetime
 
@@ -152,11 +153,14 @@ class NanoRC:
     def send_expert_command(self, node_path, json_file, timeout):
         if not timeout:
             timeout = self.timeout
-
-        canexec = node_path.can_execute_custom_or_expert("expert", check_dead=True, check_children=False)
+        
+        # Check path validity when sending the command for integtest compatibility
+        node = argval.validate_node_path(self, None, node_path)
+        
+        canexec = node.can_execute_custom_or_expert("expert", check_dead=True, check_children=False)
 
         if canexec != CanExecuteReturnVal.CanExecute:
-            self.return_code = node_path.return_code
+            self.return_code = node.return_code
             return
 
         data = json.load(open(json_file,'r'))
@@ -182,11 +186,11 @@ class NanoRC:
             self.log.error(f'The file {json_file} content doesn\'t correspond to a rcif.command.RCCommand, bailing\n{e}')
             return
 
-        if not isinstance(node_path, ApplicationNode):
+        if not isinstance(node, ApplicationNode):
             self.log.error(f'You can only send expert commands to individual application! I\'m not sending anything for now.')
             return
 
-        ret = node_path.parent.send_expert_command(node_path, data, timeout=timeout)
+        ret = node.parent.send_expert_command(node, data, timeout=timeout)
         self.log.info(f'Reply: {ret}')
 
     def execute_command(self, command, node_path=None, **kwargs):
@@ -512,27 +516,30 @@ class NanoRC:
 
 
     def exclude(self, node_path, timeout, resource_name) -> NoReturn:
+        
+        # Check path validity when sending the command for integtest compatibility
+        node = argval.validate_node_path(self, None, node_path)
 
-        canexec = node_path.can_execute_custom_or_expert(
+        canexec = node.can_execute_custom_or_expert(
             command = "exclude",
             quiet = False,
             only_included = False,
             check_dead = False,
             check_inerror = False,
-            check_children = node_path.children != []
+            check_children = node.children != []
         )
         if canexec != CanExecuteReturnVal.CanExecute:
             self.log.error(f'Cannot execute exclude, reason: {str(canexec)}')
-            self.return_code = node_path.return_code
+            self.return_code = node.return_code
             return
 
-        ret = node_path.exclude()
+        ret = node.exclude()
         if ret != 0:
             return
 
         self.execute_custom_command(
             "exclude",
-            data = {'resource_name': resource_name if resource_name else node_path.name},
+            data = {'resource_name': resource_name if resource_name else node.name},
             timeout = timeout,
             node_path = None,
             only_included = False,
@@ -546,26 +553,29 @@ class NanoRC:
 
     def include(self, node_path, timeout, resource_name) -> NoReturn:
 
-        canexec = node_path.can_execute_custom_or_expert(
+        # Check path validity when sending the command for integtest compatibility
+        node = argval.validate_node_path(self, None, node_path)
+        
+        canexec = node.can_execute_custom_or_expert(
             command = "include",
             quiet = False,
             only_included = False,
             check_dead = False,
             check_inerror = False,
-            check_children = node_path.children != []
+            check_children = node.children != []
         )
         if canexec != CanExecuteReturnVal.CanExecute:
             self.log.error(f'Cannot execute include, reason: {str(canexec)}')
-            self.return_code = node_path.return_code
+            self.return_code = node.return_code
             return
 
-        ret = node_path.include()
+        ret = node.include()
         if ret != 0:
             return
 
         self.execute_custom_command(
             "include",
-            data = {'resource_name': resource_name if resource_name else node_paht.name},
+            data = {'resource_name': resource_name if resource_name else node.name},
             timeout = timeout,
             node_path = None,
             only_included = False,
