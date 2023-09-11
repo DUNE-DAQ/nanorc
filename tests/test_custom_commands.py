@@ -6,9 +6,10 @@ import tempfile
 
 app_name = "trigger"
 
-expert_json = {"id": "record", "entry_state": "ANY", "exit_state": "ANY", "data": {}}
-conf_types = ["normal"]
-commands = "boot expert_command expert.json test-conf/test-conf/dfo".split()
+custom_command1 = {"apps": {app_name: f"data/{app_name}_custom_command"}}
+custom_command2 = {"modules": [{"data": {}, "match": "*"}]}
+conf_types = ["normal", "k8s"]
+commands = "boot custom_command".split()
 conf_name = "test-conf"
 cluster_address = "k8s://np04-srv-015:31000"
 
@@ -27,9 +28,17 @@ def perform_all_runs(request):
 
     DMG_args = ["daqconf_multiru_gen", "-m", "my_dro_map.json", conf_name]
     subprocess.run(DMG_args)                                                    #Generate a config
+    print(os.listdir())
     partition_name = f"test-partition-{request.param}"
-    with open('expert.json', 'w') as json_file1:
-        json.dump(expert_json, json_file1)
+    os.chdir(conf_name)
+    with open('custom_command.json', 'w') as json_file1:
+        json.dump(custom_command1, json_file1)
+    print(os.listdir())
+    os.chdir("data")
+    with open(f'{app_name}_custom_command.json', 'w') as json_file2:
+        json.dump(custom_command2, json_file2)
+    print(os.listdir())
+    os.chdir("../..")
 
     match request.param:
         case "normal":
