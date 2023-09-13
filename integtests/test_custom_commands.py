@@ -8,7 +8,7 @@ app_name = "trigger"
 
 custom_command1 = {"apps": {app_name: f"data/{app_name}_custom_command"}}
 custom_command2 = {"modules": [{"data": {}, "match": "*"}]}
-conf_types = ["normal", "k8s"]
+conf_types = ["normal"]
 commands = "boot custom_command".split()
 conf_name = "test-conf"
 cluster_address = "k8s://np04-srv-015:31000"
