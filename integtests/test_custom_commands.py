@@ -5,13 +5,26 @@ import subprocess
 import tempfile
 
 app_name = "trigger"
+command_name = "record"
 
-custom_command1 = {"apps": {app_name: f"data/{app_name}_custom_command"}}
+custom_command1 = {"apps": {app_name: f"data/{app_name}_{command_name}"}}
 custom_command2 = {"modules": [{"data": {}, "match": "*"}]}
-conf_types = ["normal"]
-commands = "boot custom_command".split()
+conf_types = ["normal", "k8s"]
+commands = "boot {command_name}".split()
 conf_name = "test-conf"
 cluster_address = "k8s://np04-srv-015:31000"
+
+def insert_jsons():
+    os.chdir(conf_name)
+    with open(f'{command_name}.json', 'w') as json_file1:
+        json.dump(custom_command1, json_file1)
+
+    os.chdir("data")
+    with open(f'{app_name}_{command_name}.json', 'w') as json_file2:
+        json.dump(custom_command2, json_file2)
+
+    os.chdir("../..")
+
 
 @pytest.fixture(params = conf_types)
 def perform_all_runs(request):
@@ -26,25 +39,21 @@ def perform_all_runs(request):
     os.popen(f'cp {start_dir}/my_dro_map.json {temp_dir_name}/my_dro_map.json') #Copy the DRO map inside.
     os.chdir(temp_dir_name)                                                     #Move into the temp dir.
 
-    DMG_args = ["daqconf_multiru_gen", "-m", "my_dro_map.json", conf_name]
-    subprocess.run(DMG_args)                                                    #Generate a config
-    print(os.listdir())
-    partition_name = f"test-partition-{request.param}"
-    os.chdir(conf_name)
-    with open('custom_command.json', 'w') as json_file1:
-        json.dump(custom_command1, json_file1)
-    print(os.listdir())
-    os.chdir("data")
-    with open(f'{app_name}_custom_command.json', 'w') as json_file2:
-        json.dump(custom_command2, json_file2)
-    print(os.listdir())
-    os.chdir("../..")
-
     match request.param:
         case "normal":
+            DMG_args = ["daqconf_multiru_gen", "-m", "my_dro_map.json", conf_name]
+            subprocess.run(DMG_args)
+            partition_name = f"test-partition-{request.param}"
+            insert_jsons()
             arglist = ["nanorc", conf_name, partition_name] + commands
 
         case "k8s":
+            with open('conf.json', 'w') as json_file:
+                json.dump(k8s_json_contents, json_file)
+            DMG_args_k8s = ["daqconf_multiru_gen", "--force", "-c", "conf.json", "-m", "my_dro_map.json", "--force-pm", "k8s", conf_name]
+            subprocess.run(DMG_args_k8s)
+            partition_name = f"test-partition-{request.param}"
+            insert_jsons()
             arglist = ["nanorc", "--pm", cluster_address, conf_name, partition_name] + commands
 
     output = subprocess.run(arglist)
