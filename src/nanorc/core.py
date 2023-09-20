@@ -220,6 +220,7 @@ class NanoRC:
         elif canexec != CanExecuteReturnVal.CanExecute:
             if not force:
                 self.log.info(f"Cannot execute {command}, reason: {str(canexec)}, you may be able to --force")
+                self.return_code = 1
                 return
 
         kwargs['timeout'] = kwargs['timeout'] if kwargs.get('timeout') else self.timeout
