@@ -13,23 +13,22 @@ custom_command1 = {"apps": {app_name: f"data/{app_name}_{command_name}"}}
 custom_command2 = {"modules": [{"data": {}, "match": "*"}]}
 conf_types = ["normal", "k8s"]
 exe_names = ["nanorc", "nanotimingrc"]
-commands = "boot {command_name}".split()
+commands = f"boot {command_name}".split()
 conf_name = "test-conf"
 cluster_address = "k8s://np04-srv-015:31000"
 
 def insert_jsons():
     os.chdir(conf_name)
-    print(os.getcwd())
     with open(f'{command_name}.json', 'w') as json_file1:
         json.dump(custom_command1, json_file1)
 
     os.chdir("data")
-    print(os.getcwd())
     with open(f'{app_name}_{command_name}.json', 'w') as json_file2:
         json.dump(custom_command2, json_file2)
 
     os.chdir("../..")
     print(os.getcwd())
+    print(os.listdir())
 
 def perform_all_runs(exe_name, conf_type):
     '''
@@ -42,7 +41,6 @@ def perform_all_runs(exe_name, conf_type):
     temp_dir_name = temp_dir_object.name                                        #Make a temp directory.
     os.popen(f'cp {start_dir}/my_dro_map.json {temp_dir_name}/my_dro_map.json') #Copy the DRO map inside.
     os.chdir(temp_dir_name)                                                     #Move into the temp dir.
-    print(os.getcwd())
 
     match conf_type:
         case "normal":
@@ -62,7 +60,6 @@ def perform_all_runs(exe_name, conf_type):
             arglist = [exe_name, "--pm", cluster_address, conf_name, partition_name] + commands
 
     print(arglist)
-    print(os.getcwd())
     output = subprocess.run(arglist)
     os.chdir(start_dir)
     return output.returncode

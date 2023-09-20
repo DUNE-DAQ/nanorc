@@ -10,7 +10,7 @@ conf_types = ["no-db", "db"]
 exe_names = ["nanorc", "nanotimingrc"]
 cmd_dict = {"nanorc": "boot conf start_run 111 wait 60 stop_run scrap terminate".split(),
             "nano04rc": "boot conf start_run TEST wait 60 stop_run scrap terminate".split(),
-            "nanotimingrc": "boot conf start_run 111 wait 60 stop_run scrap terminate".split()}
+            "nanotimingrc": "boot conf start_run wait 60 stop_run scrap terminate".split()}
 conf_name = "test-conf"
 db_name = "integ-test-conf"
 cluster_address = "k8s://np04-srv-015:31000"
