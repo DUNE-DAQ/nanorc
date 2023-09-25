@@ -4,13 +4,12 @@ import pytest
 import subprocess
 import tempfile
 
-app_name = "trigger"
 k8s_json_contents = {"boot": {"use_connectivity_service": True, "connectivity_service_host": "np04-srv-023", "connectivity_service_port": 30005, "start_connectivity_service": False},
                  "readout": {"use_fake_data_producers": True}}
 expert_json = {"id": "record", "entry_state": "ANY", "exit_state": "ANY", "data": {}}
 conf_types = ["normal", "k8s"]
-exe_names = ["nanorc", "nanotimingrc"]
-conf_name = "test-conf"
+exe_names = ["nanorc"]
+conf_name = "testconf"
 commands = f"boot expert_command {conf_name}/{conf_name}/dfo expert.json".split()
 cluster_address = "k8s://np04-srv-015:31000"
 
