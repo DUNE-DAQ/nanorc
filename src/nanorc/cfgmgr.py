@@ -29,7 +29,7 @@ class ConfigManager:
         self.boot = {}
         self.port_offset = port_offset
         self.scheme = None
-        self.expected_std_cmds = ['init', 'conf']
+        self.expected_std_cmds = ['init', 'conf', 'boot', 'daqconf_multiru_gen', 'dromap', 'config']
         self.conf_server = upload_to
         self.conf_data, self.config_query_string = self.fetch_configuration(config_url)
         self.log.debug(f'"{config_url.path}" content: {list(self.conf_data.keys())}')
@@ -158,7 +158,7 @@ class ConfigManager:
             exit(1)
 
 
-    def fetch_from_file_system(self,config_url):
+    def fetch_from_file_system(self, config_url):
         from .utils import get_json_recursive
         return (get_json_recursive(config_url.path), f'file://{config_url.path}')
 
@@ -174,16 +174,17 @@ class ConfigManager:
                 raise RuntimeError(f"ERROR: failed to load {cfg_path}") from e
 
     def _get_custom_commands_from_dict(self, data:dict):
+        #TODO data contains entries for commands as well as apps: these aren't wanted.
+        #The problem is that there is an entry for the custom command, so we can't just use expected_std_commands
         from collections import defaultdict
-        custom_cmds = defaultdict(list)
-
+        custom_cmds = defaultdict(dict)
         for app_name, app_data in data.items():
-            if app_data is not dict: continue
+            if type(app_data) is not dict: continue
+            if (app_name in self.expected_std_cmds): continue
             for command_name, command_data in app_data.items():
                 if command_name in self.expected_std_cmds:
                     continue
-                custom_cmds[app_name].append(command_data)
-
+                custom_cmds[command_name][app_name] = command_data
         return custom_cmds
 
 
@@ -207,7 +208,6 @@ class ConfigManager:
 
     def get_custom_commands(self):
         return self.custom_commands
-
 
     def _resolve_hostnames(self, conf_data):
         conf_port_host_resolved = cp.deepcopy(conf_data)
