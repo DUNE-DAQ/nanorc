@@ -42,6 +42,8 @@ def perform_all_runs(exe_name, conf_type):
     The error code of the process is used to determine whether everything worked.
     All processes are run in a temporary directory, so as not to fill up the CWD with logs.
     '''
+    start_dir = os.getcwd()
+
     temp_dir_object = tempfile.TemporaryDirectory()
     temp_dir_name = temp_dir_object.name                                        #Make a temp directory.
 
@@ -83,7 +85,11 @@ def perform_all_runs(exe_name, conf_type):
     elif exe_name == 'nanotimingrc':
         DMG_args_1 = ["listrev_gen","-c", config_file_name_1, conf_name_1]
 
-    subprocess.run(DMG_args_1)
+
+    try:
+        subprocess.run(DMG_args_1)
+    except Exception as e:
+        pytest.fail(reason=str(e))
 
     partition_name = f"test-partition-{conf_type}"
     insert_json(conf_name_1)
@@ -95,7 +101,9 @@ def perform_all_runs(exe_name, conf_type):
     elif conf_type == "k8s":
         arglist = [exe_name, "--pm", cluster_address, conf_name_1, partition_name] + commands
 
+    os.chdir(temp_dir_name)
     output = subprocess.run(arglist)
+    os.chdir(start_dir)
     return output.returncode
 
 @pytest.mark.parametrize("exe_name", exe_names)
