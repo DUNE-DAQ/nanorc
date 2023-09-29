@@ -79,6 +79,7 @@ def perform_all_runs(exe_name, conf_type):
             subprocess.run(upload_args)
             arglist = [exe_name, "--pm", cluster_address, f"db://{db_name}", partition_name] + commands
 
+    os.chdir(temp_dir_name)
     output = subprocess.run(arglist)
     os.chdir(start_dir)
     return output.returncode
