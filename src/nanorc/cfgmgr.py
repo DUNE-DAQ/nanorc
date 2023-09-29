@@ -29,7 +29,7 @@ class ConfigManager:
         self.boot = {}
         self.port_offset = port_offset
         self.scheme = None
-        self.expected_std_cmds = ['init', 'conf', 'boot', 'daqconf_multiru_gen', 'dromap', 'config']
+        self.ignore_for_custom_cmd = ['init', 'conf', 'boot', 'daqconf_multiru_gen', 'dromap', 'config']
         self.conf_server = upload_to
         self.conf_data, self.config_query_string = self.fetch_configuration(config_url)
         self.log.debug(f'"{config_url.path}" content: {list(self.conf_data.keys())}')
@@ -174,15 +174,13 @@ class ConfigManager:
                 raise RuntimeError(f"ERROR: failed to load {cfg_path}") from e
 
     def _get_custom_commands_from_dict(self, data:dict):
-        #TODO data contains entries for commands as well as apps: these aren't wanted.
-        #The problem is that there is an entry for the custom command, so we can't just use expected_std_commands
         from collections import defaultdict
         custom_cmds = defaultdict(dict)
         for app_name, app_data in data.items():
             if type(app_data) is not dict: continue
-            if (app_name in self.expected_std_cmds): continue
+            if (app_name in self.ignore_for_custom_cmd): continue
             for command_name, command_data in app_data.items():
-                if command_name in self.expected_std_cmds:
+                if command_name in self.ignore_for_custom_cmd:
                     continue
                 custom_cmds[command_name][app_name] = command_data
         return custom_cmds
@@ -193,7 +191,7 @@ class ConfigManager:
     #     custom_cmds = defaultdict(list)
     #     for cmd_file in os.listdir(path+'/data'):
     #         std_cmd_flag = False
-    #         for std_cmd in self.expected_std_cmds:
+    #         for std_cmd in self.ignore_for_custom_cmd:
     #             if std_cmd+".json" in cmd_file:
     #                 std_cmd_flag = True
     #                 break # just a normal command

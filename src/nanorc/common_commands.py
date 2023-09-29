@@ -328,24 +328,6 @@ def add_common_cmds(shell, end_of_run_cmds=True):
     # shell.add_command(ls_thread       , 'ls_thread'       )
 
 def add_custom_cmds(cli, rc_cmd_exec, cmds):
-    '''
-    for c,d in cmds.items():
-        arg_list = {}
-        arg_default = {}
-        for app_data in d:
-            if type(app_data) == dict:
-                for modules_data in app_data.values():
-                    if type(modules_data) == dict:
-                        for module_data in modules_data:
-                            if 'match'  not in module_data:
-                                continue
-                            module = module_data['match']
-                            cmd_data = module_data.get('data')
-                            if not cmd_data: continue
-                            for arg in cmd_data:
-                                arg_list[arg] = type(cmd_data[arg])
-                                arg_default[arg] = cmd_data[arg]
-    '''
     for cmd_name, cmd_data in cmds.items():
         arg_list = {}
         arg_default = {}
