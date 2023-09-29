@@ -3,15 +3,15 @@ import os
 import pytest
 import subprocess
 import tempfile
+from nanorc.integ_utils import get_default_config_dict, write_config, generate_dromap_contents
 
-json_contents = {"boot": {"use_connectivity_service": True, "connectivity_service_host": "np04-srv-023", "connectivity_service_port": 30005, "start_connectivity_service": False},
-                 "readout": {"use_fake_data_producers": True}}
 conf_types = ["no-db", "db"]
 exe_names = ["nanorc", "nanotimingrc"]
-cmd_dict = {"nanorc": "boot conf start_run 111 wait 60 stop_run scrap terminate".split(),
-            "nano04rc": "boot conf start_run TEST wait 60 stop_run scrap terminate".split(),
-            "nanotimingrc": "boot conf start_run wait 60 stop_run scrap terminate".split()}
-conf_name = "test-conf"
+cmd_dict = {
+    "nanorc": "boot conf start_run 111 wait 5 stop_run scrap terminate".split(),
+    "nano04rc": "boot conf start_run TEST wait 5 stop_run scrap terminate".split(),
+    "nanotimingrc": "boot conf start_run wait 5 stop_run scrap terminate".split()
+}
 db_name = "integ-test-conf"
 cluster_address = "k8s://np04-srv-015:31000"
 
@@ -21,26 +21,61 @@ def perform_all_runs(exe_name, conf_type):
     The error code of the process is used to determine whether everything worked.
     All processes are run in a temporary directory, so as not to fill up the CWD with logs.
     '''
-    commands = cmd_dict[exe_name]
     start_dir = os.getcwd()
+
     temp_dir_object = tempfile.TemporaryDirectory()
-    temp_dir_name = temp_dir_object.name                                        #Make a temp directory.
-    os.popen(f'cp {start_dir}/my_dro_map.json {temp_dir_name}/my_dro_map.json') #Copy the DRO map inside.
-    os.chdir(temp_dir_name)                                                     #Move into the temp dir.
-    with open('conf.json', 'w') as json_file:
-        json.dump(json_contents, json_file)
+    temp_dir_name = temp_dir_object.name
 
+    dro_file_name = f'{temp_dir_name}/dro.json'
+    config_file_name_1 = f'{temp_dir_name}/conf1.json'
 
-    DMG_args = ["daqconf_multiru_gen", "--force", "-c", "conf.json", "-m", "my_dro_map.json", "--force-pm", "k8s", conf_name]
-    subprocess.run(DMG_args)                                                    #Generate a config
+    with open(dro_file_name, 'w') as f:
+        f.write(generate_dromap_contents(n_streams=2))
+
+    config_data_1 = get_default_config_dict()
+    config_data_1["boot"]["use_connectivity_service"] =  True
+    config_data_1["boot"]["connectivity_service_host"] = "np04-srv-023"
+    config_data_1["boot"]["connectivity_service_port"] = 30005
+    config_data_1["boot"]["start_connectivity_service"] = False
+    config_data_1["boot"]["process_manager"] = 'k8s'
+
+    if exe_name in ['nanorc', 'nano04rc']:
+        config_data_1["detector"]["op_env"] = "nanorc-integtest"
+        config_data_1["daq_common"]["data_rate_slowdown_factor"] = 1
+        config_data_1["detector"]["clock_speed_hz"] = 62500000 # DuneWIB/WIBEth
+        config_data_1["readout"]["use_fake_cards"] = True
+
+    elif exe_name == 'nanotimingrc':
+        boot = config_data_1['boot']
+        config_data_1 = {}
+        config_data_1['boot'] = boot
+
+    write_config(config_file_name_1, config_data_1)
+
+    conf_basename = 'test-conf-1'
+    conf_name_1 = f'{temp_dir_name}/{conf_basename}'
+    DMG_args_1 = []
+
+    if exe_name in ['nanorc', 'nano04rc']:
+        DMG_args_1 = ["fddaqconf_gen", "-c", config_file_name_1, "-m", dro_file_name, conf_name_1]
+
+    elif exe_name == 'nanotimingrc':
+        DMG_args_1 = ["listrev_gen", "-c", config_file_name_1, conf_name_1]
+
+    try:
+        subprocess.run(DMG_args_1)
+    except Exception as e:
+        pytest.fail(reason=str(e))
+
     partition_name = f"test-partition-{conf_type}"
-
+    commands = cmd_dict[exe_name]
+    arglist = []
     match conf_type:
         case "no-db":
-            arglist = [exe_name, "--pm", cluster_address, conf_name, partition_name] + commands
+            arglist = [exe_name, "--pm", cluster_address, conf_name_1, partition_name] + commands
 
         case "db":      #We upload the config to the database first
-            upload_args = ["upload-conf", conf_name, db_name]
+            upload_args = ["upload-conf", conf_name_1, db_name]
             subprocess.run(upload_args)
             arglist = [exe_name, "--pm", cluster_address, f"db://{db_name}", partition_name] + commands
 
