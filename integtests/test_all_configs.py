@@ -7,7 +7,6 @@ from nanorc.integ_utils import get_default_config_dict, write_config, generate_d
 
 conf_types = ["normal", "top-json"]
 exe_names = ["nanorc", "nanotimingrc"]
-#exe_names = ["nanotimingrc"]
 cmd_dict = {
     "nanorc": "boot conf conf start_run 111 wait 5 stop_run scrap terminate".split(),
     "nano04rc": "boot conf start_run TEST wait 5 stop_run scrap terminate".split(),
@@ -43,7 +42,7 @@ def perform_all_runs(exe_name, conf_type):
         config_data_1["daq_common"]["data_rate_slowdown_factor"] = 1
         config_data_1["detector"]["clock_speed_hz"] = 62500000 # DuneWIB/WIBEth
         config_data_1["readout"]["use_fake_cards"] = True
-    else:
+    elif exe_name == 'nanotimingrc':
         boot = config_data_1['boot']
         config_data_1 = {}
         config_data_1['boot'] = boot
