@@ -164,7 +164,7 @@ def timingcli(ctx, obj, traceback, pm, loglevel, log_path, cfg_dumpdir, kerberos
         ctx.exit(rc.return_code)
 
 
-from nanorc.common_commands import status, boot, conf, scrap, wait, terminate, start_shell, stop_run, shutdown
+from nanorc.common_commands import status, boot, conf, scrap, wait, terminate, start_shell, stop_run, shutdown, expert_command
 timingcli.add_command(status, 'status')
 timingcli.add_command(boot, 'boot')
 timingcli.add_command(conf, 'conf')
@@ -174,6 +174,7 @@ timingcli.add_command(terminate, 'terminate')
 timingcli.add_command(start_shell, 'shell')
 timingcli.add_command(stop_run, 'stop_run')
 timingcli.add_command(shutdown, 'shutdown')
+timingcli.add_command(expert_command, 'expert_command')
 
 @timingcli.command('start')
 @accept_timeout(None)
