@@ -38,10 +38,16 @@ def perform_all_runs(exe_name, conf_type):
     config_data_1 = get_default_config_dict()
     config_data_1["boot"]["base_command_port"] = port1+1
     config_data_1["boot"]["connectivity_service_port"] = port1
-    config_data_1["detector"]["op_env"] = "nanorc-integtest"
-    config_data_1["daq_common"]["data_rate_slowdown_factor"] = 1
-    config_data_1["detector"]["clock_speed_hz"] = 62500000 # DuneWIB/WIBEth
-    config_data_1["readout"]["use_fake_cards"] = True
+    if exe_name in ['nanorc', 'nano04rc']:
+        config_data_1["detector"]["op_env"] = "nanorc-integtest"
+        config_data_1["daq_common"]["data_rate_slowdown_factor"] = 1
+        config_data_1["detector"]["clock_speed_hz"] = 62500000 # DuneWIB/WIBEth
+        config_data_1["readout"]["use_fake_cards"] = True
+    else:
+        boot = config_data_1['boot']
+        config_data_1 = {}
+        config_data_1['boot'] = boot
+
     write_config(config_file_name_1, config_data_1)
 
     from copy import deepcopy as dc
@@ -49,15 +55,20 @@ def perform_all_runs(exe_name, conf_type):
     config_data_2["boot"]["base_command_port"] = port1+1
     config_data_2["boot"]["connectivity_service_port"] = port1
 
-
     write_config(config_file_name_2, config_data_2)
 
     conf_name_1 = f'{temp_dir_name}/test-conf-1'
     conf_name_2 = f'{temp_dir_name}/test-conf-2'
     top_level = f'{temp_dir_name}/top-level.json'
 
-    DMG_args_1 = ["fddaqconf_gen","-c", config_file_name_1, "-m", dro_file_name, conf_name_1]
-    DMG_args_2 = ["fddaqconf_gen","-c", config_file_name_2, "-m", dro_file_name, conf_name_2]
+    DMG_args_1 = []
+    DMG_args_2 = []
+    if exe_name in ['nanorc', 'nano04rc']:
+        DMG_args_1 = ["fddaqconf_gen","-c", config_file_name_1, "-m", dro_file_name, conf_name_1]
+        DMG_args_2 = ["fddaqconf_gen","-c", config_file_name_2, "-m", dro_file_name, conf_name_2]
+    else:
+        DMG_args_1 = ["listrev_gen","-c", config_file_name_1, conf_name_1]
+        DMG_args_2 = ["listrev_gen","-c", config_file_name_2, conf_name_2]
 
     try:
         subprocess.run(DMG_args_1)
