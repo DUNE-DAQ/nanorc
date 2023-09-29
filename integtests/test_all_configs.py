@@ -19,8 +19,9 @@ def perform_all_runs(exe_name, conf_type):
     The error code of the process is used to determine whether everything worked.
     All processes are run in a temporary directory, so as not to fill up the CWD with logs.
     '''
-    commands = cmd_dict[exe_name]
     start_dir = os.getcwd()
+
+    commands = cmd_dict[exe_name]
 
     temp_dir_object = tempfile.TemporaryDirectory()
     temp_dir_name = temp_dir_object.name                                            # Make a temp directory.
@@ -82,7 +83,11 @@ def perform_all_runs(exe_name, conf_type):
             arglist = [exe_name, conf_name_1, partition_name] + commands
 
         case "top-json":        #Two duplicates of the regular config is enough to test that a top level json is functional
-            subprocess.run(DMG_args_2)
+
+            try:
+                subprocess.run(DMG_args_2)
+            except Exception as e:
+                pytest.fail(reason=str(e))
 
             TJ_content = {
                 "apparatus_id": "test",
