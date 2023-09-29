@@ -3,14 +3,16 @@ import os
 import pytest
 import subprocess
 import tempfile
+from nanorc.integ_utils import get_default_config_dict, write_config, generate_dromap_contents
 
-k8s_json_contents = {"boot": {"use_connectivity_service": True, "connectivity_service_host": "np04-srv-023", "connectivity_service_port": 30005, "start_connectivity_service": False},
-                 "readout": {"use_fake_data_producers": True}}
-expert_json = {"id": "record", "entry_state": "ANY", "exit_state": "ANY", "data": {}}
+expert_json = {
+    "id": "record",
+    "entry_state": "ANY",
+    "exit_state": "ANY",
+    "data": {}
+}
 conf_types = ["normal", "k8s"]
-exe_names = ["nanorc"]
-conf_name = "testconf"
-commands = f"boot expert_command {conf_name}/{conf_name}/dfo expert.json".split()
+exe_names = ["nanorc", "nanotimingrc"]
 cluster_address = "k8s://np04-srv-015:31000"
 
 def perform_all_runs(exe_name, conf_type):
@@ -20,32 +22,72 @@ def perform_all_runs(exe_name, conf_type):
     All processes are run in a temporary directory, so as not to fill up the CWD with logs.
     '''
     start_dir = os.getcwd()
+
     temp_dir_object = tempfile.TemporaryDirectory()
-    temp_dir_name = temp_dir_object.name                                        #Make a temp directory.
-    os.popen(f'cp {start_dir}/my_dro_map.json {temp_dir_name}/my_dro_map.json') #Copy the DRO map inside.
-    os.chdir(temp_dir_name)                                                     #Move into the temp dir.
+    temp_dir_name = temp_dir_object.name
 
-    match conf_type:
-        case "normal":
-            DMG_args = ["daqconf_multiru_gen", "-m", "my_dro_map.json", conf_name]
-            subprocess.run(DMG_args)
-            partition_name = f"test-partition-{conf_type}"
-            with open('expert.json', 'w') as json_file1:
-                json.dump(expert_json, json_file1)
-            arglist = [exe_name, conf_name, partition_name] + commands
+    dro_file_name = f'{temp_dir_name}/dro.json'
+    config_file_name_1 = f'{temp_dir_name}/conf1.json'
 
-        case "k8s":
-            with open('conf.json', 'w') as json_file:
-                json.dump(k8s_json_contents, json_file)
-            DMG_args_k8s = ["daqconf_multiru_gen", "--force", "-c", "conf.json", "-m", "my_dro_map.json", "--force-pm", "k8s", conf_name]
-            subprocess.run(DMG_args_k8s)
-            partition_name = f"test-partition-{conf_type}"
-            with open('expert.json', 'w') as json_file1:
-                json.dump(expert_json, json_file1)
-            arglist = [exe_name, "--pm", cluster_address, conf_name, partition_name] + commands
+    with open(dro_file_name, 'w') as f:
+        f.write(generate_dromap_contents(n_streams=2))
 
+    config_data_1 = get_default_config_dict()
+    config_data_1["boot"]["use_connectivity_service"] =  True
+    config_data_1["boot"]["connectivity_service_host"] = "np04-srv-023"
+    config_data_1["boot"]["connectivity_service_port"] = 30005
+    config_data_1["boot"]["start_connectivity_service"] = False
+
+    if exe_name in ['nanorc', 'nano04rc']:
+        config_data_1["detector"]["op_env"] = "nanorc-integtest"
+        config_data_1["daq_common"]["data_rate_slowdown_factor"] = 1
+        config_data_1["detector"]["clock_speed_hz"] = 62500000 # DuneWIB/WIBEth
+        config_data_1["readout"]["use_fake_cards"] = True
+
+    elif exe_name == 'nanotimingrc':
+        boot = config_data_1['boot']
+        config_data_1 = {}
+        config_data_1['boot'] = boot
+
+    if conf_type == 'k8s':
+        config_data_1["boot"]["process_manager"] = 'k8s'
+
+    write_config(config_file_name_1, config_data_1)
+
+    conf_basename = 'test-conf-1'
+    conf_name_1 = f'{temp_dir_name}/{conf_basename}'
+    DMG_args_1 = []
+
+    if exe_name in ['nanorc', 'nano04rc']:
+        DMG_args_1 = ["fddaqconf_gen", "-c", config_file_name_1, "-m", dro_file_name, conf_name_1]
+
+    elif exe_name == 'nanotimingrc':
+        DMG_args_1 = ["listrev_gen", "-c", config_file_name_1, conf_name_1]
+
+
+    try:
+        subprocess.run(DMG_args_1)
+    except Exception as e:
+        pytest.fail(reason=str(e))
+
+    partition_name = f"test-partition-{conf_type}"
+    commands = f"boot conf expert_command {conf_basename}/{conf_basename}/dfo expert.json".split()
+    if exe_name == 'nanotimingrc':
+        commands = f"boot conf expert_command {conf_basename}/{conf_basename}/listrev-app-s expert.json".split()
+
+    with open(f'{temp_dir_name}/expert.json', 'w') as json_file1:
+        json.dump(expert_json, json_file1)
+
+    if conf_type == "normal":
+        arglist = [exe_name, conf_name_1, partition_name] + commands
+
+    elif conf_type == "k8s":
+        arglist = [exe_name, "--pm", cluster_address, conf_name_1, partition_name] + commands
+
+    os.chdir(temp_dir_name)
     output = subprocess.run(arglist)
     os.chdir(start_dir)
+
     return output.returncode
 
 @pytest.mark.parametrize("exe_name", exe_names)
