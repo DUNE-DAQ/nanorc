@@ -8,12 +8,7 @@ from nanorc.integ_utils import get_default_config_dict, write_config, generate_d
 app_name = "trigger"
 command_name = "record"
 
-custom_command1 = {
-    "apps": {
-        app_name: f"data/{app_name}_{command_name}"
-    }
-}
-custom_command2 = {
+custom_command_json = {
     "modules": [{"data": {}, "match": "*"}]
 }
 
@@ -25,16 +20,8 @@ commands = f"boot conf {command_name}".split()
 cluster_address = "k8s://np04-srv-015:31000"
 
 def insert_json(conf_name_1):
-    with open(f'{conf_name_1}/{command_name}.json', 'w') as f:
-        json.dump({
-            "apps": {
-                app_name: f"data/{app_name}_{command_name}"
-            }
-        },
-        f)
-    with open(f'{conf_name_1}/data/{app_name}_{command_name}.json', 'w') as json_file2:
-        json.dump(custom_command2, json_file2)
-
+    with open(f'{conf_name_1}/data/{app_name}_{command_name}.json', 'w') as json_file:
+        json.dump(custom_command_json, json_file)
 
 def perform_all_runs(exe_name, conf_type):
     '''
@@ -89,7 +76,7 @@ def perform_all_runs(exe_name, conf_type):
     try:
         subprocess.run(DMG_args_1)
     except Exception as e:
-        pytest.fail(reason=str(e))
+        pytest.fail(msg=str(e))
 
     partition_name = f"test-partition-{conf_type}"
     insert_json(conf_name_1)
