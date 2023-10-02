@@ -333,6 +333,7 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds):
         arg_default = {}
         if type(cmd_data) != dict: continue
         for app_name, app_data in cmd_data.items():
+            if "modules" not in app_data: continue
             for module in app_data['modules']:
                 arg_data = module.get('data')
                 if not arg_data: continue
