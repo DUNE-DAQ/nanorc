@@ -363,7 +363,7 @@ NAME        READY   STATUS    RESTARTS   AGE
 dataflow0   1/1     Running   0          66s
 ...
 ```
-to get a list of pods corresponding to DAQ applications. This should be run from the node that hosts the control plane, which is `np04-srv-015`. (The control plane is a collection of top level components that manage the whole kubernetes cluster, including the API server and a data store that keeps track of current/desired state.)
+to get a list of pods corresponding to DAQ applications.
 
 Now do:
 ```bash
