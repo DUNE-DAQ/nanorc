@@ -18,24 +18,13 @@ First, set up a working area according to [the daq-buildtools instructions](http
 
 Information can be found in `daqconf` [wiki](https://github.com/DUNE-DAQ/daqconf/wiki), or in [here](https://dune-daq-sw.readthedocs.io/en/latest/packages/daqconf/InstructionsForCasualUsers/), following is to generate a configuration and run nanorc only.
 
-Get the example data file (TODO: asset manager and configuration - likely to change for v4.0.0):
 
 ```bash
-curl -o frames.bin -O https://cernbox.cern.ch/index.php/s/0XzhExSIMQJUsp0/download
+fddaqconf_gen -m dro.json -c config.json fake_daq
 ```
 
-Generate a hardware map, with the name `HardwareMap.txt`:
-```text
-# DRO_SourceID DetLink DetSlot DetCrate DetID DRO_Host DRO_Card DRO_SLR DRO_Link 
-100 0 4 6 3 localhost 0 0 0
-101 1 4 6 3 localhost 0 0 1
-```
+Example contents for `dro.json` and `config.json` can be found in the wiki linked above.
 
-Generate a configuration:
-
-```bash 
-daqconf_multiru_gen fake_daq
-```
 
 Next (if you want to), you can create a file called `top_level.json` which contains:
 
@@ -68,7 +57,7 @@ nanorc top_level.json partition-name# or "nanorc fake_daq partition-name" if you
 │  Use it with care!                                                       │
 ╰──────────────────────────────────────────────────────────────────────────╯
 
-shonky rc> 
+shonky rc>
 ```
 To see the commands available use `help`.
 
@@ -77,11 +66,11 @@ shonky rc> help
 
 Documented commands (type help <topic>):
 ========================================
-boot              exclude         scrap        stop                
-change_rate       expert_command  shutdown     stop_run            
+boot              exclude         scrap        stop
+change_rate       expert_command  shutdown     stop_run
 conf              include         start        stop_trigger_sources
-disable_triggers  ls              start_run    terminate           
-drain_dataflow    message         start_shell  wait                
+disable_triggers  ls              start_run    terminate
+drain_dataflow    message         start_shell  wait
 enable_triggers   pin_threads     status
 
 Undocumented commands:
@@ -98,7 +87,7 @@ shonky rc> boot
   hsi            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00 0:00:02
   ruemu0         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00 0:00:01
   trigger        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00 0:00:02
-                                Apps                                
+                                Apps
 ┏━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━┓
 ┃ name     ┃ host      ┃ alive ┃ pings ┃ last cmd ┃ last succ. cmd ┃
 ┡━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━┩
@@ -125,7 +114,7 @@ Use 'status' to see what's going on:
 
 ```
 shonky rc> status
-                                    Apps                                     
+                                    Apps
 ┏━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━┓
 ┃ name     ┃ host      ┃ alive ┃ pings ┃ last cmd ┃ last succ. cmd ┃
 ┡━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━╇━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━┩
@@ -145,7 +134,7 @@ You can also control nanorc in "batch mode", e.g.:
 run_number=999
 nanorc fake_daq partition-name boot conf start_run --disable-data-storage $run_number wait 2 shutdown
 ```
-Notice the ability to control the time via transitions from the command line via the `wait` argument. 
+Notice the ability to control the time via transitions from the command line via the `wait` argument.
 
 
 If you want to execute command and be dropped in a shell, you can use `start_shell`:
@@ -273,9 +262,9 @@ Once you have set up your browser to use a SOCKS proxy, connect to the address i
 
 ![GUI](GUI.png)
 
-From here, using nanorc is just about the same as in the terminal: 
+From here, using nanorc is just about the same as in the terminal:
 
-*  transitions between FSM states can be done using the State Control Buttons, 
+*  transitions between FSM states can be done using the State Control Buttons,
 *  the information that nanorc outputs can be viewed by clicking the expansion triangle under "Last response from nanorc" to see the details of the response.
 
 **Note that this information will also be shown as output to the terminal.**
@@ -389,9 +378,9 @@ Create a daqconf file as such (named `config.json` in the rest of the instructio
 ```
 Next, you need to generate the configuration:
 ```sh
-daqconf_multiru_gen -c config.json daq-config
+fddaqconf_gen -m dro.json -c config.json daq-config
 ```
-And upload it on the MongoDB, the first argument is the directory you have just generated with `daqconf_multiru_gen` and the second is the key in the configuration on the MongoDB, **it cannot have underscores in it** since it's accessed via HTTP requests:
+And upload it on the MongoDB, the first argument is the directory you have just generated with `fddaqconf_gen` and the second is the key in the configuration on the MongoDB, **it cannot have underscores in it** since it's accessed via HTTP requests:
 ```sh
 upload-conf daq-config ${USER}-configuration # name it something better!
 ```
@@ -415,7 +404,7 @@ nanorc> [...]
 Hop on http://np04-srv-015:31001/ (after setting up a web SOCKS proxy to `lxplus` if you are not physically at CERN) to check the status of the cluster. Note you will need to select the partition you fed at `boot`. You'll be able to see if the pods are running or not, and where.
 
 #### Log on a pod
-First, do 
+First, do
 ```
 $ kubectl get pods -n partition-name
 NAME        READY   STATUS    RESTARTS   AGE
@@ -462,7 +451,7 @@ Go to http://np04-srv-009:3000/ and select your partition on the left.
  - `daq_applications` live in pods (not deployments), with k8s pod restart policy of "Never".
  - mounts `cvmfs` in the pod (`dunedaq` and `dunedaq-development`).
  - ... Many more to discover...
- 
+
 ## How to build a `daq_application` image and distribute it
 NOTE: You need to be on `np04-srv-{015,016,026}` for this to work, if you are not, setup the daqenv above from above in the usual way (the first 4 commented out instructions):
 ```sh
@@ -522,75 +511,75 @@ username-image-name        N22-06-27   3e53688480dc   9 hours ago    1.79GB
 
 ## Running the Felix with Kubernetes
 
-Clone the np04daq-configs and checkout `feature/k8s`, 
+Clone the np04daq-configs and checkout `feature/k8s`,
 
-``` 
-git clone ssh://git@gitlab.cern.ch:7999/dune-daq/online/np04daq-configs.git 
-cd np04daq-configs 
-git checkout feature/k8s 
-``` 
+```
+git clone ssh://git@gitlab.cern.ch:7999/dune-daq/online/np04daq-configs.git
+cd np04daq-configs
+git checkout feature/k8s
+```
 
 
-This branch uses a special image in the configuration `(np04docker.cern.ch/dunedaq-local/k8s-v400-rc3:rc-v4.0.0-3-01)` which has Eric’s modifications to IPM. Other modifications are: 
-- Removing the cern.ch postfix from the hostname 
-- Setting the parameter start\_connectivity\_service to false 
+This branch uses a special image in the configuration `(np04docker.cern.ch/dunedaq-local/k8s-v400-rc3:rc-v4.0.0-3-01)` which has Eric’s modifications to IPM. Other modifications are:
+- Removing the cern.ch postfix from the hostname
+- Setting the parameter start\_connectivity\_service to false
 - Adding a use\_k8s = true and the name of the image as described above
 
 Run the daq-config bash script:
-``` 
-./recreate_np04_daq_configurations.sh 
-``` 
-
-Upload the new nanorc configuration of your choice 
-
-``` 
-upload-conf [np04_daq_APA_conf] [flx-k8s-test] 
-``` 
-
-Here are some examples of [np04\_daq\_APA\_conf]'s that you can upload: 
-
-- `np02_coldbox_daq_100mHz_conf/` 
-- `np02_coldbox_daq_268ms_conf/` 
-- `np02_coldbox_daq_5Hz/` 
-- `np02_coldbox_daq_conf/` 
-- `np02_coldbox_daq_hma_conf/` 
-- `np02_coldbox_daq_tp_conf/` 
-- `np02_coldbox_flxcard_conf/` 
-- `np02_coldbox_flxcard_WIB12_conf/` 
-- `np02_coldbox_flxcard_WIB34_conf/` 
-- `np02_coldbox_flxcard_WIB56_conf/` 
-- `np02_coldbox_timing_tlu_conf/` 
-- `np02_coldbox_wib_conf/` 
-- `np02_coldbox_wib_pulser_conf/` 
-- `np02_coldbox_wib_WIB12_conf/` 
-- `np02_coldbox_wib_WIB34_conf/` 
-- `np02_coldbox_wib_WIB56_conf/` 
-- `np04_daq_APA1_conf/` 
-- `np04_daq_APA1_tp_conf/` 
-- `np04_daq_APA2_conf/` 
-- `np04_daq_APA2_tp_conf/` 
-- `np04_daq_APA3_conf/` 
-- `np04_daq_APA4_conf/` 
-- `np04_daq_conf/` 
-- `np04_daq_DAPHNE_conf/` 
-- `np04_daq_DAPHNE_test_conf/` 
-- `np04_daq_TPC_conf/` 
-- `np04_flxcard_APA1_conf/` 
-- `np04_flxcard_APA2_conf/` 
-- `np04_flxcard_APA3_conf/` 
-- `np04_flxcard_APA4_conf/` 
-- `np04_flxcard_conf/` 
-- `np04_flxcard_TPC_conf/` 
-
-For this to work you need to be able to use `kubectl` which can be is done by, 
-
-``` 
-export KUBECONFIG=/nfs/home/np04daq/np04-kubernetes/config 
+```
+./recreate_np04_daq_configurations.sh
 ```
 
-**Remember to inform** `np04_shifterassistant` **on slack that you are taking one of the APA’s for a spin and make sure no one else is running anything on it first.** 
+Upload the new nanorc configuration of your choice
 
-Now you can run the nanorc using the following command: 
 ```
-nanorc --pm k8s://np04-srv-015:31000 db://[flx-k8s-test] [yourname-flx-k8s-test-run] 
-``` 
+upload-conf [np04_daq_APA_conf] [flx-k8s-test]
+```
+
+Here are some examples of [np04\_daq\_APA\_conf]'s that you can upload:
+
+- `np02_coldbox_daq_100mHz_conf/`
+- `np02_coldbox_daq_268ms_conf/`
+- `np02_coldbox_daq_5Hz/`
+- `np02_coldbox_daq_conf/`
+- `np02_coldbox_daq_hma_conf/`
+- `np02_coldbox_daq_tp_conf/`
+- `np02_coldbox_flxcard_conf/`
+- `np02_coldbox_flxcard_WIB12_conf/`
+- `np02_coldbox_flxcard_WIB34_conf/`
+- `np02_coldbox_flxcard_WIB56_conf/`
+- `np02_coldbox_timing_tlu_conf/`
+- `np02_coldbox_wib_conf/`
+- `np02_coldbox_wib_pulser_conf/`
+- `np02_coldbox_wib_WIB12_conf/`
+- `np02_coldbox_wib_WIB34_conf/`
+- `np02_coldbox_wib_WIB56_conf/`
+- `np04_daq_APA1_conf/`
+- `np04_daq_APA1_tp_conf/`
+- `np04_daq_APA2_conf/`
+- `np04_daq_APA2_tp_conf/`
+- `np04_daq_APA3_conf/`
+- `np04_daq_APA4_conf/`
+- `np04_daq_conf/`
+- `np04_daq_DAPHNE_conf/`
+- `np04_daq_DAPHNE_test_conf/`
+- `np04_daq_TPC_conf/`
+- `np04_flxcard_APA1_conf/`
+- `np04_flxcard_APA2_conf/`
+- `np04_flxcard_APA3_conf/`
+- `np04_flxcard_APA4_conf/`
+- `np04_flxcard_conf/`
+- `np04_flxcard_TPC_conf/`
+
+For this to work you need to be able to use `kubectl` which can be is done by,
+
+```
+export KUBECONFIG=/nfs/home/np04daq/np04-kubernetes/config
+```
+
+**Remember to inform** `np04_shifterassistant` **on slack that you are taking one of the APA’s for a spin and make sure no one else is running anything on it first.**
+
+Now you can run the nanorc using the following command:
+```
+nanorc --pm k8s://np04-srv-015:31000 db://[flx-k8s-test] [yourname-flx-k8s-test-run]
+```
