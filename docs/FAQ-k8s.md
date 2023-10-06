@@ -2,9 +2,8 @@
 
 ## What was that command again to use K8s with the NP04 cluster?
 ```bash
-daqconf_multiru_gen --force-pm k8s .... conf-dir # generate the configuration in the usual way, with the --force-pm
-upload_conf conf-dir conf-name # upload the configuration to the service
-nanorc --pm k8s://np04-srv-015:31000 db://conf-name # tell nanorc to run k8s process manager
+fddaqconf_gen --force-pm k8s .... conf-dir # generate the configuration in the usual way, with the --force-pm
+nanorc --pm k8s://np04-srv-016:31000 conf-dir session-name
 ```
 
 ## NanoRC exited ungracefully and all my apps are still running, what do I do?
