@@ -65,14 +65,14 @@ def ls(obj, legend):
 
 
 @click.command()
-@click.option('--pin-thread-file', type=click.Path(exists=True), default=None)
+@click.option('--pin-thread-file', type=click.Path(exists=True, resolve_path=True), default=None)
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
 def pin_threads(ctx, obj:NanoContext, pin_thread_file, timeout:int):
     data = { "script_name": 'thread_pinning' }
-    if pin_thread_file:
-        data["env"]: { "DUNEDAQ_THREAD_PIN_FILE": pin_thread_file }
+    if pin_thread_file is not None:
+        data["env"] = { "DUNEDAQ_THREAD_PIN_FILE": pin_thread_file }
     obj.rc.execute_script(data=data, timeout=timeout)
 
 
