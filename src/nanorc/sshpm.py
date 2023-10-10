@@ -153,6 +153,7 @@ class SSHProcessManager(object):
         hosts = set(self.boot_info["hosts-ctrl"].values())
         for host in hosts:
             self.log.info(f'Executing {script_data["cmd"]} on {host}.')
+            self.log.debug(f'Executing {cmd} on {host}.')
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"] + [cmd]
             try:
                 proc = sh.ssh(ssh_args)
