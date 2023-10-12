@@ -8,7 +8,7 @@ from nanorc.integ_utils import get_default_config_dict, write_config, generate_d
 conf_types = ["normal", "top-json"]
 exe_names = ["nanorc", "nanotimingrc"]
 cmd_dict = {
-    "nanorc": "boot conf conf start_run 111 wait 5 stop_run scrap terminate".split(),
+    "nanorc": "boot conf start_run 111 wait 5 stop_run scrap terminate".split(),
     "nano04rc": "boot conf start_run TEST wait 5 stop_run scrap terminate".split(),
     "nanotimingrc": "boot conf start_run wait 5 stop_run scrap terminate".split()
 }

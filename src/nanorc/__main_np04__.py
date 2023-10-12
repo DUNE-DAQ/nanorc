@@ -140,7 +140,7 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
 
         rc.log_path = os.path.abspath(log_path)
         add_common_cmds(ctx.command, end_of_run_cmds=False)
-        add_custom_cmds(ctx.command, rc.execute_custom_command, rc.custom_cmd)
+        add_custom_cmds(ctx, rc.execute_custom_command, rc.custom_cmd, rc.status)
 
         if web or tui:
             host = socket.gethostname()

@@ -29,7 +29,7 @@ class ConfigManager:
         self.boot = {}
         self.port_offset = port_offset
         self.scheme = None
-        self.expected_std_cmds = ['init', 'conf']
+        self.ignore_for_custom_cmd = ['init', 'conf', 'boot', 'daqconf_multiru_gen', 'dromap', 'config']
         self.conf_server = upload_to
         self.conf_data, self.config_query_string = self.fetch_configuration(config_url)
         self.log.debug(f'"{config_url.path}" content: {list(self.conf_data.keys())}')
@@ -158,7 +158,7 @@ class ConfigManager:
             exit(1)
 
 
-    def fetch_from_file_system(self,config_url):
+    def fetch_from_file_system(self, config_url):
         from .utils import get_json_recursive
         return (get_json_recursive(config_url.path), f'file://{config_url.path}')
 
@@ -175,39 +175,32 @@ class ConfigManager:
 
     def _get_custom_commands_from_dict(self, data:dict):
         from collections import defaultdict
-        custom_cmds = defaultdict(list)
+        custom_cmds = defaultdict(dict)
+        std_cmd = ['init', 'conf']
 
         for app_name, app_data in data.items():
-            if app_data is not dict: continue
+            if type(app_data) is not dict:
+                continue
+
             for command_name, command_data in app_data.items():
-                if command_name in self.expected_std_cmds:
+                if command_name in std_cmd:
                     continue
-                custom_cmds[app_name].append(command_data)
 
+                if type(command_data) is not dict:
+                    continue
+
+                if "modules" not in command_data:
+                    continue
+
+                if type(command_data['modules']) is not list:
+                    continue
+
+                custom_cmds[command_name][app_name] = command_data
         return custom_cmds
 
-
-    # def _get_custom_commands_from_dirs(self, path:str):
-    #     from collections import defaultdict
-    #     custom_cmds = defaultdict(list)
-    #     for cmd_file in os.listdir(path+'/data'):
-    #         std_cmd_flag = False
-    #         for std_cmd in self.expected_std_cmds:
-    #             if std_cmd+".json" in cmd_file:
-    #                 std_cmd_flag = True
-    #                 break # just a normal command
-
-    #         if std_cmd_flag:
-    #             continue
-
-    #         cmd_name = '_'.join(cmd_file.split('_')[1:]).replace('.json', '')
-    #         custom_cmds[cmd_name].append(json.load(open(path+'/data/'+cmd_file, 'r')))
-
-        return custom_cmds
 
     def get_custom_commands(self):
         return self.custom_commands
-
 
     def _resolve_hostnames(self, conf_data):
         conf_port_host_resolved = cp.deepcopy(conf_data)

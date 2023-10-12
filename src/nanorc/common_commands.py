@@ -327,31 +327,66 @@ def add_common_cmds(shell, end_of_run_cmds=True):
         shell.add_command(shutdown            , 'shutdown'            )
     # shell.add_command(ls_thread       , 'ls_thread'       )
 
-def add_custom_cmds(cli, rc_cmd_exec, cmds):
-    for c,d in cmds.items():
+def add_custom_cmds(cli, rc_cmd_exec, cmds, status_exec):
+
+    for cmd_name, cmd_data in cmds.items():
         arg_list = {}
         arg_default = {}
-        for app_data in d:
-            for modules_data in app_data.values():
-                for module_data in modules_data:
-                    module = module_data['match']
-                    cmd_data = module_data.get('data')
-                    if not cmd_data: continue
-                    for arg in cmd_data:
-                        arg_list[arg] = type(cmd_data[arg])
-                        arg_default[arg] = cmd_data[arg]
 
-        def execute_custom(ctx, obj, timeout, **kwargs):
-            rc_cmd_exec(command=obj.info_name, data=kwargs, timeout=timeout)
+        if type(cmd_data) != dict:
+            print(f'{cmd_name} is misformatted, ignoring!')
+            continue
 
-        execute_custom = click.pass_obj(execute_custom)
+        app_paths = []
+        for app_path, app_data in cmd_data.items():
+            app_paths += [app_path]
+
+            if "modules" not in app_data:
+                continue
+
+            for module in app_data['modules']:
+                arg_data = module.get('data')
+                if not arg_data: continue
+                for arg in arg_data:
+                    arg_list[arg] = type(arg_data[arg])
+                    arg_default[arg] = arg_data[arg]
+
+        def execute_custom(app_paths, ctx, obj, timeout, **kwargs):
+
+            for app_path in app_paths:
+                try:
+                    from nanorc.argval import validate_node_path
+                    node = validate_node_path(
+                        ctx = ctx,
+                        param = None,
+                        prompted_path = app_path
+                    )
+                    rc_cmd_exec(
+                        command = obj.info_name,
+                        data = kwargs,
+                        timeout = timeout,
+                        node_path = node,
+                    )
+                except Exception as e:
+                    ctx.rc.log.error(f'Could not execute "{obj.command.name}" on "{app_path}". Reason: {str(e)}')
+                    ctx.rc.return_code = 1
+                    continue
+            status_exec()
+            check_rc(obj, ctx.rc)
+
+        from functools import partial
+        from copy import deepcopy as dc
+
+        execute_custom = click.pass_obj(partial(execute_custom, dc(app_paths)))
         execute_custom = click.pass_context(execute_custom)
-        execute_custom = click.command(c)(execute_custom)
+        execute_custom = click.command(cmd_name)(execute_custom)
         execute_custom = accept_timeout(None)(execute_custom)
+
         for arg, argtype in arg_list.items():
             arg_pretty = arg.replace("_", "-")
             execute_custom = click.option(f'--{arg_pretty}', type=argtype, default=arg_default[arg])(execute_custom)
-        cli.add_command(execute_custom, c)
+
+        cli.command.add_command(execute_custom, cmd_name)
 
 
 def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool, cmd_args:dict):

@@ -93,7 +93,7 @@ def timingcli(ctx, obj, traceback, pm, loglevel, log_path, cfg_dumpdir, kerberos
         )
 
         rc.log_path = os.path.abspath(log_path)
-        add_custom_cmds(ctx.command, rc.execute_custom_command, rc.custom_cmd)
+        add_custom_cmds(ctx, rc.execute_custom_command, rc.custom_cmd, rc.status)
         if web or tui:
             host = socket.gethostname()
 

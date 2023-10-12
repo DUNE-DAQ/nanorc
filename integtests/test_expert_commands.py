@@ -13,7 +13,7 @@ expert_json = {
 }
 conf_types = ["normal", "k8s"]
 exe_names = ["nanorc", "nanotimingrc"]
-cluster_address = "k8s://np04-srv-015:31000"
+cluster_address = "k8s://np04-srv-016:31000"
 
 def perform_all_runs(exe_name, conf_type):
     '''

@@ -246,6 +246,49 @@ It should be pointed out that some substitutions are made when nanorc uses a fil
 * `{CMD_FAC}` and `{INFO_SVC}` are replaced by their corresponding environment value
 * `{CONF_LOC}` is replaced by a path to a local directory containing the configuration data that the application must be able to see.
 
+## Custom commands
+You can add a file to your configuration data, which will execute commands that are not "standard".
+You should place that file in the `data/` directory, and name it `<app-name>_<command-name>.json`.
+
+The content of this file should be:
+```json
+{
+    "modules": [
+        {
+            "data": {
+                "some_number": 123,
+                "pi": 3.14,
+                "lore-ipsum": "Nanorc fluctuat nec mergitur"
+            },
+            "match": "*"
+        }
+    ]
+}
+```
+for example. Let's assume that you have added a file called `rulocalhosteth0_mycmd.json` in `data/`, now you should get:
+```text
+nanorc top.json plasorak
+╭──────────────────────────────────────────────────────────────────────────╮
+│                              Shonky NanoRC                               │
+│  This is an admittedly shonky nano RC to control DUNE-DAQ applications.  │
+│    Give it a command and it will do your biddings,                       │
+│    but trust it and it will betray you!                                  │
+│  Use it with care, user!                                                 │
+╰──────────────────────────────────────────────────────────────────────────╯
+[12:08:20] INFO     nano-conf-svc Flask lives on PID: 1474870
+FSM available states: ['none', 'booted', 'initial', 'configured', 'ready', 'running', 'paused', 'dataflow_drained', 'trigger_sources_stopped', 'error']
+FSM available transitions: {'scrap', 'start', 'drain_dataflow', 'terminate', 'stop', 'enable_triggers', 'abort', 'stop_trigger_sources', 'disable_triggers', 'conf', 'boot'}
+Extra commands are: ['mycmd']
+```
+when you start nanorc.
+
+You can now send commands like:
+```bash
+user@rc> mycmd --some-number 9 --pi 6.2 --lore-ipsum "Hi, this is Pierre"
+```
+with or without the arguments, and `mycmd` will be sent to the `rulocalhosteth0` app.
+
+It should work if you have many applications too (for example `rulocalhosteth0_mycmd.json` and `trigger_mycmd.json`), but it will send the _same command data_ to all the applications (the behaviour if you have specified modules is undefined in this case).
 
 ## How to run WebUI
 

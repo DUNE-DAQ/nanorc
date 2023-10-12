@@ -59,7 +59,7 @@ class TreeBuilder:
                     name = n,
                     log = self.log,
                     cfgmgr = cfgmgr,
-                    console=self.console,
+                    console = self.console,
                     fsm_conf = fsm_conf,
                     parent = mother
                 )
@@ -71,7 +71,15 @@ class TreeBuilder:
     def get_custom_commands(self):
         ret = {}
         for node in PreOrderIter(self.topnode):
-            ret.update(node.get_custom_commands())
+            if node == self.topnode:
+                continue
+
+            for cmd, data in node.get_custom_commands().items():
+                if cmd not in ret:
+                    ret[cmd] = {}
+
+                for app_name, cmd_data in data.items():
+                    ret[cmd][f'{self.apparatus_id}/{node.name}/{app_name}'] = cmd_data
         return ret
 
     def terminate(self):

@@ -13,7 +13,7 @@ cmd_dict = {
     "nanotimingrc": "boot conf start_run wait 5 stop_run scrap terminate".split()
 }
 db_name = "integ-test-conf"
-cluster_address = "k8s://np04-srv-015:31000"
+cluster_address = "k8s://np04-srv-016:31000"
 
 def perform_all_runs(exe_name, conf_type):
     '''
