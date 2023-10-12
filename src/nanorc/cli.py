@@ -143,7 +143,7 @@ def cli(ctx, obj, traceback, loglevel, cfg_dumpdir, log_path, logbook_prefix, ti
             rc.log_path = os.path.abspath(log_path)
 
         add_common_cmds(ctx.command)
-        add_custom_cmds(ctx.command, rc.execute_custom_command, rc.custom_cmd)
+        add_custom_cmds(ctx, rc.execute_custom_command, rc.custom_cmd, rc.status)
 
         if web or tui:                  #The TUI also needs the rest thread
             host = socket.gethostname()

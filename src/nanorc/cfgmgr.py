@@ -176,33 +176,28 @@ class ConfigManager:
     def _get_custom_commands_from_dict(self, data:dict):
         from collections import defaultdict
         custom_cmds = defaultdict(dict)
+        std_cmd = ['init', 'conf']
+
         for app_name, app_data in data.items():
-            if type(app_data) is not dict: continue
-            if (app_name in self.ignore_for_custom_cmd): continue
+            if type(app_data) is not dict:
+                continue
+
             for command_name, command_data in app_data.items():
-                if command_name in self.ignore_for_custom_cmd:
+                if command_name in std_cmd:
                     continue
+
+                if type(command_data) is not dict:
+                    continue
+
+                if "modules" not in command_data:
+                    continue
+
+                if type(command_data['modules']) is not list:
+                    continue
+
                 custom_cmds[command_name][app_name] = command_data
         return custom_cmds
 
-
-    # def _get_custom_commands_from_dirs(self, path:str):
-    #     from collections import defaultdict
-    #     custom_cmds = defaultdict(list)
-    #     for cmd_file in os.listdir(path+'/data'):
-    #         std_cmd_flag = False
-    #         for std_cmd in self.ignore_for_custom_cmd:
-    #             if std_cmd+".json" in cmd_file:
-    #                 std_cmd_flag = True
-    #                 break # just a normal command
-
-    #         if std_cmd_flag:
-    #             continue
-
-    #         cmd_name = '_'.join(cmd_file.split('_')[1:]).replace('.json', '')
-    #         custom_cmds[cmd_name].append(json.load(open(path+'/data/'+cmd_file, 'r')))
-
-        return custom_cmds
 
     def get_custom_commands(self):
         return self.custom_commands
