@@ -351,13 +351,13 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds, status_exec):
                     arg_list[arg] = type(arg_data[arg])
                     arg_default[arg] = arg_data[arg]
 
-        def execute_custom(app_paths, ctx_, obj, timeout, **kwargs):
+        def execute_custom(app_paths, ctx, obj, timeout, **kwargs):
 
             for app_path in app_paths:
                 try:
                     from nanorc.argval import validate_node_path
                     node = validate_node_path(
-                        ctx = ctx_,
+                        ctx = ctx,
                         param = None,
                         prompted_path = app_path
                     )
@@ -368,9 +368,12 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds, status_exec):
                         node_path = node,
                     )
                 except Exception as e:
-                    ctx_.rc.log.error(f'Could not execute "{obj.command.name}" on "{app_path}". Reason: {str(e)}')
+                    ctx.rc.log.error(f'Could not execute "{obj.command.name}" on "{app_path}". Reason: {str(e)}')
+                    ctx.rc.return_code = 1
                     continue
             status_exec()
+            check_rc(obj, ctx.rc)
+
         from functools import partial
         from copy import deepcopy as dc
 
