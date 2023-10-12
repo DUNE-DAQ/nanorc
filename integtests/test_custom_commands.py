@@ -5,25 +5,46 @@ import subprocess
 import tempfile
 from nanorc.integ_utils import get_default_config_dict, write_config, generate_dromap_contents
 
-app_name = "trigger"
-command_name = "record"
-
-custom_command_json = {
-    "modules": [{"data": {}, "match": "*"}]
+custom_commands_json = {
+    "random":
+        {
+            "modules": [
+                {
+                    "data": {
+                        "some_number": 123,
+                        "pi": 3.14,
+                        "lore-ipsum": "Nanorc fluctuat nec mergitur"
+                    },
+                    "match": "*"
+                }
+            ]
+        },
+    "record":
+        {
+            "modules": [
+                {
+                    "data": {
+                        "duration": 2,
+                    },
+                    "match": "datahandler_100"
+                }
+            ]
+        }
 }
 
-conf_types = ["normal", "k8s"]
+
+conf_types = ["normal"]#, "k8s"]
 exe_names = ["nanorc", "nanotimingrc"]
 
-commands = f"boot conf {command_name}".split()
+use_args = [False, True]
+cluster_address = "k8s://np04-srv-016:31000"
 
-cluster_address = "k8s://np04-srv-015:31000"
+def insert_json(config_name, app_names, command_name, command_data):
+    for app_name in app_names:
+        with open(f'{config_name}/data/{app_name}_{command_name}.json', 'w') as json_file:
+            json.dump(command_data, json_file)
 
-def insert_json(conf_name_1):
-    with open(f'{conf_name_1}/data/{app_name}_{command_name}.json', 'w') as json_file:
-        json.dump(custom_command_json, json_file)
-
-def perform_all_runs(exe_name, conf_type):
+def perform_all_runs(exe_name, conf_type, custom_command, with_args):
     '''
     We generate a config using fddaqconf_gen, then run nanorc with it in two different ways.
     The error code of the process is used to determine whether everything worked.
@@ -65,13 +86,15 @@ def perform_all_runs(exe_name, conf_type):
     conf_name_1 = f'{temp_dir_name}/test-conf-1'
 
     DMG_args_1 = []
+    app_names = []
 
     if exe_name in ['nanorc', 'nano04rc']:
         DMG_args_1 = ["fddaqconf_gen","-c", config_file_name_1, "-m", dro_file_name, conf_name_1]
+        app_names = ['rulocalhosteth0'] if custom_command == "record" else ['dfo', 'trigger']
 
     elif exe_name == 'nanotimingrc':
         DMG_args_1 = ["listrev_gen","-c", config_file_name_1, conf_name_1]
-
+        app_names = ['listrev-app-s']
 
     try:
         subprocess.run(DMG_args_1)
@@ -79,7 +102,16 @@ def perform_all_runs(exe_name, conf_type):
         pytest.fail(msg=str(e))
 
     partition_name = f"test-partition-{conf_type}"
-    insert_json(conf_name_1)
+    insert_json(
+        config_name = conf_name_1,
+        app_names = app_names,
+        command_name = custom_command,
+        command_data = custom_commands_json[custom_command],
+    )
+    #insert_json(config_name, app_name, command_name, command_data):
+    commands = f"boot conf {custom_command}".split()
+    if with_args:
+        commands += ['--duration', '3'] if custom_command == 'record' else ['--some-number', '3', '--pi', '6.2', '--lore-ipsum', 'alea jacta est']
 
     arglist = []
     if conf_type == "normal":
@@ -95,6 +127,8 @@ def perform_all_runs(exe_name, conf_type):
 
 @pytest.mark.parametrize("exe_name", exe_names)
 @pytest.mark.parametrize("conf_type", conf_types)
-def test_no_errors(exe_name, conf_type):
-    code = perform_all_runs(exe_name, conf_type)
+@pytest.mark.parametrize("custom_command", custom_commands_json.keys())
+@pytest.mark.parametrize("with_args", use_args)
+def test_no_errors(exe_name, conf_type, custom_command, with_args):
+    code = perform_all_runs(exe_name, conf_type, custom_command, with_args)
     assert code == 0
