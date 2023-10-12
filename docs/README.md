@@ -286,9 +286,9 @@ You can now send commands like:
 ```bash
 user@rc> mycmd --some-number 9 --pi 6.2 --lore-ipsum "Hi, this is Pierre"
 ```
-with or without the arguments.
+with or without the arguments, and `mycmd` will be sent to the `rulocalhosteth0` app.
 
-It should work if you have many applications, but it will send the _same command data_ to all the applications.
+It should work if you have many applications too (for example `rulocalhosteth0_mycmd.json` and `trigger_mycmd.json`), but it will send the _same command data_ to all the applications (the behaviour if you have specified modules is undefined in this case).
 
 ## How to run WebUI
 
