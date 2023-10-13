@@ -189,7 +189,7 @@ class SSHProcessManager(object):
             "CONF_LOC": conf_loc,
         }
         if is_port_open(host, app_conf["port"]):
-            raise RuntimeError(f'The port {host}:{app_conf["port"]} is already open, likely by another application, cannot continue')
+            raise RuntimeError(f'The port {host}:{app_conf["port"]} for {app_name} is already open, likely by another application, cannot continue')
 
         if 'update-env' in app_conf:
             for k,v in app_conf['update-env'].items():

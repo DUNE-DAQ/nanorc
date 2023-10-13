@@ -99,3 +99,11 @@ the expert command could be:`
 ```bash
 expert_command /config/config/rulocalhosteth0 the-file.json
 ```
+
+## Ports clashing
+The usual answer is that you need to feed a different `--partition-number`. Nanorc offset automatically ports in your configuration here is what is used:
+- `nanorc`: `port_offset` = 0 + `partition_number` * 500 + `subsystem_number` * 50
+- `nano04rc`: `port_offset` = 0 + `partition_number` * 500 + `subsystem_number` * 50
+- `nanotimingrc`: `port_offset` = 300 + `partition_number` * 500 + `subsystem_number` * 50
+
+If the offsets are the same and you are running nanorc on the same host, you will get port clash errors.
