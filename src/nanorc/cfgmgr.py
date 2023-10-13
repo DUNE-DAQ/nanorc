@@ -28,6 +28,7 @@ class ConfigManager:
         self.conf_str = ''
         self.boot = {}
         self.port_offset = port_offset
+        self.log.debug(f'{str(config_url)} {port_offset=}')
         self.scheme = None
         self.ignore_for_custom_cmd = ['init', 'conf', 'boot', 'daqconf_multiru_gen', 'dromap', 'config']
         self.conf_server = upload_to
@@ -282,10 +283,13 @@ class ConfigManager:
                 port = boot['services'][app]['port']
                 newport = port + port_offset
                 boot['services'][app]['port'] = newport
+                self.log.debug(f"{app} ctrl port: {boot['apps'][app]['port']}")
+
         for app in boot["apps"]:
             port = boot['apps'][app]['port']
             newport = port + port_offset
             boot['apps'][app]['port'] = newport
+            self.log.debug(f"{app} ctrl port: {boot['apps'][app]['port']}")
 
         boot['response_listener']['port'] += port_offset
 
