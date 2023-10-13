@@ -123,7 +123,7 @@ class ResponseListener:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         result = sock.connect_ex(('localhost',self.port))
         if result == 0:
-            raise RuntimeError('Port clash for the Response listener!')
+            raise RuntimeError(f'Port clash for the Response listener! Port {self.port} is already in use')
         sock.close()
 
         self.response_queue = Queue()
@@ -136,7 +136,7 @@ class ResponseListener:
         fm = FlaskManager(self.log, self.response_queue, self.port) # locked
         fm.start() # should unlock
         if not fm.ready_lock.acquire(timeout=12): # make sure that everything is ready
-            raise RuntimeError("Cannot create a response listener!!")
+            raise RuntimeError("Cannot create a response listener at port {self.port}!")
         fm.ready_lock.release()
         return fm
 
