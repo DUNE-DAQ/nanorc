@@ -283,7 +283,7 @@ class ConfigManager:
                 port = boot['services'][app]['port']
                 newport = port + port_offset
                 boot['services'][app]['port'] = newport
-                self.log.debug(f"{app} ctrl port: {boot['apps'][app]['port']}")
+                self.log.debug(f"{app} ctrl port: {boot['services'][app]['port']}")
 
         for app in boot["apps"]:
             port = boot['apps'][app]['port']
