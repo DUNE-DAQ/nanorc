@@ -171,15 +171,24 @@ class CredentialManager:
     def generate_new_sso_cookie(self, website):
         if not self.cache_initialised: raise RuntimeError('Nanorc\'s kerberos cache wasn\'t initialised!')
         SSO_COOKIE_PATH=tempfile.NamedTemporaryFile(mode='w', prefix="ssocookie", delete=False).name
-        max_tries = 3
-        it_try = 0
-        args=["cern-get-sso-cookie", "--krb", "-r", "-u", website, "-o", f"{SSO_COOKIE_PATH}"]
+        args = []
+
+        from nanorc.utils import which
+        if which('cern-get-sso-cookie'):
+            args = ["cern-get-sso-cookie", "--krb", "-r", "-u", website, "-o", f"{SSO_COOKIE_PATH}"]
+        elif which('auth-get-sso-cookie'):
+            args = ['auth-get-sso-cookie', '-u', website, '-o', f"{SSO_COOKIE_PATH}"]
+        else:
+            raise RuntimeError("CredentialManager: Couldn't get SSO cookie, there is no 'cern-get-sso-cookie' or 'auth-get-sso-cookie' on your system!")
+
         env = { 'LD_LIBRARY_PATH':'/lib64'}
         env.update(self.krbenv)
         proc = subprocess.run(args, env=env)
         if proc.returncode != 0:
             self.log.error("CredentialManager: Couldn't get SSO cookie!")
             self.log.error("You need to 'kinit' or 'change_user' and try again!")
+            self.log.error(f'{args[0]} stdout: {proc.stdout}')
+            self.log.error(f'{args[0]} stderr: {proc.stderr}')
             raise RuntimeError("CredentialManager: Couldn't get SSO cookie!")
         return SSO_COOKIE_PATH
 
