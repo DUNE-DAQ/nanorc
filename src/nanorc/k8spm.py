@@ -161,13 +161,28 @@ class K8SProcessManager(object):
             metadata=client.V1ObjectMeta(name=namespace)
         )
         try:
-            #
             resp = self._core_v1_api.create_namespace(
                 body=ns
             )
         except Exception as e:
             self.log.error(e)
             raise RuntimeError(f"Failed to create namespace \"{namespace}\"") from e
+
+
+        metadata = {
+            "metadata": {
+                "labels": {
+                    "pod-security.kubernetes.io/enforce":"privileged",
+                    "pod-security.kubernetes.io/enforce-version":"latest",
+                    "pod-security.kubernetes.io/warn":"privileged",
+                    "pod-security.kubernetes.io/warn-version":"latest",
+                    "pod-security.kubernetes.io/audit":"privileged",
+                    "pod-security.kubernetes.io/audit-version":"latest"
+                }
+            }
+        }
+
+        self._core_v1_api.patch_namespace(namespace, body)
 
     # ----
     def delete_namespace(self, namespace: str):
@@ -457,7 +472,7 @@ class K8SProcessManager(object):
             )
         )
 
-        #self.log.debug(pod)
+        self.log.debug(pod)
 
         # Creation of the pod in specified namespace
         try:
