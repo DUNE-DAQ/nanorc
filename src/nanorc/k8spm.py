@@ -182,7 +182,7 @@ class K8SProcessManager(object):
             }
         }
 
-        self._core_v1_api.patch_namespace(namespace, body)
+        self._core_v1_api.patch_namespace(namespace, metadata)
 
     # ----
     def delete_namespace(self, namespace: str):
