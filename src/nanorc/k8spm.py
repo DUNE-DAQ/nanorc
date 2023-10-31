@@ -855,15 +855,15 @@ class K8SProcessManager(object):
         self.nanorc_responder = responder_name
 
 
-        # if 'external_services' in boot_info:
-        #     for name, svc in boot_info['external_services'].items():
-        #         info_ip = socket.gethostbyname(svc['host'])
-        #         self.create_egress_endpoint(
-        #             name = name,
-        #             namespace = self.partition,
-        #             ip = info_ip,
-        #             port = svc['port']
-        #         )
+        if 'external_services' in boot_info:
+            for name, svc in boot_info['external_services'].items():
+                info_ip = socket.gethostbyname(svc['host'])
+                self.create_egress_endpoint(
+                    name = name,
+                    namespace = self.partition,
+                    ip = info_ip,
+                    port = svc['port']
+                )
 
 
         with Progress(
