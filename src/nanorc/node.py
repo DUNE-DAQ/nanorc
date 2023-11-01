@@ -266,7 +266,7 @@ class SubsystemNode(StatefulNode):
             if event.kwargs['pm'].use_k8spm():
                 response_host = self.pm.nanorc_responder
                 proxy = (event.kwargs['pm'].address, event.kwargs['pm'].port)
-                logging.warn(f"respons_host={response_host}, proxy={proxy} ")
+                logging.debug(f"respons_host={response_host}, proxy={proxy} ")
 
             child = ApplicationNode(
                 name=n,
