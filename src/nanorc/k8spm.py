@@ -618,7 +618,7 @@ class K8SProcessManager(object):
 
 
     def add_mounted_dir(self, in_pod_location, physical_location, name, read_only=True):
-        forbidden_paths = ['/','/boot','/dev','/etc','/lib','/proc','/sys','/usr','/tmp']
+        forbidden_paths = ['/','/boot','/etc','/lib','/proc','/sys','/usr','/tmp']
 
         import os
 
