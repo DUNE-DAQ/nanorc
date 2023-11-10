@@ -617,7 +617,7 @@ class K8SProcessManager(object):
             raise RuntimeError(f"Failed to create persistent volume claim \"{namespace}:{name}\"") from e
 
 
-    def add_mounted_dir(in_pod_location, physical_location, name, read_only=True):
+    def add_mounted_dir(self, in_pod_location, physical_location, name, read_only=True):
         forbidden_paths = ['/','/boot','/dev','/etc','/lib','/proc','/sys','/usr','/tmp']
 
         import os
@@ -627,7 +627,7 @@ class K8SProcessManager(object):
         if physical_loc_apath in forbidden_paths:
             raise RuntimeError(f'You are not allowed to mount \'{physical_location}\', required for \'{name}\'')
 
-        in_pod_location_apath = os.path.abspath(in_pod_location_apath)
+        in_pod_location_apath = os.path.abspath(in_pod_location)
 
         if in_pod_location_apath in forbidden_paths:
             raise RuntimeError(f'You are not allowed to mount \'{in_pod_location_apath}\', required for \'{name}\'')
@@ -691,7 +691,6 @@ class K8SProcessManager(object):
 
         if release_or_dev() == "dev":
             dbt_install_dir = os.getenv('DBT_INSTALL_DIR')
-
             mounted_dirs += [self.add_mounted_dir(
                 in_pod_location = dbt_install_dir,
                 name = 'installdir',
@@ -783,7 +782,7 @@ class K8SProcessManager(object):
             if trace:
                 trace_dir = f'/tmp/trace-buffers/{env_vars["DUNEDAQ_PARTITION"]}/{app_name}'
                 if not os.path.exists(trace_dir):
-                    os.mkdir(trace_dir)
+                    os.makedirs(trace_dir)
 
                 trace_uri = urlparse(trace)
                 tpath = os.path.dirname(trace_uri.path)#+'trace'
