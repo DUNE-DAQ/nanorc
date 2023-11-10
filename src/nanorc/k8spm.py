@@ -722,7 +722,7 @@ class K8SProcessManager(object):
             'gid': os.getgid(),
         }
 
-        log_dir = f'{os.getcwd()}/logs'
+        log_dir = self.log_path if self.log_path else f'{os.getcwd()}/logs'
         if not os.path.exists(log_dir):
             os.mkdir(log_dir)
 
