@@ -781,7 +781,7 @@ class K8SProcessManager(object):
             trace = app_env.get('TRACE_FILE')
 
             if trace:
-                trace_dir = f'{os.getcwd()}/trace'
+                trace_dir = f'/tmp/trace-buffers/{env_vars["DUNEDAQ_PARTITION"]}/{app_name}'
                 if not os.path.exists(trace_dir):
                     os.mkdir(trace_dir)
 
