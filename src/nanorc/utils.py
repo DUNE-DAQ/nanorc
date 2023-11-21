@@ -102,6 +102,52 @@ class FlaskManager(threading.Thread):
         self._create_and_join_flask()
 
 
+def which(program):
+    # https://stackoverflow.com/a/377028
+    import os
+    def is_exe(fpath):
+        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+
+    fpath, fname = os.path.split(program)
+    if fpath:
+        if is_exe(program):
+            return program
+    else:
+        for path in os.environ.get("PATH", "").split(os.pathsep):
+            exe_file = os.path.join(path, program)
+            if is_exe(exe_file):
+                return exe_file
+
+    return None
+
+
+# def get_distro_info():
+#     # come on, python, you need this in "sys"
+
+#     import glob
+#     files = glob.glob('/etc/*elease')
+
+#     if not files:
+#         raise RuntimeError('Cannot determine distribution, \'/etc/*elease\' does not lead to any match')
+
+#     def distro_parse_line(line):
+#         return line.replace('\'', '').replace('"', '').replace('\n', '')
+
+#     info = {}
+
+#     for file in files:
+#         print(f'opening {file=}')
+
+#         with open(file, 'r') as f:
+
+#             for line in f.readlines():
+#                 key_values = line.split('=')
+#                 if len(key_values) != 2:
+#                     print(f'ignoring line {line}: {key_values=}')
+#                     continue
+#                 info[distro_parse_line(key_values[0]).lower()] = distro_parse_line(key_values[1])
+
+#     return info
 
 
 
