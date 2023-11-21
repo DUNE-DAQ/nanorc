@@ -151,7 +151,7 @@ def create_daqapp_deployment(api, name, namespace):
     create_deployment(api, daqapp_manifest, name, namespace)
     
 
-def create_nanorc_responder(api, name, namespace):
+def create_egress_endpoint(api, name, namespace):
     # Load template from file
     manifests = load_manifest(path.join('/home/ale/devel/pocket/', 'pocket', 'manifests', 'minidaqapp', 'nanorc_responder.yaml'))
     dep['metadata']['namespace'] = namespace
@@ -172,7 +172,7 @@ if __name__ == '__main__':
     list_pods(core_v1)
 
     create_daqapp_deployment(apps_v1, 'rubu', 'dunedaq')
-    # create_nanorc_responder(apps_v1, 'nanorc', 'dunedaq ')
+    # create_egress_endpoint(apps_v1, 'nanorc', 'dunedaq ')
 
     # # time.sleep(10)
     # while(True):

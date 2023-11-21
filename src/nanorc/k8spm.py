@@ -13,6 +13,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeRemainingColumn, TimeElapsedColumn, track
 from rich.table import Table
 
+from datetime import datetime
 
 class AppProcessDescriptor(object):
     """docstring for AppProcessDescriptor"""
@@ -161,13 +162,28 @@ class K8SProcessManager(object):
             metadata=client.V1ObjectMeta(name=namespace)
         )
         try:
-            #
             resp = self._core_v1_api.create_namespace(
                 body=ns
             )
         except Exception as e:
             self.log.error(e)
             raise RuntimeError(f"Failed to create namespace \"{namespace}\"") from e
+
+
+        metadata = {
+            "metadata": {
+                "labels": {
+                    "pod-security.kubernetes.io/enforce":"privileged",
+                    "pod-security.kubernetes.io/enforce-version":"latest",
+                    "pod-security.kubernetes.io/warn":"privileged",
+                    "pod-security.kubernetes.io/warn-version":"latest",
+                    "pod-security.kubernetes.io/audit":"privileged",
+                    "pod-security.kubernetes.io/audit-version":"latest"
+                }
+            }
+        }
+
+        self._core_v1_api.patch_namespace(namespace, metadata)
 
     # ----
     def delete_namespace(self, namespace: str):
@@ -457,7 +473,7 @@ class K8SProcessManager(object):
             )
         )
 
-        #self.log.debug(pod)
+        self.log.debug(pod)
 
         # Creation of the pod in specified namespace
         try:
@@ -486,10 +502,9 @@ class K8SProcessManager(object):
             raise RuntimeError(f"Failed to create daqapp service \"{namespace}:{name}\"") from e
 
     # ----
-    def create_nanorc_responder(self, name: str, namespace: str, ip: str, port: int):
+    def create_egress_endpoint(self, name: str, namespace: str, ip: str, port: int):
 
-        self.nanorc_responder = name
-        self.log.info(f"Creating nanorc responder service \"{namespace}:{name}\" for \"{ip}:{port}\"")
+        self.log.info(f"Creating egress service \"{namespace}:{name}\" for \"{ip}:{port}\"")
         # Creating Service object
         service = client.V1Service(
             metadata=client.V1ObjectMeta(
@@ -506,14 +521,13 @@ class K8SProcessManager(object):
             )
         )  # V1Service
 
-        #self.log.debug(service)
         try:
             resp = self._core_v1_api.create_namespaced_service(namespace, service)
         except Exception as e:
             self.log.error(e)
             raise RuntimeError(f"Failed to create nanorc responder service \"{namespace}:{name}\"") from e
 
-        self.log.info(f"Creating nanorc responder endpoint {ip}:{port}")
+        self.log.info(f"Creating egress responder endpoint {ip}:{port}")
 
         # Create Endpoints Objects
         endpoints = client.V1Endpoints(
@@ -603,6 +617,28 @@ class K8SProcessManager(object):
             raise RuntimeError(f"Failed to create persistent volume claim \"{namespace}:{name}\"") from e
 
 
+    def add_mounted_dir(self, in_pod_location, physical_location, name, read_only=True):
+        forbidden_paths = ['/','/boot','/etc','/lib','/proc','/sys','/usr','/tmp']
+
+        import os
+
+        physical_loc_apath = os.path.abspath(physical_location)
+
+        if physical_loc_apath in forbidden_paths:
+            raise RuntimeError(f'You are not allowed to mount \'{physical_location}\', required for \'{name}\'')
+
+        in_pod_location_apath = os.path.abspath(in_pod_location)
+
+        if in_pod_location_apath in forbidden_paths:
+            raise RuntimeError(f'You are not allowed to mount \'{in_pod_location_apath}\', required for \'{name}\'')
+
+        return {
+            'in_pod_location': in_pod_location,
+            'physical_location': physical_location,
+            'name': name,
+            'read_only': read_only,
+        }
+
 
     #---
     def boot(self, boot_info, timeout, conf_loc, **kwargs):
@@ -655,24 +691,23 @@ class K8SProcessManager(object):
 
         if release_or_dev() == "dev":
             dbt_install_dir = os.getenv('DBT_INSTALL_DIR')
-
-            mounted_dirs += [{
-                'in_pod_location': dbt_install_dir,
-                'name': 'installdir',
-                'read_only': True,
-                'physical_location': dbt_install_dir
-            }]
+            mounted_dirs += [self.add_mounted_dir(
+                in_pod_location = dbt_install_dir,
+                name = 'installdir',
+                read_only = True,
+                physical_location = dbt_install_dir
+            )]
             self.log.info(f'Using the dev area "{dbt_install_dir}"')
 
             # Check this
             venv_dir = os.getenv('VIRTUAL_ENV')
 
-            mounted_dirs += [{
-                'in_pod_location': venv_dir,
-                'name': 'venv',
-                'read_only': True,
-                'physical_location': venv_dir
-            }]
+            mounted_dirs += [self.add_mounted_dir(
+                in_pod_location = venv_dir,
+                name = 'venv',
+                read_only = True,
+                physical_location = venv_dir
+            )]
 
         #--------------
 
@@ -686,16 +721,16 @@ class K8SProcessManager(object):
             'gid': os.getgid(),
         }
 
-        log_dir = f'{os.getcwd()}/logs'
+        log_dir = self.log_path if self.log_path else f'{os.getcwd()}/logs'
         if not os.path.exists(log_dir):
             os.mkdir(log_dir)
 
-        mounted_dirs += [{
-            'in_pod_location': '/logs',
-            'name': 'logdir',
-            'read_only': False,
-            'physical_location': log_dir
-        }]
+        mounted_dirs += [self.add_mounted_dir(
+            in_pod_location = '/logs',
+            name = 'logdir',
+            read_only = False,
+            physical_location = log_dir
+        )]
 
         for app_name in boot_info['order']:
             app_conf = apps[app_name]
@@ -742,53 +777,49 @@ class K8SProcessManager(object):
                 "capabilities"    : app_conf.get('capabilities', []),
             }
 
-            from urllib.parse import urlparse
             trace = app_env.get('TRACE_FILE')
 
             if trace:
-                trace_dir = f'{os.getcwd()}/trace'
+                trace_dir = f'/tmp/trace-buffers/{env_vars["DUNEDAQ_PARTITION"]}/{app_name}'
                 if not os.path.exists(trace_dir):
-                    os.mkdir(trace_dir)
+                    os.makedirs(trace_dir)
 
                 trace_uri = urlparse(trace)
                 tpath = os.path.dirname(trace_uri.path)#+'trace'
                 #tfile = os.path.basename(trace_uri.path)
 
-                app_boot_info['mounted_dirs'] += [{
-                    'in_pod_location': tpath,
-                    'name': 'tracedir',
-                    'read_only': False,
-                    'physical_location': trace_dir
-                }]
+                app_boot_info['mounted_dirs'] += [self.add_mounted_dir(
+                    in_pod_location = tpath,
+                    name = 'tracedir',
+                    read_only = False,
+                    physical_location = trace_dir
+                )]
                 #app_env['TRACE_FILE'] = f'{tpath}/{tfile}'
 
             if self.mount_cvmfs:
                 app_boot_info['mounted_dirs'] += [
-                    {
-                        'in_pod_location': '/cvmfs/dunedaq.opensciencegrid.org',
-                        'name': 'dunedaq-cvmfs',
-                        'read_only': True,
-                        'physical_location': '/cvmfs/dunedaq.opensciencegrid.org'
-                    },
-                    {
-                        'in_pod_location': '/cvmfs/dunedaq-development.opensciencegrid.org',
-                        'name': 'dunedaq-dev-cvmfs',
-                        'read_only': True,
-                        'physical_location': '/cvmfs/dunedaq-development.opensciencegrid.org'
-                    }
+                    self.add_mounted_dir(
+                        in_pod_location = '/cvmfs/dunedaq.opensciencegrid.org',
+                        name = 'dunedaq-cvmfs',
+                        read_only = True,
+                        physical_location = '/cvmfs/dunedaq.opensciencegrid.org'
+                    ),
+                    self.add_mounted_dir(
+                        in_pod_location = '/cvmfs/dunedaq-development.opensciencegrid.org',
+                        name = 'dunedaq-dev-cvmfs',
+                        read_only = True,
+                        physical_location = '/cvmfs/dunedaq-development.opensciencegrid.org'
+                    )
                 ]
 
             if self.cluster_config.is_kind:
-                app_boot_info['mounted_dirs'] += [
-                    {
-                        'in_pod_location': '/dunedaq/pocket',
-                        'name': 'pocket',
-                        'read_only': False,
-                        'physical_location': '/pocket'
-                    }
-                ]
+                app_boot_info['mounted_dirs'] += [self.add_mounted_dir(
+                    in_pod_location = '/dunedaq/pocket',
+                    name = 'pocket',
+                    read_only = False,
+                    physical_location = '/pocket'
+                )]
 
-            from datetime import datetime
 
             now = datetime.now() # current date and time
             date_time = now.strftime("%Y-%m-%d_%H%M%S")
@@ -829,6 +860,31 @@ class K8SProcessManager(object):
 
             self.apps[app_name] = app_desc
 
+        def rdm_string(N:int=5):
+            import string
+            import random
+            return ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(N))
+
+        responder_name = f'nanorc-{rdm_string()}'
+        self.create_egress_endpoint(
+            name = responder_name,
+            namespace = self.partition,
+            ip = self.gateway,
+            port = boot_info["response_listener"]["port"])
+        self.nanorc_responder = responder_name
+
+
+        if 'external_services' in boot_info:
+            for name, svc in boot_info['external_services'].items():
+                info_ip = socket.gethostbyname(svc['host'])
+                self.create_egress_endpoint(
+                    name = name,
+                    namespace = self.partition,
+                    ip = info_ip,
+                    port = svc['port']
+                )
+
+
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -863,16 +919,7 @@ class K8SProcessManager(object):
 
                 time.sleep(1)
 
-        def rdm_string(N:int=5):
-            import string
-            import random
-            return ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(N))
 
-        self.create_nanorc_responder(
-            name = f'nanorc-{rdm_string()}',
-            namespace = self.partition,
-            ip = self.gateway,
-            port = boot_info["response_listener"]["port"])
 
     # ---
     def check_apps(self):
@@ -924,7 +971,7 @@ def main():
     pm.create_namespace(partition)
     pm.create_cvmfs_pvc('dunedaq.opensciencegrid.org', partition)
     pm.create_daqapp_pod('trigger', 'trg', partition, True)
-    pm.create_nanorc_responder('nanorc', 'nanorc', partition, '128.141.174.0', 56789)
+    pm.create_egress_endpoint('nanorc', 'nanorc', partition, '128.141.174.0', 56789)
     # pm.list_pods()
 
 if __name__ == '__main__':
