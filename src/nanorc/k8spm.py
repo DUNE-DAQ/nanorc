@@ -617,6 +617,28 @@ class K8SProcessManager(object):
             raise RuntimeError(f"Failed to create persistent volume claim \"{namespace}:{name}\"") from e
 
 
+    def add_mounted_dir(self, in_pod_location, physical_location, name, read_only=True):
+        forbidden_paths = ['/','/boot','/etc','/lib','/proc','/sys','/usr','/tmp']
+
+        import os
+
+        physical_loc_apath = os.path.abspath(physical_location)
+
+        if physical_loc_apath in forbidden_paths:
+            raise RuntimeError(f'You are not allowed to mount \'{physical_location}\', required for \'{name}\'')
+
+        in_pod_location_apath = os.path.abspath(in_pod_location)
+
+        if in_pod_location_apath in forbidden_paths:
+            raise RuntimeError(f'You are not allowed to mount \'{in_pod_location_apath}\', required for \'{name}\'')
+
+        return {
+            'in_pod_location': in_pod_location,
+            'physical_location': physical_location,
+            'name': name,
+            'read_only': read_only,
+        }
+
 
     #---
     def boot(self, boot_info, timeout, conf_loc, **kwargs):
@@ -669,24 +691,23 @@ class K8SProcessManager(object):
 
         if release_or_dev() == "dev":
             dbt_install_dir = os.getenv('DBT_INSTALL_DIR')
-
-            mounted_dirs += [{
-                'in_pod_location': dbt_install_dir,
-                'name': 'installdir',
-                'read_only': True,
-                'physical_location': dbt_install_dir
-            }]
+            mounted_dirs += [self.add_mounted_dir(
+                in_pod_location = dbt_install_dir,
+                name = 'installdir',
+                read_only = True,
+                physical_location = dbt_install_dir
+            )]
             self.log.info(f'Using the dev area "{dbt_install_dir}"')
 
             # Check this
             venv_dir = os.getenv('VIRTUAL_ENV')
 
-            mounted_dirs += [{
-                'in_pod_location': venv_dir,
-                'name': 'venv',
-                'read_only': True,
-                'physical_location': venv_dir
-            }]
+            mounted_dirs += [self.add_mounted_dir(
+                in_pod_location = venv_dir,
+                name = 'venv',
+                read_only = True,
+                physical_location = venv_dir
+            )]
 
         #--------------
 
@@ -700,16 +721,16 @@ class K8SProcessManager(object):
             'gid': os.getgid(),
         }
 
-        log_dir = f'{os.getcwd()}/logs'
+        log_dir = self.log_path if self.log_path else f'{os.getcwd()}/logs'
         if not os.path.exists(log_dir):
             os.mkdir(log_dir)
 
-        mounted_dirs += [{
-            'in_pod_location': '/logs',
-            'name': 'logdir',
-            'read_only': False,
-            'physical_location': log_dir
-        }]
+        mounted_dirs += [self.add_mounted_dir(
+            in_pod_location = '/logs',
+            name = 'logdir',
+            read_only = False,
+            physical_location = log_dir
+        )]
 
         for app_name in boot_info['order']:
             app_conf = apps[app_name]
@@ -759,47 +780,45 @@ class K8SProcessManager(object):
             trace = app_env.get('TRACE_FILE')
 
             if trace:
-                trace_dir = f'{os.getcwd()}/trace'
+                trace_dir = f'/tmp/trace-buffers/{env_vars["DUNEDAQ_PARTITION"]}/{app_name}'
                 if not os.path.exists(trace_dir):
-                    os.mkdir(trace_dir)
+                    os.makedirs(trace_dir)
 
                 trace_uri = urlparse(trace)
                 tpath = os.path.dirname(trace_uri.path)#+'trace'
                 #tfile = os.path.basename(trace_uri.path)
 
-                app_boot_info['mounted_dirs'] += [{
-                    'in_pod_location': tpath,
-                    'name': 'tracedir',
-                    'read_only': False,
-                    'physical_location': trace_dir
-                }]
+                app_boot_info['mounted_dirs'] += [self.add_mounted_dir(
+                    in_pod_location = tpath,
+                    name = 'tracedir',
+                    read_only = False,
+                    physical_location = trace_dir
+                )]
                 #app_env['TRACE_FILE'] = f'{tpath}/{tfile}'
 
             if self.mount_cvmfs:
                 app_boot_info['mounted_dirs'] += [
-                    {
-                        'in_pod_location': '/cvmfs/dunedaq.opensciencegrid.org',
-                        'name': 'dunedaq-cvmfs',
-                        'read_only': True,
-                        'physical_location': '/cvmfs/dunedaq.opensciencegrid.org'
-                    },
-                    {
-                        'in_pod_location': '/cvmfs/dunedaq-development.opensciencegrid.org',
-                        'name': 'dunedaq-dev-cvmfs',
-                        'read_only': True,
-                        'physical_location': '/cvmfs/dunedaq-development.opensciencegrid.org'
-                    }
+                    self.add_mounted_dir(
+                        in_pod_location = '/cvmfs/dunedaq.opensciencegrid.org',
+                        name = 'dunedaq-cvmfs',
+                        read_only = True,
+                        physical_location = '/cvmfs/dunedaq.opensciencegrid.org'
+                    ),
+                    self.add_mounted_dir(
+                        in_pod_location = '/cvmfs/dunedaq-development.opensciencegrid.org',
+                        name = 'dunedaq-dev-cvmfs',
+                        read_only = True,
+                        physical_location = '/cvmfs/dunedaq-development.opensciencegrid.org'
+                    )
                 ]
 
             if self.cluster_config.is_kind:
-                app_boot_info['mounted_dirs'] += [
-                    {
-                        'in_pod_location': '/dunedaq/pocket',
-                        'name': 'pocket',
-                        'read_only': False,
-                        'physical_location': '/pocket'
-                    }
-                ]
+                app_boot_info['mounted_dirs'] += [self.add_mounted_dir(
+                    in_pod_location = '/dunedaq/pocket',
+                    name = 'pocket',
+                    read_only = False,
+                    physical_location = '/pocket'
+                )]
 
 
             now = datetime.now() # current date and time
