@@ -47,7 +47,8 @@ class DBRunNumberManager:
             error = f"{__name__}: Connection to {self.API_SOCKET} timed out"
             self.log.error(error)
             raise RuntimeError(error) from exc
-        
+
+        print(req.json())
         self.run = req.json()[0][0][0]
         return self.run
 
