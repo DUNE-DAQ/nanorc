@@ -132,6 +132,9 @@ class SSHProcessManager(object):
         self.watchers = []
         self.event_queue = queue.Queue()
         self.ssh_conf = ssh_conf
+        import os
+        host_env = os.environ
+        self.ssh_env = {'KRB5CCNAME': host_env['KRB5CCNAME'] } if 'KRB5CCNAME' in host_env else {}
         self.log_path = log_path
         # Add self to the list of instances
         self.__instances.add(self)
@@ -161,7 +164,7 @@ class SSHProcessManager(object):
             self.log.info(f'Executing {script_data["cmd"]} on {host}.')
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"] + [cmd]
             try:
-                proc = sh.ssh(ssh_args)
+                proc = self.ssh_cmd(ssh_args, _env=self.ssh_env)
             except ErrorReturnCode as e:
                 self.log.error(
                     e.stdout.decode('ascii')
@@ -236,17 +239,20 @@ class SSHProcessManager(object):
             import socket
             self.console.print(f'\'{app_name}\' logs are in \'{socket.gethostname()}:{os.getcwd()}/{log_file}\'')
 
-        ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"]
+        ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no", "-vvv"]
         # if not self.can_use_kerb:
         ssh_args += self.ssh_conf
 
         ssh_test_args = ssh_args+['echo "Knock knock, tricks or treats!"']
 
         try:
-            test_proc = self.ssh_cmd(ssh_test_args, _env={})
+            test_proc = self.ssh_cmd(ssh_test_args, _env=self.ssh_env)
         except Exception as e:
             self.log.error(f'I cannot ssh to {host}:')
             self.log.error(f'ssh {" ".join(ssh_test_args)}')
+            if hasattr(e, 'stderr'):
+                stderr = e.stderr.decode("utf-8")
+                self.log.debug(stderr)
             raise e
 
         #ssh_args += [cmd]
@@ -279,13 +285,13 @@ class SSHProcessManager(object):
                 desc=self.setup_app(srv_name, srv_conf, conf_loc)
                 self.services[srv_name] = desc
                 ssh_args=desc.ssh_args + [desc.cmd]
-                proc = sh.ssh(
+                proc = self.ssh_cmd(
                     *ssh_args,
                     _out=file_logger(desc.logfile) if not self.log_path else None,
                     _bg=True,
                     _bg_exc=False,
                     _new_session=True,
-                    _env={},
+                    _env=self.ssh_env,
                     #_preexec_fn=on_parent_exit(signal.SIGTERM), # should be here too
                 )
                 self.watch(srv_name, proc)
@@ -306,7 +312,7 @@ class SSHProcessManager(object):
             ssh_args=desc.ssh_args + [desc.cmd]
             proc = self.ssh_cmd(
                 *ssh_args,
-                _env={},
+                _env=self.ssh_env,
                 _out = file_logger(desc.logfile) if not self.log_path else None,
                 _bg = True,
                 _bg_exc = False,
