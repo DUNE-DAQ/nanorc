@@ -507,9 +507,26 @@ class SubsystemNode(StatefulNode):
                 done = []
                 for child_node in appset:
                     if not child_node.included: continue
-
-                    if not child_node.sup.desc.proc.is_alive() or not child_node.sup.commander.ping():
+                    IsAlive = child_node.sup.desc.proc.is_alive()
+                    if not IsAlive:
                         failed.append(child_node.name)
+                        self.console.print(f"{child_node.name}, is dead")
+                        child_node.to_error(
+                            command = command,
+                        )
+                        done += [child_node]
+                        break
+                    IsPing = False
+                    pingattempt=5
+                    for i in range(pingattempt):
+                        IsPing = child_node.sup.commander.ping
+                        if IsPing:
+                            break
+                        time.sleep(0.1)
+                        self.console.print(f"Trying to ping {child_node.name}, attempt {i+1} of {pingattempt}")
+                    if not IsPing:
+                        failed.append(child_node.name)
+                        self.console.print(f"{child_node.name}, cannot be Pinged")
                         child_node.to_error(
                             command = command,
                         )
