@@ -499,7 +499,6 @@ class SubsystemNode(StatefulNode):
 
             for _ in range(timeout*10):
                 progress.update(timeout_bar, advance=1)
-
                 if len(appset)==0:
                     progress.update(total, completed = n_apps)
                     progress.update(timeout_bar, visible=False)
@@ -507,32 +506,29 @@ class SubsystemNode(StatefulNode):
                 done = []
                 for child_node in appset:
                     if not child_node.included: continue
-                    IsAlive = child_node.sup.desc.proc.is_alive()
-                    if not IsAlive:
-                        failed.append(child_node.name)
-                        self.console.print(f"{child_node.name}, is dead")
+                    is_alive = child_node.sup.desc.proc.is_alive()
+                    if not is_alive:
+                        failed.append('dead')
                         child_node.to_error(
                             command = command,
                         )
                         done += [child_node]
-                        break
-                    IsPing = False
-                    pingattempt=5
-                    for i in range(pingattempt):
-                        IsPing = child_node.sup.commander.ping
-                        if IsPing:
+                        continue
+                    is_ping = False
+                    ping_attempt=5
+                    for i in range(ping_attempt):
+                        is_ping = child_node.sup.commander.ping
+                        if is_ping:
                             break
                         time.sleep(0.1)
-                        self.console.print(f"Trying to ping {child_node.name}, attempt {i+1} of {pingattempt}")
-                    if not IsPing:
-                        failed.append(child_node.name)
-                        self.console.print(f"{child_node.name}, cannot be Pinged")
+                        self.console.print(f"Trying to ping {child_node.name}, attempt {i+1} of {ping_attempt}")
+                    if not is_ping:
+                        failed.append('no_ping')
                         child_node.to_error(
                             command = command,
                         )
                         done += [child_node]
-                        break
-
+                        continue
                     try:
                         r = child_node.sup.check_response()
                     except NoResponse:
@@ -573,7 +569,7 @@ class SubsystemNode(StatefulNode):
                 "error": failed,
             }
             self.to_error(
-                text=f"Children nodes{[r for r in failed]} failed to {command}",
+                text=f"Children nodes{[r for r in failed]} failed to {command} because mode: {failed} ",
                 command=command
             )
         else:
