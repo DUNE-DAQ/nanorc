@@ -401,7 +401,8 @@ class SubsystemNode(StatefulNode):
         self.log.debug(log)
 
         appset = list(self.children)
-        failed = { f:[] for f in ('dead', 'no_ping', 'cmd_error') }
+        failed = []
+
         if not self.listener.flask_manager.is_alive():
             self.log.error('Response listener is not alive, trying to respawn it!!')
             self.listener.flask_manager = self.listener.create_manager()
@@ -504,30 +505,29 @@ class SubsystemNode(StatefulNode):
                     break
                 done = []
                 for child_node in appset:
+                    mode_fail = []
                     if not child_node.included: continue
                     is_alive = child_node.sup.desc.proc.is_alive()
                     if not is_alive:
-                        failed['dead'] += [child_node]
+                        mode_fail.append('pod died')
                         child_node.to_error(
                             command = command,
                         )
                         done += [child_node]
-                        continue
-                    is_ping = child_node.sup.commander.ping
-                    if is_ping:
                         break
+                    is_ping = child_node.sup.commander.ping
+                    failed_ping_count = 0
                     if not is_ping:
-                        failed_ping_count[child_node] += 1
+                        failed_ping_count += 1
                         continue
                     failed_ping_thres = 5
-                    if failed_ping_count > self.failed_ping_thres:
-                        failed['no_ping'] += [child_node]
+                    if failed_ping_count > failed_ping_thres:
+                        mode_fail.append('there is no ping')
                         child_node.to_error(
                             command = command,
                         )
                         done += [child_node]
-                        print(f'({child_node} failed to ping {failed_ping_count} times')
-                        continue
+                        break
                     try:
                         r = child_node.sup.check_response()
                     except NoResponse:
@@ -545,7 +545,7 @@ class SubsystemNode(StatefulNode):
                             "error": r,
                         }
                         failed.append(child_node.name)
-                        failed['cmd_error'] += [child_node]
+                        mode_fail.append('command error')
                         child_node.to_error(
                             command=command,
                             text=r['result']
@@ -559,7 +559,7 @@ class SubsystemNode(StatefulNode):
                 time.sleep(0.1)
 
         response= {}
-        if any(failed.values)():
+        if failed:
             response = {
                 "node":self.name,
                 "status_code" : ErrorCode.Failed,
@@ -569,7 +569,7 @@ class SubsystemNode(StatefulNode):
                 "error": failed,
             }
             self.to_error(
-                text=f"Children nodes{[r for r in failed]} failed to {command} because mode: {failed} ",
+                text=f"Children nodes{[r for r in failed]} failed to {command} because mode: {mode_fail} ",
                 command=command
             )
         else:
