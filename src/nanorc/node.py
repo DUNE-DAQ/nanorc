@@ -520,7 +520,6 @@ class SubsystemNode(StatefulNode):
                     is_ping = child_node.sup.commander.ping()
                     if not is_ping:
                         failed_ping_count += 1
-                        print(f'{child_node.name}:{failed_ping_count}')
                         continue
                     failed_ping_thres = 3
                     if failed_ping_count > failed_ping_thres:
