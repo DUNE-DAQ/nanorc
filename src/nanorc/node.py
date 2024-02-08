@@ -497,6 +497,7 @@ class SubsystemNode(StatefulNode):
             }
             timeout_bar = progress.add_task("[yellow]timeout", total = timeout*10)
 
+            failed_ping_count = 0
             for _ in range(timeout*10):
                 progress.update(timeout_bar, advance=1)
                 if len(appset)==0:
@@ -509,19 +510,21 @@ class SubsystemNode(StatefulNode):
                     if not child_node.included: continue
                     is_alive = child_node.sup.desc.proc.is_alive()
                     if not is_alive:
+                        failed.append(child_node.name)
                         mode_fail.append('pod died')
                         child_node.to_error(
                             command = command,
                         )
                         done += [child_node]
                         break
-                    is_ping = child_node.sup.commander.ping
-                    failed_ping_count = 0
+                    is_ping = child_node.sup.commander.ping()
                     if not is_ping:
                         failed_ping_count += 1
+                        print(f'{child_node.name}:{failed_ping_count}')
                         continue
-                    failed_ping_thres = 5
+                    failed_ping_thres = 3
                     if failed_ping_count > failed_ping_thres:
+                        failed.append(child_node.name)
                         mode_fail.append('there is no ping')
                         child_node.to_error(
                             command = command,
@@ -543,6 +546,7 @@ class SubsystemNode(StatefulNode):
                             "state": child_node.state,
                             "command": command,
                             "error": r,
+                            "failure_mode": mode_fail, 
                         }
                         failed.append(child_node.name)
                         mode_fail.append('command error')
@@ -567,6 +571,7 @@ class SubsystemNode(StatefulNode):
                 "command": command,
                 "failed": [r for r in failed],
                 "error": failed,
+                "failure_mode":mode_fail,
             }
             self.to_error(
                 text=f"Children nodes{[r for r in failed]} failed to {command} because mode: {mode_fail} ",
