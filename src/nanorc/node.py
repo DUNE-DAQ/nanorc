@@ -498,6 +498,7 @@ class SubsystemNode(StatefulNode):
 
             failed_ping_count = {app.name:0 for app in appset}
             mode_fail = []
+            failed_ping_thres = 3
             for _ in range(timeout*10):
                 progress.update(timeout_bar, advance=1)
                 if len(appset)==0:
@@ -519,7 +520,6 @@ class SubsystemNode(StatefulNode):
                     is_ping = child_node.sup.commander.ping()
                     if not is_ping:
                         failed_ping_count[child_node.name] += 1
-                        failed_ping_thres = 3
                         if failed_ping_count[child_node.name] > failed_ping_thres:
                             failed.append(child_node.name)
                             mode_fail.append('app not pinging')
@@ -527,7 +527,6 @@ class SubsystemNode(StatefulNode):
                                 command = command,
                             )
                             done += [child_node]
-                            continue
                         continue
                     try:
                         r = child_node.sup.check_response()
