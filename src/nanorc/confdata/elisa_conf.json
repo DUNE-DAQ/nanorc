@@ -1,7 +1,7 @@
 {
     "np02_coldbox": {
-        "connection": "https://np-vd-coldbox-elog.cern.ch/elisa/api/np-vd-coldbox-elog/",
-        "website": "https://np-vd-coldbox-elog.cern.ch",
+        "connection": "https://np-vd-coldbox-elog.app.cern.ch/elisa/api/np-vd-coldbox-elog/",
+        "website": "https://np-vd-coldbox-elog.app.cern.ch/",
         "attributes": {
             "start": {
                 "type": {
@@ -43,8 +43,8 @@
     },
 
     "np02_pds": {
-        "connection": "https://np-vd-coldbox-elog.cern.ch/elisa/api/np-vd-coldbox-elog/",
-        "website": "https://np-vd-coldbox-elog.cern.ch",
+        "connection": "https://np-vd-coldbox-elog.app.cern.ch/elisa/api/np-vd-coldbox-elog/",
+        "website": "https://np-vd-coldbox-elog.app.cern.ch/",
         "attributes": {
             "start": {
                 "type": {
@@ -86,8 +86,8 @@
     },
 
     "np04_coldbox": {
-        "connection": "https://pdsp-elog.cern.ch/elisa/api/ProtoDUNE-SP/",
-        "website": "https://pdsp-elog.cern.ch",
+        "connection": "https://pdsp-elog.app.cern.ch/elisa/api/ProtoDUNE-SP/",
+        "website": "https://pdsp-elog.app.cern.ch",
         "attributes": {
             "start": {
                 "type": {
@@ -129,8 +129,8 @@
     },
 
     "np04_hd": {
-        "connection": "https://pdsp-elog.cern.ch/elisa/api/ProtoDUNE-SP/",
-        "website": "https://pdsp-elog.cern.ch",
+        "connection": "https://pdsp-elog.app.cern.ch/elisa/api/ProtoDUNE-SP/",
+        "website": "https://pdsp-elog.app.cern.ch",
         "attributes": {
             "start": {
                 "type": {
