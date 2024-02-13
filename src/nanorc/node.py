@@ -124,7 +124,7 @@ class SubsystemNode(StatefulNode):
             script = cp.deepcopy(scripts.get(data['script_name'])) if scripts else None
 
             if not script:
-                self.log.error(f"no {data['script_name']} script data in boot.json")
+                # self.log.error(f"no {data['script_name']} script data in boot.json")
                 return {self.name : f"no {data['script_name']} script data in boot.json"}
 
             try:
@@ -543,7 +543,7 @@ class SubsystemNode(StatefulNode):
                             "state": child_node.state,
                             "command": command,
                             "error": r,
-                            "failure_mode": mode_fail, 
+                            "failure_mode": mode_fail,
                         }
                         failed.append(child_node.name)
                         mode_fail.append('command error')
