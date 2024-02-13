@@ -40,7 +40,10 @@ def add_run_end_parameters():
     def add_decorator(function):
         f1 = accept_timeout(None)(function)
         f2 = click.option('--force', default=False, is_flag=True)(f1)
-        return click.option('--message', type=str, default="")(f2)
+        f3 = click.option(
+            '--ignore-run-registry-insertion-error', type=bool, is_flag=True, default=False,
+            help='Start the run, even if saving the configuration into the run registry fails')(f2)
+        return click.option('--message', type=str, default="")(f3)
      # sigh end
     return add_decorator
 
