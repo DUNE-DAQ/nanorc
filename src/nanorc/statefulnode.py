@@ -161,7 +161,8 @@ class StatefulNode(NodeMixin):
         for c in self.children:
             if not is_include_exclude and not c.included: continue
             self.console.log(f"Sending {cmd} to {c.name}")
-            ret[c.name] = c.send_custom_command(cmd, data, timeout)
+            from copy import deepcopy as dc
+            ret[c.name] = c.send_custom_command(cmd, dc(data), timeout)
         self.resolve_error()
         return ret
 
