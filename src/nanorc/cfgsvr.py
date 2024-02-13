@@ -231,11 +231,11 @@ class DBConfigSaver:
             self.log.error(error)
             raise RuntimeError(error) from exc
         except requests.ConnectionError as exc:
-            error = f"{__name__}: Connection to {self.API_SOCKET} wasn't successful"
+            error = f"{__name__}: RunRegistryDB: Connection to {self.API_SOCKET} wasn't successful"
             self.log.error(error)
             raise RuntimeError(error) from exc
         except requests.Timeout as exc:
-            error = f"{__name__}: Connection to {self.API_SOCKET} timed out"
+            error = f"{__name__}: RunRegistryDB: Connection to {self.API_SOCKET} timed out"
             self.log.error(error)
             raise RuntimeError(error) from exc
 
