@@ -202,16 +202,18 @@ class DBConfigSaver:
                                       data=post_data,
                                       auth=(self.API_USER, self.API_PSWD),
                                       timeout=self.timeout)
+                    r.raise_for_status()
+
                 except requests.HTTPError as exc:
-                    error = f"{__name__}: RunRegistryDB: HTTP Error (maybe failed auth, maybe ill-formed post message, ...)"
+                    error = f"{__name__}: RunRegistryDB: HTTP Error: {exc}, {r.text}"
                     self.log.error(error)
                     raise RuntimeError(error) from exc
                 except requests.ConnectionError as exc:
-                    error = f"{__name__}: Connection to {self.API_SOCKET} wasn't successful"
+                    error = f"{__name__}: Connection to {self.API_SOCKET} wasn't successful: {exc}"
                     self.log.error(error)
                     raise RuntimeError(error) from exc
                 except requests.Timeout as exc:
-                    error = f"{__name__}: Connection to {self.API_SOCKET} timed out"
+                    error = f"{__name__}: Connection to {self.API_SOCKET} timed out: {exc}"
                     self.log.error(error)
                     raise RuntimeError(error) from exc
 
