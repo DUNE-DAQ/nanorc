@@ -111,18 +111,32 @@ class K8SProcessManager(object):
 
         ## Instead we revert to ssh...
         env_vars = script_data["env"]
-        cmd =';'.join([ f"export {n}=\"{v}\"" for n,v in env_vars.items()])
-        cmd += ";"+"; ".join(script_data['cmd'])
+        cmd = ''
+        pretty_print = ''
+        for n,v in env_vars.items():
+            cmd += f"export {n}=\"{v}\"; "
+            pretty_v = v
+            if len(v)>100:
+                pretty_v = v[:50]+'...'+v[-50:]
+            pretty_print += f"export {n}=\"{pretty_v}\"; "
+
+        cmd += "; ".join(script_data['cmd'])
+        pretty_print += "; ".join(script_data['cmd'])
+
         pods = self.list_pods(self.partition)
         hosts = set([self.get_pod_node(pod.metadata.name, self.partition) for pod in pods.items])
 
         for host in hosts:
-            self.log.info(f'Executing {script_data["cmd"]} on {host}.')
+            self.console.print(f'Executing {script_data["cmd"]} script on \'{host}\':\n[bright_black]{pretty_print}[/]')
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"] + [cmd]
             import sh
             from sh import ErrorReturnCode
             try:
-                proc = sh.ssh(ssh_args)
+                import os
+                host_env = os.environ
+                ssh_env = {'KRB5CCNAME': host_env['KRB5CCNAME'] } if 'KRB5CCNAME' in host_env else {}
+                ssh_cmd  = sh.Command('/usr/bin/ssh')
+                proc = ssh_cmd(ssh_args, _env=ssh_env)
             except ErrorReturnCode as e:
                 self.log.error(
                     e.stdout.decode('ascii')
@@ -132,7 +146,7 @@ class K8SProcessManager(object):
                 self.log.critical(
                     str(e)
                 )
-            self.log.info(proc)
+            self.log.debug(proc)
 
 
 
