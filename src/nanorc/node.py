@@ -325,17 +325,25 @@ class SubsystemNode(StatefulNode):
         self.end_boot(response=response)
 
 
-    def on_exit_conf_ing(self, event) -> NoReturn:
-        self.pin_thread()
+    def _on_exit_callback(self, event) -> NoReturn:
+        scripts = self.cfgmgr.boot.get('scripts', {})
+
+        for script_name, script_data in scripts.items():
+            if 'thread_pin' in script_name.lower():
+                after_what = ['end_'+script_data.get('after').lower()]
+
+                if not after_what:
+                    after_what = ['end_conf', 'end_boot']
+
+                if event.event.name.lower() in after_what:
+                    self.pin_thread(script_name)
+
         super()._on_exit_callback(event)
 
-    def on_exit_boot_ing(self, event) -> NoReturn:
-        self.pin_thread()
-        super()._on_exit_callback(event)
 
-    def pin_thread(self):
+    def pin_thread(self, script_name):
         scripts = self.cfgmgr.boot.get('scripts')
-        thread_pinning = scripts.get('thread_pinning') if scripts else None
+        thread_pinning = scripts.get(script_name) if scripts else None
         if thread_pinning:
             try:
                 # self.pm.execute_script(thread_pinning)
