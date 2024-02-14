@@ -121,7 +121,15 @@ class SubsystemNode(StatefulNode):
 
         if cmd == 'scripts': # unfortunately I don't see how else to do this
             scripts = self.cfgmgr.boot.get('scripts')
-            script = cp.deepcopy(scripts.get(data['script_name'])) if scripts else None
+
+            def search_script(dico, name):
+                # hopefully that's good enough. This matches "thread_pinning" to "thread_pinning_0"... not ideal
+                for key, value in dico.items():
+                    if key.startswith(name):
+                        return cp.deepcopy(value)
+                return None
+
+            script = search_script(scripts, data['script_name']) if scripts else None
 
             if not script:
                 # self.log.error(f"no {data['script_name']} script data in boot.json")
@@ -330,13 +338,16 @@ class SubsystemNode(StatefulNode):
 
         for script_name, script_data in scripts.items():
             if 'thread_pin' in script_name.lower():
-                after_what = ['end_'+script_data.get('after').lower()]
-
-                if not after_what:
+                after = script_data.get('after')
+                if after:
+                    after_what = ['end_'+after.lower()]
+                else:
                     after_what = ['end_conf', 'end_boot']
+                    # the behaviour if one doesn't specify anything.
 
                 if event.event.name.lower() in after_what:
                     self.pin_thread(script_name)
+                    break
 
         super()._on_exit_callback(event)
 
