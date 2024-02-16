@@ -83,23 +83,26 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
 
     rest_thread  = threading.Thread()
     webui_thread = threading.Thread()
+
     if web and tui:
         raise RuntimeError("cant have TUI and GUI at the same time")
+
     try:
         dotnanorc = os.path.expanduser(dotnanorc)
         obj.console.print(f"[blue]Loading {dotnanorc}[/blue]")
         f = open(dotnanorc, 'r')
         dotnanorc = json.load(f)
+        cern_profile = dotnanorc['cern']
 
-        rundb_socket = json.loads(resources.read_text(confdata, "run_number.json"))['socket']
-        runreg_socket = json.loads(resources.read_text(confdata, "run_registry.json"))['socket']
+        rundb_socket  = cern_profile['cern_profile']['run_number_configuration'  ]['socket']
+        runreg_socket = cern_profile['cern_profile']['run_registry_configuration']['socket']
 
-        credentials.add_login("rundb",
-                              dotnanorc["rundb"]["user"],
-                              dotnanorc["rundb"]["password"])
-        credentials.add_login("runregistrydb",
-                              dotnanorc["runregistrydb"]["user"],
-                              dotnanorc["runregistrydb"]["password"])
+        for service, user_data in cern_profile['authentication'].items():
+            credentials.add_login(
+                service,
+                user_data,
+            )
+
         logging.getLogger("cli").info("RunDB socket "+rundb_socket)
         logging.getLogger("cli").info("RunRegistryDB socket "+runreg_socket)
 
@@ -115,6 +118,7 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
             port_offset = port_offset,
             pm = pm
         )
+
         credentials.set_partition(partition_number=partition_number,apparatus_id=rc.apparatus_id)
 
         in_use = credentials.partition_in_use()
@@ -125,11 +129,12 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
                 obj.console.print(f'[bold red]Partition #{partition_number} on apparatus \'{in_use}\' seems to be used by \'{kuser}\', do you want to steal it? Y/N[/bold red]')
             else:
                 obj.console.print(f'[bold red]You seem to already have partition #{partition_number} on apparatus \'{in_use}\' active, are you sure you want to proceed? Y/N[/bold red]')
-                while True:
-                    steal = input()
-                    if   steal == 'Y': break
-                    elif steal == 'N': exit(0)
-                    obj.console.print(f'[bold red]Wrong answer! Y or N?[/bold red]')
+
+            while True:
+                steal = input()
+                if   steal == 'Y': break
+                elif steal == 'N': exit(0)
+                obj.console.print(f'[bold red]Wrong answer! Y or N?[/bold red]')
 
         credentials.start_partition()
         credentials.change_user(user)
