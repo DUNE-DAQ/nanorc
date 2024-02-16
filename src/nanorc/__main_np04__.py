@@ -58,7 +58,6 @@ from nanorc.nano_context import NanoContext
 def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, dotnanorc, kerberos, timeout, partition_number, partition_label, web, tui, pm, cfg_dir, user):
 
 
-
     if not elisa_conf:
         with resources.path(confdata, "elisa_conf.json") as p:
             elisa_conf = p
@@ -94,8 +93,8 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
         dotnanorc = json.load(f)
         cern_profile = dotnanorc['cern']
 
-        rundb_socket  = cern_profile['cern_profile']['run_number_configuration'  ]['socket']
-        runreg_socket = cern_profile['cern_profile']['run_registry_configuration']['socket']
+        rundb_socket  = cern_profile['run_number_configuration'  ]['socket']
+        runreg_socket = cern_profile['run_registry_configuration']['socket']
 
         for service, user_data in cern_profile['authentication'].items():
             credentials.add_login(
@@ -119,29 +118,43 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
             pm = pm
         )
 
-        credentials.set_partition(partition_number=partition_number,apparatus_id=rc.apparatus_id)
+        from nanorc.credmgr import CERNSessionHandler
 
-        in_use = credentials.partition_in_use()
+        in_use = CERNSessionHandler.session_is_active(
+            session_name = rc.apparatus_id,
+            session_number = partition_number,
+        )
+
         if in_use:
-            kuser = credentials.get_kerberos_user(silent=True)
+            kuser = CERNSessionHandler.get_kerberos_user_from_session(
+                session_name = rc.apparatus_id,
+                session_number = partition_number,
+            )
 
-            if kuser!=None and kuser != user:
-                obj.console.print(f'[bold red]Partition #{partition_number} on apparatus \'{in_use}\' seems to be used by \'{kuser}\', do you want to steal it? Y/N[/bold red]')
+            if kuser is not None and kuser != user:
+                obj.console.print(f'[bold red]Session #{partition_number} on apparatus \'{rc.apparatus_id}\' seems to be used by \'{kuser}\', do you want to steal it? Y/N[/bold red]')
             else:
-                obj.console.print(f'[bold red]You seem to already have partition #{partition_number} on apparatus \'{in_use}\' active, are you sure you want to proceed? Y/N[/bold red]')
+                obj.console.print(f'[bold red]You seem to already have session #{partition_number} on apparatus \'{rc.apparatus_id}\' active, are you sure you want to proceed? Y/N[/bold red]')
 
             while True:
-                steal = input()
+                try:
+                    steal = input().upper()
+                except KeyboardInterrupt:
+                    obj.console.print(f'Exiting...')
+                    exit(1)
                 if   steal == 'Y': break
                 elif steal == 'N': exit(0)
                 obj.console.print(f'[bold red]Wrong answer! Y or N?[/bold red]')
 
-        credentials.start_partition()
-        credentials.change_user(user)
-        ctx.command.shell.prompt = f"{credentials.user}@np04rc> "
-        if credentials.user is None:
-            print()
-            raise RuntimeError(f'User {user} couldn\'t login')
+        cern_auth = CERNSessionHandler(
+            apparatus_id = rc.apparatus_id,
+            session_number = partition_number,
+            username = user,
+        )
+
+        rc.session_handler = cern_auth
+
+        ctx.command.shell.prompt = f"{cern_auth.nanorc_user.username}@np04rc> "
 
         rc.log_path = os.path.abspath(log_path)
         add_common_cmds(ctx.command, end_of_run_cmds=False)
@@ -194,8 +207,8 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
         raise click.Abort()
 
     def cleanup_rc():
+        rc.session_handler.quit()
         rc.quit()
-        credentials.quit()
         if rc.topnode.state != 'none':
             logging.getLogger("cli").warning("NanoRC context cleanup: Aborting applications before exiting")
             rc.abort(timeout=120)
@@ -223,7 +236,7 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
 @click.pass_obj
 @click.pass_context
 def change_user(ctx, obj, user):
-    if credentials.change_user(user):
+    if obj.rc.session_handler.change_user(user):
         ctx.parent.command.shell.prompt = f"{credentials.user}@np04rc > "
 
 
@@ -231,19 +244,13 @@ def change_user(ctx, obj, user):
 @click.pass_obj
 @click.pass_context
 def kinit(ctx, obj):
-    credentials.new_kerberos_ticket()
+    obj.rc.session_handler.new_kerberos_ticket()
 
 @np04cli.command('klist')
 @click.pass_obj
 @click.pass_context
 def klist(ctx, obj):
-    credentials.check_kerberos_credentials(silent=False)
-    import subprocess
-    # print(subprocess.call(['klist', '-s']))
-    proc = subprocess.run(['klist', '-s'], capture_output=True, text=True, env=credentials.krbenv)
-    obj.rc.log.info(f'klist -s\nstdout: {proc.stdout}')
-    obj.rc.log.info(f'stderr: {proc.stderr}')
-    obj.rc.log.info(f'ret code: {proc.returncode}')
+    obj.rc.session_handler.klist()
 
 
 def add_run_start_parameters():
@@ -261,9 +268,9 @@ def start_defaults_overwrite(kwargs):
     kwargs['path'] = None
     return kwargs
 
-def is_authenticated():
-    if not credentials.check_kerberos_credentials(silent=True):
-        logging.getLogger("cli").error(f'\'{credentials.user}\' doesn\'t have valid kerberos ticket, use \'kinit\', or \'change_user\' to create a ticket (in a shell or in nanorc)')
+def is_authenticated(rc):
+    if not rc.cern_auth.nanorc_user_is_authenticated(silent=True):
+        logging.getLogger("cli").error(f'\'{rc.cern_auth.nanorc_user.username}\' does not have a valid kerberos ticket, use \'kinit\', or \'change_user\' to create a ticket, [bold]inside nanorc[/]')
         return False
     return True
 
@@ -274,7 +281,7 @@ def is_authenticated():
 @click.pass_obj
 @click.pass_context
 def start_run(ctx, obj, wait:int, **kwargs):
-    if not is_authenticated(): return
+    if not is_authenticated(obj.rc): return
 
     kwargs['node_path'] = None
     execute_cmd_sequence(
@@ -292,7 +299,7 @@ def start_run(ctx, obj, wait:int, **kwargs):
 @click.pass_obj
 @click.pass_context
 def start(ctx, obj:NanoContext, **kwargs):
-    if not is_authenticated(): return
+    if not is_authenticated(obj.rc): return
 
     obj.rc.start(**start_defaults_overwrite(kwargs))
     check_rc(ctx,obj.rc)
@@ -302,7 +309,7 @@ def start(ctx, obj:NanoContext, **kwargs):
 @accept_message(argument=True)
 @click.pass_obj
 def message(obj, message):
-    if not is_authenticated(): return
+    if not is_authenticated(obj.rc): return
     obj.rc.message(message)
 
 
@@ -312,7 +319,7 @@ def message(obj, message):
 @click.pass_obj
 @click.pass_context
 def stop_run(ctx, obj, wait:int, **kwargs):
-    if not is_authenticated(): return
+    if not is_authenticated(obj.rc): return
 
     execute_cmd_sequence(
         ctx = ctx,
@@ -329,7 +336,7 @@ def stop_run(ctx, obj, wait:int, **kwargs):
 @click.pass_obj
 @click.pass_context
 def shutdown(ctx, obj, wait:int, **kwargs):
-    if not is_authenticated(): return
+    if not is_authenticated(obj.rc): return
 
     kwargs['node_path'] = None
     execute_cmd_sequence(
@@ -347,7 +354,7 @@ def shutdown(ctx, obj, wait:int, **kwargs):
 @click.pass_obj
 @click.pass_context
 def drain_dataflow(ctx, obj, **kwargs):
-    if not is_authenticated(): return
+    if not is_authenticated(obj.rc): return
 
     obj.rc.drain_dataflow(**kwargs)
     check_rc(ctx,obj.rc)
