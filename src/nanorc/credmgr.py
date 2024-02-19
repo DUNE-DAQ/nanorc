@@ -21,6 +21,7 @@ def new_kerberos_ticket(user:str, realm:str, password:str=None, ticket_dir:str="
                 password = getpass()
 
             except KeyboardInterrupt:
+                print()
                 return False
 
         import subprocess
@@ -126,6 +127,7 @@ class ServiceAccountWithKerberos(ServiceAuthentication):
     def generate_cern_sso_cookie(self, website, kerberos_directory, output_directory):
         args = []
         env = {'KRB5CCNAME': f'DIR:{kerberos_directory}'}
+
 
         from nanorc.utils import which
         import sh
@@ -234,9 +236,10 @@ class CERNSessionHandler:
             self.log.error(f'User \'{username}\' cannot authenticate, exiting...')
             exit(1)
 
-        self.authenticate_elisa_user(
-            credentials.get_login('elisa')
-        )
+        if not self.elisa_user_is_authenticated():
+            self.authenticate_elisa_user(
+                credentials.get_login('elisa')
+            )
 
     @staticmethod
     def __get_session_kerberos_cache_path(session_name:str, session_number:int):
@@ -288,17 +291,16 @@ class CERNSessionHandler:
             )
         )
 
-        cmd = ['klist', '-s']
+        cmd = ['klist']
         printout = ''
         for k,v in env.items():
             printout += f'{k}=\"{v}\" '
 
         printout += ' '.join(cmd)
-        print(printout)
+        print(printout+"\n")
 
         with Popen(
             cmd,
-            #capture_output=True,
             stderr=STDOUT,
             stdout=PIPE,
             bufsize=1,
@@ -306,7 +308,8 @@ class CERNSessionHandler:
             env=env
         ) as sp:
             for line in sp.stdout:
-                print(line)
+                print(line.replace("\n", ""))
+
 
     def authenticate_nanorc_user(self):
         session_kerb_cache = CERNSessionHandler.__get_session_kerberos_cache_path(
@@ -344,6 +347,15 @@ class CERNSessionHandler:
             ticket_dir = session_kerb_cache,
         )
 
+    def elisa_user_is_authenticated(self):
+
+        return check_kerberos_credentials(
+            against_user = self.nanorc_user.username,
+            silent = True,
+            ticket_dir = CERNSessionHandler.__get_elisa_kerberos_cache_path(),
+        )
+
+
     def authenticate_elisa_user(self, account:ServiceAccountWithKerberos):
         elisa_kerb_cache = CERNSessionHandler.__get_elisa_kerberos_cache_path()
         import os
@@ -365,13 +377,6 @@ class CERNSessionHandler:
             password = account.password,
             ticket_dir = elisa_kerb_cache,
         )
-
-
-    def start_session(self, session_number, apparatus_id):
-        self.session_number = session_number
-        self.session_name = apparatus_id # here is the mother of all the session definition questions...
-        self.create_session_kerberos_cache()
-
 
     def stop_session(self):
         import os
@@ -407,11 +412,15 @@ class CERNSessionHandler:
 
     def change_user(self, user:UserAccountWithKerberos):
 
-        if user == self.nanorc_user:
+        if user == self.nanorc_user.username:
             return True
 
         previous_user = self.nanorc_user
-        self.nanorc_user = user
+        self.nanorc_user = UserAccountWithKerberos(
+            service = previous_user.service,
+            username = user,
+            realm = previous_user.realm,
+        )
 
         if not self.authenticate_nanorc_user():
             self.nanorc_user = previous_user
