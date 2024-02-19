@@ -238,13 +238,15 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
 def change_user(ctx, obj, user):
     if obj.rc.session_handler.change_user(user):
         ctx.parent.command.shell.prompt = f"{credentials.user}@np04rc > "
+    else:
+        obj.console.log(f"User \'{user}\' could not authenticate! Reverted to the user previously logged in.")
 
 
 @np04cli.command('kinit')
 @click.pass_obj
 @click.pass_context
 def kinit(ctx, obj):
-    obj.rc.session_handler.new_kerberos_ticket()
+    obj.rc.session_handler.authenticate_nanorc_user()
 
 @np04cli.command('klist')
 @click.pass_obj
@@ -269,9 +271,16 @@ def start_defaults_overwrite(kwargs):
     return kwargs
 
 def is_authenticated(rc):
+
     if not rc.cern_auth.nanorc_user_is_authenticated(silent=True):
         logging.getLogger("cli").error(f'\'{rc.cern_auth.nanorc_user.username}\' does not have a valid kerberos ticket, use \'kinit\', or \'change_user\' to create a ticket, [bold]inside nanorc[/]')
         return False
+
+    if not rc.elisa_user_is_authenticated():
+        rc.authenticate_elisa_user(
+            credentials.get_login('elisa')
+        )
+
     return True
 
 
