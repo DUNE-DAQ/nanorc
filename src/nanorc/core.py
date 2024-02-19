@@ -153,10 +153,10 @@ class NanoRC:
     def send_expert_command(self, node_path, json_file, timeout):
         if not timeout:
             timeout = self.timeout
-        
+
         # Check path validity when sending the command for integtest compatibility
         node = argval.validate_node_path(self, None, node_path)
-        
+
         canexec = node.can_execute_custom_or_expert("expert", check_dead=True, check_children=False)
 
         if canexec != CanExecuteReturnVal.CanExecute:
@@ -301,7 +301,7 @@ class NanoRC:
         """
         self.execute_command("scrap", node_path=node_path, raise_on_fail=True, timeout=timeout, force=force)
 
-    def start(self, run_type:str, trigger_rate:float, disable_data_storage:bool, timeout:int, message:str, **kwargs) -> NoReturn:
+    def start(self, run_type:str, trigger_rate:float, disable_data_storage:bool, ignore_run_registry_insertion_error:bool, timeout:int, message:str, **kwargs) -> NoReturn:
         """
         Sends start command to the applications
 
@@ -347,7 +347,7 @@ class NanoRC:
             except Exception as e:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
-
+        cfg_save_dir = None
         if self.cfgsvr:
             try:
                 cfg_save_dir = self.cfgsvr.save_on_start(
@@ -359,7 +359,8 @@ class NanoRC:
             except Exception as e:
                 self.log.error(f'Couldn\'t save the configuration so not starting a run!\n{str(e)}')
                 self.return_code = 1
-                return
+                if not ignore_run_registry_insertion_error:
+                    raise e
 
         self.execute_command(
             "start",
@@ -385,7 +386,7 @@ class NanoRC:
             else:
                 text += "Started running"
 
-            if self.cfgsvr:
+            if cfg_save_dir is not None:
                 text+=f", saving run data in {cfg_save_dir}"
 
             self.console.print(' ')
@@ -454,7 +455,7 @@ class NanoRC:
             timeout = timeout,
         )
 
-    def drain_dataflow(self, timeout:int, force:bool, message:str, **kwargs) -> NoReturn:
+    def drain_dataflow(self, timeout:int, force:bool, message:str, ignore_run_registry_insertion_error:bool, **kwargs) -> NoReturn:
         """
         Stop the triggers
         """
@@ -478,7 +479,11 @@ class NanoRC:
                 self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
         if self.cfgsvr and self.runs:
-            self.cfgsvr.save_on_stop(self.runs[-1].run_number)
+            try:
+                self.cfgsvr.save_on_stop(self.runs[-1].run_number)
+            except Exception as e:
+                if not ignore_run_registry_insertion_error:
+                    raise e
 
         self.execute_command("drain_dataflow", node_path=None, raise_on_fail=True, timeout=timeout, force=force)
         self.return_code = self.topnode.return_code.value
@@ -517,7 +522,7 @@ class NanoRC:
 
 
     def exclude(self, node_path, timeout, resource_name) -> NoReturn:
-        
+
         # Check path validity when sending the command for integtest compatibility
         node = argval.validate_node_path(self, None, node_path)
 
@@ -556,7 +561,7 @@ class NanoRC:
 
         # Check path validity when sending the command for integtest compatibility
         node = argval.validate_node_path(self, None, node_path)
-        
+
         canexec = node.can_execute_custom_or_expert(
             command = "include",
             quiet = False,
