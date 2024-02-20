@@ -157,6 +157,7 @@ class TreeBuilder:
 
                 for key, val in data.items():
                     if key=='apparatus_id':
+                        apparatus_id = val
                         continue
                     try:
                         data_cp[key] = validate_conf(None, None, val)
