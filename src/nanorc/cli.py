@@ -243,6 +243,17 @@ def start_defaults_overwrite(kwargs):
     kwargs['path'] = None
     return kwargs
 
+from nanorc.common_commands import  accept_message
+
+@cli.command('message')
+@accept_message(argument=True)
+@click.pass_obj
+def message(obj, message):
+    import getpass
+    user = getpass.getuser()
+    obj.rc.message(message, user=user)
+
+
 
 @cli.command('start_run')
 @add_run_start_parameters()

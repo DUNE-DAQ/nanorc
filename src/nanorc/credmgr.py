@@ -141,7 +141,6 @@ class ServiceAccountWithKerberos(ServiceAuthentication):
         else:
             raise RuntimeError("Couldn't get SSO cookie, there is no 'cern-get-sso-cookie' or 'auth-get-user-token' on your system!")
 
-        env.update(self.krbenv)
         proc = executable(*args, _env=env, _new_session=True)
         if proc.exit_code != 0:
             self.log.error("Couldn't get SSO cookie!")
@@ -188,6 +187,13 @@ class CredentialManager:
         self.log = logging.getLogger(self.__class__.__name__)
         self.authentications = []
 
+    def get_nanorc_username(self):
+        user = self.get_login(service='nanorc')
+        if user:
+            return user.username
+        else:
+            import getpass
+            return getpass.getuser()
 
     def add_login(self, service:str, data:dict[str,str]):
         self.authentications.append(
@@ -311,6 +317,7 @@ class CERNSessionHandler:
                 print(line.replace("\n", ""))
 
 
+
     def authenticate_nanorc_user(self):
         session_kerb_cache = CERNSessionHandler.__get_session_kerberos_cache_path(
             self.session_name,
@@ -321,12 +328,8 @@ class CERNSessionHandler:
         if not os.path.isdir(session_kerb_cache):
             os.mkdir(session_kerb_cache)
 
-        if check_kerberos_credentials(
-            against_user = self.nanorc_user.username,
-            ticket_dir = session_kerb_cache,
-            silent = True,
-        ):
-            # we're authenticated stop here
+        if self.nanorc_user_is_authenticated():
+            # we're authenticated, stop here
             return True
 
         return new_kerberos_ticket(
@@ -348,35 +351,46 @@ class CERNSessionHandler:
         )
 
     def elisa_user_is_authenticated(self):
+        elisa_user = credentials.get_login('elisa')
 
         return check_kerberos_credentials(
-            against_user = self.nanorc_user.username,
+            against_user = elisa_user.username,
             silent = True,
             ticket_dir = CERNSessionHandler.__get_elisa_kerberos_cache_path(),
         )
 
 
-    def authenticate_elisa_user(self, account:ServiceAccountWithKerberos):
+    def authenticate_elisa_user(self):
+        elisa_user = credentials.get_login('elisa')
         elisa_kerb_cache = CERNSessionHandler.__get_elisa_kerberos_cache_path()
         import os
 
         if not os.path.isdir(elisa_kerb_cache):
             os.mkdir(elisa_kerb_cache)
 
-        if check_kerberos_credentials(
-            against_user = account.username,
-            ticket_dir = elisa_kerb_cache,
-            silent = True,
-        ):
-            # we're authenticated stop here
+        if self.elisa_user_is_authenticated():
+            # we're authenticated, stop here
             return True
 
         return new_kerberos_ticket(
-            user = account.username,
-            realm = account.realm,
-            password = account.password,
+            user = elisa_user.username,
+            realm = elisa_user.realm,
+            password = elisa_user.password,
             ticket_dir = elisa_kerb_cache,
         )
+
+    def generate_elisa_cern_cookie(self, website, cookie_dir):
+        elisa_user = credentials.get_login('elisa')
+        elisa_kerb_cache = CERNSessionHandler.__get_elisa_kerberos_cache_path()
+
+        self.authenticate_elisa_user()
+
+        return elisa_user.generate_cern_sso_cookie(
+            website,
+            elisa_kerb_cache,
+            cookie_dir,
+        )
+
 
     def stop_session(self):
         import os
@@ -401,11 +415,39 @@ class CERNSessionHandler:
 
 
     def start_session(self):
+        in_use = CERNSessionHandler.session_is_active(
+            session_name = self.session_name,
+            session_number = self.session_number,
+        )
+
+        if in_use:
+            kuser = CERNSessionHandler.get_kerberos_user_from_session(
+                session_name = self.session_name,
+                session_number = self.session_number,
+            )
+
+            if kuser is not None and kuser != self.nanorc_user.username:
+                self.console.print(f'[bold red]Session #{self.session_number} on apparatus \'{self.session_name}\' seems to be used by \'{kuser}\', do you want to steal it? Y/N[/bold red]')
+            else:
+                self.console.print(f'[bold red]You seem to already have session #{self.session_number} on apparatus \'{self.session_name}\' active, are you sure you want to proceed? Y/N[/bold red]')
+
+            while True:
+                try:
+                    steal = input().upper()
+                except KeyboardInterrupt:
+                    self.console.print(f'Exiting...')
+                    exit(1)
+                if   steal == 'Y': break
+                elif steal == 'N': exit(0)
+                self.console.print(f'[bold red]Wrong answer! Y or N?[/bold red]')
+
+
         self.create_session_kerberos_cache()
         cache_path = CERNSessionHandler.__get_session_kerberos_cache_path(
             self.session_name,
             self.session_number,
         )
+
         f = open(cache_path/'active_session', "w")
         f.close()
 

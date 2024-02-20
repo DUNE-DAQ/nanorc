@@ -105,6 +105,16 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
         logging.getLogger("cli").info("RunDB socket "+rundb_socket)
         logging.getLogger("cli").info("RunRegistryDB socket "+runreg_socket)
 
+        from nanorc.treebuilder import TreeBuilder
+        apparatus_id, _ = TreeBuilder.get_apparatus_and_config(cfg_dir)
+
+        from nanorc.credmgr import CERNSessionHandler
+        cern_auth = CERNSessionHandler(
+            apparatus_id = apparatus_id,
+            session_number = partition_number,
+            username = user,
+        )
+
         rc = NanoRC(
             console = obj.console,
             top_cfg = cfg_dir,
@@ -115,44 +125,9 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
             timeout = timeout,
             use_kerb = kerberos,
             port_offset = port_offset,
-            pm = pm
+            pm = pm,
+            session_handler = cern_auth,
         )
-
-        from nanorc.credmgr import CERNSessionHandler
-
-        in_use = CERNSessionHandler.session_is_active(
-            session_name = rc.apparatus_id,
-            session_number = partition_number,
-        )
-
-        if in_use:
-            kuser = CERNSessionHandler.get_kerberos_user_from_session(
-                session_name = rc.apparatus_id,
-                session_number = partition_number,
-            )
-
-            if kuser is not None and kuser != user:
-                obj.console.print(f'[bold red]Session #{partition_number} on apparatus \'{rc.apparatus_id}\' seems to be used by \'{kuser}\', do you want to steal it? Y/N[/bold red]')
-            else:
-                obj.console.print(f'[bold red]You seem to already have session #{partition_number} on apparatus \'{rc.apparatus_id}\' active, are you sure you want to proceed? Y/N[/bold red]')
-
-            while True:
-                try:
-                    steal = input().upper()
-                except KeyboardInterrupt:
-                    obj.console.print(f'Exiting...')
-                    exit(1)
-                if   steal == 'Y': break
-                elif steal == 'N': exit(0)
-                obj.console.print(f'[bold red]Wrong answer! Y or N?[/bold red]')
-
-        cern_auth = CERNSessionHandler(
-            apparatus_id = rc.apparatus_id,
-            session_number = partition_number,
-            username = user,
-        )
-
-        rc.session_handler = cern_auth
 
         ctx.command.shell.prompt = f"{cern_auth.nanorc_user.username}@np04rc> "
 
@@ -272,12 +247,12 @@ def start_defaults_overwrite(kwargs):
 
 def is_authenticated(rc):
 
-    if not rc.cern_auth.nanorc_user_is_authenticated(silent=True):
-        logging.getLogger("cli").error(f'\'{rc.cern_auth.nanorc_user.username}\' does not have a valid kerberos ticket, use \'kinit\', or \'change_user\' to create a ticket, [bold]inside nanorc[/]')
+    if not rc.session_handler.nanorc_user_is_authenticated():
+        rc.log.error(f'\'{rc.session_handler.nanorc_user.username}\' does not have a valid kerberos ticket, use \'kinit\', or \'change_user\' to create a ticket, [bold]inside nanorc![/]', extra={"markup": True})
         return False
 
-    if not rc.elisa_user_is_authenticated():
-        rc.authenticate_elisa_user(
+    if not rc.session_handler.elisa_user_is_authenticated():
+        rc.session_handler.authenticate_elisa_user(
             credentials.get_login('elisa')
         )
 
@@ -299,6 +274,7 @@ def start_run(ctx, obj, wait:int, **kwargs):
         command = 'start_run',
         wait = wait,
         force = False,
+        user = obj.rc.session_handler.nanorc_user.username,
         cmd_args = start_defaults_overwrite(kwargs)
     )
 
@@ -310,7 +286,10 @@ def start_run(ctx, obj, wait:int, **kwargs):
 def start(ctx, obj:NanoContext, **kwargs):
     if not is_authenticated(obj.rc): return
 
-    obj.rc.start(**start_defaults_overwrite(kwargs))
+    obj.rc.start(
+        user = obj.rc.session_handler.nanorc_user.username,
+        **start_defaults_overwrite(kwargs)
+    )
     check_rc(ctx,obj.rc)
     obj.rc.status()
 
@@ -319,7 +298,10 @@ def start(ctx, obj:NanoContext, **kwargs):
 @click.pass_obj
 def message(obj, message):
     if not is_authenticated(obj.rc): return
-    obj.rc.message(message)
+    obj.rc.message(
+        message,
+        user = obj.rc.session_handler.nanorc_user.username,
+    )
 
 
 @np04cli.command('stop_run')
@@ -336,6 +318,7 @@ def stop_run(ctx, obj, wait:int, **kwargs):
         command = 'stop_run',
         force = kwargs['force'],
         wait = wait,
+        user = obj.rc.session_handler.nanorc_user.username,
         cmd_args = kwargs
     )
 
@@ -353,6 +336,7 @@ def shutdown(ctx, obj, wait:int, **kwargs):
         rc = obj.rc,
         wait = wait,
         command = 'shutdown',
+        user = obj.rc.session_handler.nanorc_user.username,
         force = kwargs['force'],
         cmd_args = kwargs
     )
@@ -365,7 +349,10 @@ def shutdown(ctx, obj, wait:int, **kwargs):
 def drain_dataflow(ctx, obj, **kwargs):
     if not is_authenticated(obj.rc): return
 
-    obj.rc.drain_dataflow(**kwargs)
+    obj.rc.drain_dataflow(
+        user = obj.rc.session_handler.nanorc_user.username,
+        **kwargs
+    )
     check_rc(ctx,obj.rc)
     obj.rc.status()
 
