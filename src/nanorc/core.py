@@ -51,7 +51,7 @@ class NanoRC:
             logbook_type:str,
             timeout: int,
             use_kerb=True,
-            logbook_prefix=".",
+            logbook_prefix="./",
             fsm_cfg="partition",
             port_offset=0,
             pm=None,
@@ -322,7 +322,7 @@ class NanoRC:
         """
         self.execute_command("scrap", node_path=node_path, raise_on_fail=True, timeout=timeout, force=force)
 
-    def start(self, run_type:str, trigger_rate:float, disable_data_storage:bool, timeout:int, message:str, user:str, **kwargs) -> NoReturn:
+    def start(self, run_type:str, trigger_rate:float, disable_data_storage:bool, timeout:int, message:str, **kwargs) -> NoReturn:
         """
         Sends start command to the applications
 
@@ -364,7 +364,6 @@ class NanoRC:
                     apparatus = self.apparatus_id,
                     run_num = run,
                     run_type = run_type,
-                    user = user,
                 )
             except Exception as e:
                 self.log.error(f"Couldn't make an entry to the logbook, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
@@ -417,7 +416,7 @@ class NanoRC:
             self.log.error(f"There was an error when starting the run #{run}:")
             self.log.error(f'Response: {self.topnode.response}')
 
-    def message(self, message:str, user:str) -> NoReturn:
+    def message(self, message:str) -> NoReturn:
         """
         Append the logbook
         """
@@ -427,7 +426,6 @@ class NanoRC:
                 self.logbook.add_message(
                     message = message,
                     apparatus = self.apparatus_id,
-                    user = user,
                 )
 
             except Exception as e:
@@ -475,7 +473,7 @@ class NanoRC:
             timeout = timeout,
         )
 
-    def drain_dataflow(self, timeout:int, force:bool, message:str, user:str, **kwargs) -> NoReturn:
+    def drain_dataflow(self, timeout:int, force:bool, message:str, **kwargs) -> NoReturn:
         """
         Stop the triggers
         """
@@ -493,7 +491,6 @@ class NanoRC:
                 self.logbook.message_on_stop(
                     message = message,
                     apparatus = self.apparatus_id,
-                    user = user,
                 )
             except Exception as e:
                 self.log.error(f"Couldn't make an entry to the logbook, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")

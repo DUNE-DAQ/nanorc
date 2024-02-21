@@ -213,7 +213,7 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
 @click.pass_context
 def change_user(ctx, obj, user):
     if obj.rc.session_handler.change_user(user):
-        ctx.parent.command.shell.prompt = f"{credentials.user}@np04rc > "
+        ctx.parent.command.shell.prompt = f"{obj.rc.session_handler.nanorc_user.username}@np04rc > "
     else:
         obj.console.log(f"User \'{user}\' could not authenticate! Reverted to the user previously logged in.")
 
@@ -275,7 +275,6 @@ def start_run(ctx, obj, wait:int, **kwargs):
         command = 'start_run',
         wait = wait,
         force = False,
-        user = obj.rc.session_handler.nanorc_user.username,
         cmd_args = start_defaults_overwrite(kwargs)
     )
 
@@ -288,7 +287,6 @@ def start(ctx, obj:NanoContext, **kwargs):
     if not is_authenticated(obj.rc): return
 
     obj.rc.start(
-        user = obj.rc.session_handler.nanorc_user.username,
         **start_defaults_overwrite(kwargs)
     )
     check_rc(ctx,obj.rc)
@@ -301,7 +299,6 @@ def message(obj, message):
     if not is_authenticated(obj.rc): return
     obj.rc.message(
         message,
-        user = obj.rc.session_handler.nanorc_user.username,
     )
 
 
@@ -319,7 +316,6 @@ def stop_run(ctx, obj, wait:int, **kwargs):
         command = 'stop_run',
         force = kwargs['force'],
         wait = wait,
-        user = obj.rc.session_handler.nanorc_user.username,
         cmd_args = kwargs
     )
 
@@ -337,7 +333,6 @@ def shutdown(ctx, obj, wait:int, **kwargs):
         rc = obj.rc,
         wait = wait,
         command = 'shutdown',
-        user = obj.rc.session_handler.nanorc_user.username,
         force = kwargs['force'],
         cmd_args = kwargs
     )
@@ -351,7 +346,6 @@ def drain_dataflow(ctx, obj, **kwargs):
     if not is_authenticated(obj.rc): return
 
     obj.rc.drain_dataflow(
-        user = obj.rc.session_handler.nanorc_user.username,
         **kwargs
     )
     check_rc(ctx,obj.rc)
