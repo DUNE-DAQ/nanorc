@@ -110,6 +110,7 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
 
         from nanorc.credmgr import CERNSessionHandler
         cern_auth = CERNSessionHandler(
+            console = obj.console,
             apparatus_id = apparatus_id,
             session_number = partition_number,
             username = user,

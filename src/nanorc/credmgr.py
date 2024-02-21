@@ -225,7 +225,8 @@ credentials = CredentialManager()
 
 
 class CERNSessionHandler:
-    def __init__(self, apparatus_id:str, session_number:int, username:str):
+    def __init__(self, console, apparatus_id:str, session_number:int, username:str):
+        self.console = console
         import logging
         self.log = logging.getLogger(self.__class__.__name__)
         self.nanorc_user = UserAccountWithKerberos(
@@ -243,9 +244,7 @@ class CERNSessionHandler:
             exit(1)
 
         if not self.elisa_user_is_authenticated():
-            self.authenticate_elisa_user(
-                credentials.get_login('elisa')
-            )
+            self.authenticate_elisa_user()
 
     @staticmethod
     def __get_session_kerberos_cache_path(session_name:str, session_number:int):
