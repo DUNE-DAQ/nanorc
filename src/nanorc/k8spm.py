@@ -89,8 +89,8 @@ class K8SProcessManager(object):
 
 
     def execute_script(self, script_data):
-        ## This beauty can't be used because the pin thread file can be anywhere in the bloody filesystem
-        ## When did we say we needed assets manager?
+        ## Pin thread file can be anywhere in the filesystem
+        ## so below won't work.
 
         # from kubernetes.stream import stream
 
@@ -109,8 +109,7 @@ class K8SProcessManager(object):
         #     # proc = sh.ssh(ssh_args)
         #     self.log.info(resp)
 
-        ## Instead we revert to ssh
-        ## @E$%^RT^&$%^&*!!!
+        ## Instead we revert to ssh...
         env_vars = script_data["env"]
         cmd = ''
         pretty_print = ''
