@@ -11,7 +11,7 @@ import tempfile
 from .statefulnode import StatefulNode
 from .node import SubsystemNode
 from .cfgmgr import ConfigManager
-from .credmgr import credentials,Authentication
+#from .credmgr import credentials,Authentication
 from distutils.dir_util import copy_tree
 
 # Straight from stack overflow
@@ -139,8 +139,9 @@ class FileConfigSaver:
 class DBConfigSaver:
     def __init__(self, socket:str):
         self.API_SOCKET = socket
-        auth = credentials.get_login("runregistrydb")
-        self.API_USER = auth.user
+        from nanorc.credmgr import credentials
+        auth = credentials.get_login("run_registry")
+        self.API_USER = auth.username
         self.API_PSWD = auth.password
         self.timeout = 2
         self.apparatus_id = None

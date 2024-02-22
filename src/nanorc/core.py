@@ -41,10 +41,26 @@ from .node import ApplicationNode
 class NanoRC:
     """A Shonky RC for DUNE DAQ"""
 
-    def __init__(self, console: Console, top_cfg: str, partition_label:str, run_num_mgr, run_registry, logbook_type:str, timeout: int,
-                 use_kerb=True, logbook_prefix="", fsm_cfg="partition", port_offset=0,
-                 pm=None):
+    def __init__(
+            self,
+            console: Console,
+            top_cfg: str,
+            partition_label:str,
+            run_num_mgr,
+            run_registry,
+            logbook_type:str,
+            timeout: int,
+            use_kerb=True,
+            logbook_prefix="./",
+            fsm_cfg="partition",
+            port_offset=0,
+            pm=None,
+            session_handler=None
+            ):
         super(NanoRC, self).__init__()
+
+        self.session_handler = session_handler
+
         self.log = logging.getLogger(self.__class__.__name__)
         self.console = console
         self.pm = pm
@@ -85,14 +101,19 @@ class NanoRC:
             try:
                 elisa_conf = json.load(open(logbook_type,'r'))
                 if elisa_conf.get(self.apparatus_id):
-                    self.logbook = ElisaLogbook(configuration = elisa_conf[self.apparatus_id],
-                                                console = console)
+                    self.logbook = ElisaLogbook(
+                        configuration = elisa_conf[self.apparatus_id],
+                        console = console,
+                        session_handler = self.session_handler,
+                    )
                 else:
-                    self.log.error(f"Can't find config {self.apparatus_id} in {logbook_type}, reverting to file logbook!")
+                    self.log.error(f"Can't find config \'{self.apparatus_id}\' in {logbook_type}, reverting to file logbook!")
+                    logbook_type = 'file'
             except Exception as e:
-                self.log.error(f"Can't find {logbook_type}, reverting to file logbook! {str(e)}")
+                self.log.error(f"Can't find \'{logbook_type}\', reverting to file logbook! {str(e)}")
+                logbook_type = 'file'
 
-        elif logbook_type == 'file':
+        if logbook_type == 'file':
             self.log.info("Using filelogbook")
             self.logbook = FileLogbook(logbook_prefix, self.console)
 
@@ -342,10 +363,10 @@ class NanoRC:
                     message = message,
                     apparatus = self.apparatus_id,
                     run_num = run,
-                    run_type = run_type
+                    run_type = run_type,
                 )
             except Exception as e:
-                self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
+                self.log.error(f"Couldn't make an entry to the logbook, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
         cfg_save_dir = None
         if self.cfgsvr:
@@ -405,13 +426,11 @@ class NanoRC:
             try:
                 self.logbook.add_message(
                     message = message,
-                    apparatus = self.apparatus_id
+                    apparatus = self.apparatus_id,
                 )
-                # if self.runs:
-                #     if self.runs[-1].is_running():
-                #         self.runs[-1].messages.append(message)
+
             except Exception as e:
-                self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
+                self.log.error(f"Couldn't make an entry to the logbook, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
     def stop(self, force:bool, timeout:int, **kwargs) -> NoReturn:
         """
@@ -472,11 +491,10 @@ class NanoRC:
             try:
                 self.logbook.message_on_stop(
                     message = message,
-                    apparatus = self.apparatus_id
+                    apparatus = self.apparatus_id,
                 )
-                # if self.runs: self.runs[-1].messages.append(message)
             except Exception as e:
-                self.log.error(f"Couldn't make an entry to elisa, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
+                self.log.error(f"Couldn't make an entry to the logbook, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
 
         if self.cfgsvr and self.runs:
             try:

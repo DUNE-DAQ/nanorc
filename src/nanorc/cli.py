@@ -86,7 +86,7 @@ def updateLogLevel(loglevel):
 @click.option('--cfg-dumpdir', type=click.Path(), default="./", help='Path where the config gets copied on start')
 @click.option('--log-path', type=click.Path(exists=True), default=None, help='Where the logs should go (on localhost of applications)')
 @click.option('--kerberos/--no-kerberos', default=True, help='Whether you want to use kerberos for communicating between processes')
-@click.option('--logbook-prefix', type=str, default="logbook", help='Prefix for the logbook file')
+@click.option('--logbook-prefix', type=str, default="./", help='Prefix for the logbook file')
 @click.option('--pm', type=str, default="ssh://", help='Process manager, can be: ssh://, kind://, or k8s://np04-srv-015:31000, for example', callback=argval.validate_pm)
 @click.option('--web/--no-web', is_flag=True, default=False, help='whether to spawn webui')
 @click.option('--tui/--no-tui', is_flag=True, default=False, help='whether to use TUI')
@@ -246,6 +246,15 @@ def start_defaults_overwrite(kwargs):
     kwargs['path'] = None
     return kwargs
 
+from nanorc.common_commands import  accept_message
+
+@cli.command('message')
+@accept_message(argument=True)
+@click.pass_obj
+def message(obj, message):
+    obj.rc.message(message)
+
+
 
 @cli.command('start_run')
 @add_run_start_parameters()
@@ -255,6 +264,7 @@ def start_defaults_overwrite(kwargs):
 def start_run(ctx, obj, wait:int, **kwargs):
     obj.rc.run_num_mgr.set_run_number(kwargs['run_num'])
     kwargs['node_path'] = None
+
     execute_cmd_sequence(
         ctx = ctx,
         rc = obj.rc,
@@ -271,7 +281,9 @@ def start_run(ctx, obj, wait:int, **kwargs):
 @click.pass_context
 def start(ctx, obj:NanoContext, **kwargs):
     obj.rc.run_num_mgr.set_run_number(kwargs['run_num'])
-    obj.rc.start(**start_defaults_overwrite(kwargs))
+    obj.rc.start(
+        **start_defaults_overwrite(kwargs)
+    )
     check_rc(ctx,obj.rc)
     obj.rc.status()
 

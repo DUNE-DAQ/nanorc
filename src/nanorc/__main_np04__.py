@@ -58,7 +58,6 @@ from nanorc.nano_context import NanoContext
 def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, dotnanorc, kerberos, timeout, partition_number, partition_label, web, tui, pm, cfg_dir, user):
 
 
-
     if not elisa_conf:
         with resources.path(confdata, "elisa_conf.json") as p:
             elisa_conf = p
@@ -83,25 +82,39 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
 
     rest_thread  = threading.Thread()
     webui_thread = threading.Thread()
+
     if web and tui:
         raise RuntimeError("cant have TUI and GUI at the same time")
+
     try:
         dotnanorc = os.path.expanduser(dotnanorc)
         obj.console.print(f"[blue]Loading {dotnanorc}[/blue]")
         f = open(dotnanorc, 'r')
         dotnanorc = json.load(f)
+        cern_profile = dotnanorc['cern']
 
-        rundb_socket = json.loads(resources.read_text(confdata, "run_number.json"))['socket']
-        runreg_socket = json.loads(resources.read_text(confdata, "run_registry.json"))['socket']
+        rundb_socket  = cern_profile['run_number_configuration'  ]['socket']
+        runreg_socket = cern_profile['run_registry_configuration']['socket']
 
-        credentials.add_login("rundb",
-                              dotnanorc["rundb"]["user"],
-                              dotnanorc["rundb"]["password"])
-        credentials.add_login("runregistrydb",
-                              dotnanorc["runregistrydb"]["user"],
-                              dotnanorc["runregistrydb"]["password"])
+        for service, user_data in cern_profile['authentication'].items():
+            credentials.add_login(
+                service,
+                user_data,
+            )
+
         logging.getLogger("cli").info("RunDB socket "+rundb_socket)
         logging.getLogger("cli").info("RunRegistryDB socket "+runreg_socket)
+
+        from nanorc.treebuilder import TreeBuilder
+        apparatus_id, _ = TreeBuilder.get_apparatus_and_config(cfg_dir)
+
+        from nanorc.credmgr import CERNSessionHandler
+        cern_auth = CERNSessionHandler(
+            console = obj.console,
+            apparatus_id = apparatus_id,
+            session_number = partition_number,
+            username = user,
+        )
 
         rc = NanoRC(
             console = obj.console,
@@ -113,30 +126,11 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
             timeout = timeout,
             use_kerb = kerberos,
             port_offset = port_offset,
-            pm = pm
+            pm = pm,
+            session_handler = cern_auth,
         )
-        credentials.set_partition(partition_number=partition_number,apparatus_id=rc.apparatus_id)
 
-        in_use = credentials.partition_in_use()
-        if in_use:
-            kuser = credentials.get_kerberos_user(silent=True)
-
-            if kuser!=None and kuser != user:
-                obj.console.print(f'[bold red]Partition #{partition_number} on apparatus \'{in_use}\' seems to be used by \'{kuser}\', do you want to steal it? Y/N[/bold red]')
-            else:
-                obj.console.print(f'[bold red]You seem to already have partition #{partition_number} on apparatus \'{in_use}\' active, are you sure you want to proceed? Y/N[/bold red]')
-                while True:
-                    steal = input()
-                    if   steal == 'Y': break
-                    elif steal == 'N': exit(0)
-                    obj.console.print(f'[bold red]Wrong answer! Y or N?[/bold red]')
-
-        credentials.start_partition()
-        credentials.change_user(user)
-        ctx.command.shell.prompt = f"{credentials.user}@np04rc> "
-        if credentials.user is None:
-            print()
-            raise RuntimeError(f'User {user} couldn\'t login')
+        ctx.command.shell.prompt = f"{cern_auth.nanorc_user.username}@np04rc> "
 
         rc.log_path = os.path.abspath(log_path)
         add_common_cmds(ctx.command, end_of_run_cmds=False)
@@ -189,8 +183,8 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
         raise click.Abort()
 
     def cleanup_rc():
+        rc.session_handler.quit()
         rc.quit()
-        credentials.quit()
         if rc.topnode.state != 'none':
             logging.getLogger("cli").warning("NanoRC context cleanup: Aborting applications before exiting")
             rc.abort(timeout=120)
@@ -218,27 +212,23 @@ def np04cli(ctx, obj, traceback, loglevel, elisa_conf, log_path, cfg_dumpdir, do
 @click.pass_obj
 @click.pass_context
 def change_user(ctx, obj, user):
-    if credentials.change_user(user):
-        ctx.parent.command.shell.prompt = f"{credentials.user}@np04rc > "
+    if obj.rc.session_handler.change_user(user):
+        ctx.parent.command.shell.prompt = f"{obj.rc.session_handler.nanorc_user.username}@np04rc > "
+    else:
+        obj.console.log(f"User \'{user}\' could not authenticate! Reverted to the user previously logged in.")
 
 
 @np04cli.command('kinit')
 @click.pass_obj
 @click.pass_context
 def kinit(ctx, obj):
-    credentials.new_kerberos_ticket()
+    obj.rc.session_handler.authenticate_nanorc_user()
 
 @np04cli.command('klist')
 @click.pass_obj
 @click.pass_context
 def klist(ctx, obj):
-    credentials.check_kerberos_credentials(silent=False)
-    import subprocess
-    # print(subprocess.call(['klist', '-s']))
-    proc = subprocess.run(['klist', '-s'], capture_output=True, text=True, env=credentials.krbenv)
-    obj.rc.log.info(f'klist -s\nstdout: {proc.stdout}')
-    obj.rc.log.info(f'stderr: {proc.stderr}')
-    obj.rc.log.info(f'ret code: {proc.returncode}')
+    obj.rc.session_handler.klist()
 
 
 def add_run_start_parameters():
@@ -257,10 +247,17 @@ def start_defaults_overwrite(kwargs):
     kwargs['path'] = None
     return kwargs
 
-def is_authenticated():
-    if not credentials.check_kerberos_credentials(silent=True):
-        logging.getLogger("cli").error(f'\'{credentials.user}\' doesn\'t have valid kerberos ticket, use \'kinit\', or \'change_user\' to create a ticket (in a shell or in nanorc)')
+def is_authenticated(rc):
+
+    if not rc.session_handler.nanorc_user_is_authenticated():
+        rc.log.error(f'\'{rc.session_handler.nanorc_user.username}\' does not have a valid kerberos ticket, use \'kinit\', or \'change_user\' to create a ticket, [bold]inside nanorc![/]', extra={"markup": True})
         return False
+
+    if not rc.session_handler.elisa_user_is_authenticated():
+        rc.session_handler.authenticate_elisa_user(
+            credentials.get_login('elisa')
+        )
+
     return True
 
 
@@ -270,7 +267,7 @@ def is_authenticated():
 @click.pass_obj
 @click.pass_context
 def start_run(ctx, obj, wait:int, **kwargs):
-    if not is_authenticated(): return
+    if not is_authenticated(obj.rc): return
 
     kwargs['node_path'] = None
     execute_cmd_sequence(
@@ -288,9 +285,11 @@ def start_run(ctx, obj, wait:int, **kwargs):
 @click.pass_obj
 @click.pass_context
 def start(ctx, obj:NanoContext, **kwargs):
-    if not is_authenticated(): return
+    if not is_authenticated(obj.rc): return
 
-    obj.rc.start(**start_defaults_overwrite(kwargs))
+    obj.rc.start(
+        **start_defaults_overwrite(kwargs)
+    )
     check_rc(ctx,obj.rc)
     obj.rc.status()
 
@@ -298,8 +297,10 @@ def start(ctx, obj:NanoContext, **kwargs):
 @accept_message(argument=True)
 @click.pass_obj
 def message(obj, message):
-    if not is_authenticated(): return
-    obj.rc.message(message)
+    if not is_authenticated(obj.rc): return
+    obj.rc.message(
+        message,
+    )
 
 
 @np04cli.command('stop_run')
@@ -308,7 +309,7 @@ def message(obj, message):
 @click.pass_obj
 @click.pass_context
 def stop_run(ctx, obj, wait:int, **kwargs):
-    if not is_authenticated(): return
+    if not is_authenticated(obj.rc): return
 
     execute_cmd_sequence(
         ctx = ctx,
@@ -325,7 +326,7 @@ def stop_run(ctx, obj, wait:int, **kwargs):
 @click.pass_obj
 @click.pass_context
 def shutdown(ctx, obj, wait:int, **kwargs):
-    if not is_authenticated(): return
+    if not is_authenticated(obj.rc): return
 
     kwargs['node_path'] = None
     execute_cmd_sequence(
@@ -343,9 +344,11 @@ def shutdown(ctx, obj, wait:int, **kwargs):
 @click.pass_obj
 @click.pass_context
 def drain_dataflow(ctx, obj, **kwargs):
-    if not is_authenticated(): return
+    if not is_authenticated(obj.rc): return
 
-    obj.rc.drain_dataflow(**kwargs)
+    obj.rc.drain_dataflow(
+        **kwargs
+    )
     check_rc(ctx,obj.rc)
     obj.rc.status()
 
