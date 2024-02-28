@@ -181,7 +181,7 @@ timingcli.add_command(expert_command, 'expert_command')
 @click.pass_obj
 @click.pass_context
 def start(ctx, obj, timeout:int):
-    obj.rc.start(disable_data_storage=True, run_type="TEST", timeout=timeout, trigger_rate=None, message="")
+    obj.rc.start(disable_data_storage=True, run_type="TEST", timeout=timeout, trigger_rate=None, message="", ignore_run_registry_insertion_error=True)
     check_rc(ctx,obj.rc)
     obj.rc.status()
 

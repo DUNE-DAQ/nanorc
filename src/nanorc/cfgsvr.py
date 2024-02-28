@@ -11,7 +11,7 @@ import tempfile
 from .statefulnode import StatefulNode
 from .node import SubsystemNode
 from .cfgmgr import ConfigManager
-from .credmgr import credentials,Authentication
+#from .credmgr import credentials,Authentication
 from distutils.dir_util import copy_tree
 
 # Straight from stack overflow
@@ -139,8 +139,9 @@ class FileConfigSaver:
 class DBConfigSaver:
     def __init__(self, socket:str):
         self.API_SOCKET = socket
-        auth = credentials.get_login("runregistrydb")
-        self.API_USER = auth.user
+        from nanorc.credmgr import credentials
+        auth = credentials.get_login("run_registry")
+        self.API_USER = auth.username
         self.API_PSWD = auth.password
         self.timeout = 2
         self.apparatus_id = None
@@ -202,16 +203,18 @@ class DBConfigSaver:
                                       data=post_data,
                                       auth=(self.API_USER, self.API_PSWD),
                                       timeout=self.timeout)
+                    r.raise_for_status()
+
                 except requests.HTTPError as exc:
-                    error = f"{__name__}: RunRegistryDB: HTTP Error (maybe failed auth, maybe ill-formed post message, ...)"
+                    error = f"{__name__}: RunRegistryDB: HTTP Error: {exc}, {r.text}"
                     self.log.error(error)
                     raise RuntimeError(error) from exc
                 except requests.ConnectionError as exc:
-                    error = f"{__name__}: Connection to {self.API_SOCKET} wasn't successful"
+                    error = f"{__name__}: Connection to {self.API_SOCKET} wasn't successful: {exc}"
                     self.log.error(error)
                     raise RuntimeError(error) from exc
                 except requests.Timeout as exc:
-                    error = f"{__name__}: Connection to {self.API_SOCKET} timed out"
+                    error = f"{__name__}: Connection to {self.API_SOCKET} timed out: {exc}"
                     self.log.error(error)
                     raise RuntimeError(error) from exc
 
@@ -229,11 +232,11 @@ class DBConfigSaver:
             self.log.error(error)
             raise RuntimeError(error) from exc
         except requests.ConnectionError as exc:
-            error = f"{__name__}: Connection to {self.API_SOCKET} wasn't successful"
+            error = f"{__name__}: RunRegistryDB: Connection to {self.API_SOCKET} wasn't successful"
             self.log.error(error)
             raise RuntimeError(error) from exc
         except requests.Timeout as exc:
-            error = f"{__name__}: Connection to {self.API_SOCKET} timed out"
+            error = f"{__name__}: RunRegistryDB: Connection to {self.API_SOCKET} timed out"
             self.log.error(error)
             raise RuntimeError(error) from exc
 
