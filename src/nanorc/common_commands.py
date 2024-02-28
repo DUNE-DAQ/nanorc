@@ -40,15 +40,12 @@ def add_run_end_parameters():
     def add_decorator(function):
         f1 = accept_timeout(None)(function)
         f2 = click.option('--force', default=False, is_flag=True)(f1)
-        return click.option('--message', type=str, default="")(f2)
+        f3 = click.option(
+            '--ignore-run-registry-insertion-error', type=bool, is_flag=True, default=False,
+            help='Start the run, even if saving the configuration into the run registry fails')(f2)
+        return click.option('--message', type=str, default="")(f3)
      # sigh end
     return add_decorator
-
-@click.command()
-@accept_message(argument=True)
-@click.pass_obj
-def message(obj, message):
-    obj.rc.message(message)
 
 
 @click.command()
@@ -65,14 +62,13 @@ def ls(obj, legend):
 
 
 @click.command()
-@click.option('--pin-thread-file', type=click.Path(exists=True, resolve_path=True), default=None)
+@click.argument('pin-thread-file', type=click.Path(exists=True, resolve_path=True))
 @accept_timeout(None)
 @click.pass_obj
 @click.pass_context
 def pin_threads(ctx, obj:NanoContext, pin_thread_file, timeout:int):
     data = { "script_name": 'thread_pinning' }
-    if pin_thread_file is not None:
-        data["env"] = { "DUNEDAQ_THREAD_PIN_FILE": pin_thread_file }
+    data["env"] = { "DUNEDAQ_THREAD_PIN_FILE": pin_thread_file }
     obj.rc.execute_script(data=data, timeout=timeout)
 
 
@@ -303,7 +299,6 @@ def start_shell(ctx, obj):
 
 
 def add_common_cmds(shell, end_of_run_cmds=True):
-    shell.add_command(message             , 'message'             )
     shell.add_command(status              , 'status'              )
     shell.add_command(ls                  , 'ls'                  )
     shell.add_command(pin_threads         , 'pin_threads'         )
@@ -389,7 +384,7 @@ def add_custom_cmds(cli, rc_cmd_exec, cmds, status_exec):
         cli.command.add_command(execute_custom, cmd_name)
 
 
-def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool, cmd_args:dict):
+def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool, user:str=None, cmd_args:dict={}):
     sequence = rc.get_command_sequence(command)
     import time
     last_cmd = sequence[-1]['cmd']
@@ -422,7 +417,10 @@ def execute_cmd_sequence(command:str, ctx, rc, wait:int, force:bool, cmd_args:di
             rc.log.error(f"Function {cmd} doesn't exist in nanorc.core!")
             if not force: break
 
-        seq_func(**cmd_args)
+        if user:
+            seq_func(user=user, **cmd_args)
+        else:
+            seq_func(user=user, **cmd_args)
         rc.console.print(f'DONE executing \'{cmd}\'!\n')
 
         check_rc(ctx, rc)

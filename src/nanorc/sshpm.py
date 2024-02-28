@@ -157,11 +157,22 @@ class SSHProcessManager(object):
 
     def execute_script(self, script_data):
         env_vars = script_data["env"]
-        cmd =';'.join([ f"export {n}=\"{v}\"" for n,v in env_vars.items()])
-        cmd += ";"+"; ".join(script_data['cmd'])
+        cmd = ''
+        pretty_print = ''
+        for n,v in env_vars.items():
+            cmd += f"export {n}=\"{v}\"; "
+            pretty_v = v
+            if len(v)>100:
+                pretty_v = v[:50]+'...'+v[-50:]
+            pretty_print += f"export {n}=\"{pretty_v}\"; "
+
+        cmd += "; ".join(script_data['cmd'])
+        pretty_print += "; ".join(script_data['cmd'])
+
         hosts = set(self.boot_info["hosts-ctrl"].values())
+
         for host in hosts:
-            self.log.info(f'Executing {script_data["cmd"]} on {host}.')
+            self.console.print(f'Executing {script_data["cmd"]} script on \'{host}\':\n[bright_black]{pretty_print}[/]')
             ssh_args = [host, "-tt", "-o StrictHostKeyChecking=no"] + [cmd]
             try:
                 proc = self.ssh_cmd(ssh_args, _env=self.ssh_env)
@@ -174,7 +185,7 @@ class SSHProcessManager(object):
                 self.log.critical(
                     str(e)
                 )
-            self.log.info(proc)
+            self.log.debug(proc)
 
     def setup_app(self, app_name, app_conf, conf_loc):
         hosts = self.boot_info["hosts-ctrl"]

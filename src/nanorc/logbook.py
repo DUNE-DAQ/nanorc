@@ -14,46 +14,49 @@ from .credmgr import credentials
 class FileLogbook:
     def __init__(self, path:str, console):
         self.path = path
-        self.file_name = ""
+        self.file_name = f"{path}logbook.txt"
         self.website = self.file_name
         self.console = console
         self.run_num = ""
         self.run_type = ""
 
+    def now(self):
+        from datetime import datetime
+        now = datetime.now() # current date and time
+        return now.strftime("%Y-%m-%d--%H-%M-%S")
+
     def message_on_start(self, message:str, apparatus:str, run_num:int, run_type:str):
         self.run_num = run_num
         self.run_type = run_type
-        self.file_name = self.path+f"_{apparatus}_{self.run_num}_{self.run_type}.txt"
         self.website = self.file_name
-        f = open(self.file_name, "w")
-        f.write(f"-- User {credentials.user} started a run {self.run_num}, of type {self.run_type} on {apparatus} --\n")
-        f.write(credentials.user+": "+message+"\n")
+        f = open(self.file_name, "a")
+        f.write(f"{self.now()}: User started a run {self.run_num}, of type {self.run_type} on {apparatus}\n")
+        f.write(f'{self.now()}: {message}\n')
         f.close()
 
     def add_message(self, message:str, apparatus:str):
-        self.file_name = self.path+f"_{apparatus}_{self.run_num}_{self.run_type}.txt"
         f = open(self.file_name, "a")
-        f.write(credentials.user+": "+message+"\n")
+        f.write(f'{self.now()}: {message}\n')
         f.close()
 
     def message_on_stop(self, message:str, apparatus:str):
-        self.file_name = self.path+f"_{apparatus}_{self.run_num}_{self.run_type}.txt"
         f = open(self.file_name, "a")
-        f.write(f"-- User {credentials.user} stopped the run {self.run_num}, of type {self.run_type} on {apparatus} --\n")
-        f.write(credentials.user+": "+message+"\n")
+        f.write(f"{self.now()} User stopped the run {self.run_num}, of type {self.run_type} on {apparatus}\n")
+        f.write(f'{self.now()}: {message}\n')
         f.close()
 
 
-    
+
 class ElisaLogbook:
-    def __init__(self, console, configuration):
+    def __init__(self, console, configuration, session_handler):
         self.console = console
+        self.session_handler = session_handler
         self.elisa_arguments = {"connection": configuration['connection']}
         self.website = configuration['website']
         self.message_attributes = configuration['attributes']
         self.log = logging.getLogger(self.__class__.__name__)
         self.log.info(f'ELisA logbook connection: {configuration["website"]} (API: {configuration["connection"]})')
-        
+
     def _start_new_message_thread(self):
         self.log.info("ELisA logbook: Next message will be a new thread")
         self.current_id = None
@@ -62,45 +65,58 @@ class ElisaLogbook:
 
 
     def _send_message(self, subject:str, body:str, command:str):
+        user = self.session_handler.nanorc_user.username
+
         elisa_arg = copy.deepcopy(self.elisa_arguments)
-        sso = {"ssocookie": credentials.generate_new_sso_cookie(self.website)}
-        elisa_arg.update(sso)
 
-        elisa_inst = Elisa(**elisa_arg)
-        try:
-            answer = None
-            if not self.current_id:
-                self.log.info("ELisA logbook: Creating a new message thread")
-                message = MessageInsert()
-                message.author = credentials.user
-                message.subject = subject
-                for attr_name, attr_data in self.message_attributes[command].items():
-                    if attr_data['set_on_new_thread']:
-                        setattr(message, attr_name, attr_data['value'])
-                message.systemsAffected = ["DAQ"]
-                message.body = body
-                answer = elisa_inst.insertMessage(message)
-                
-            else:
-                self.log.info(f"ELisA logbook: Answering to message ID{self.current_id}")
-                message = MessageReply(self.current_id)
-                message.author = credentials.user
-                message.systemsAffected = ["DAQ"]
-                for attr_name, attr_data in self.message_attributes[command].items():
-                    if attr_data['set_on_reply']:
-                        setattr(message, attr_name, attr_data['value'])
-                message.body = body
-                answer = elisa_inst.replyToMessage(message)
-            self.current_id = answer.id
+        elisa_user = credentials.get_login('elisa')
 
-        except ElisaError as ex:
-            self.log.error(f"ELisA logbook: {str(ex)}")
-            self.log.error(answer)
-            raise ex
-        
-        self.log.info(f"ELisA logbook: Sent message (ID{self.current_id})")
-        
-        os.remove(sso['ssocookie'])
+        import tempfile
+        with tempfile.NamedTemporaryFile() as tf:
+            try:
+                sso = {"ssocookie": self.session_handler.generate_elisa_cern_cookie(self.website, tf.name)}
+                elisa_arg.update(sso)
+                elisa_inst = Elisa(**elisa_arg)
+                answer = None
+                if not self.current_id:
+                    self.log.info("ELisA logbook: Creating a new message thread")
+                    message = MessageInsert()
+                    message.author = user
+                    message.subject = subject
+                    for attr_name, attr_data in self.message_attributes[command].items():
+                        if attr_data['set_on_new_thread']:
+                            setattr(message, attr_name, attr_data['value'])
+                    message.systemsAffected = ["DAQ"]
+                    message.body = body
+                    answer = elisa_inst.insertMessage(message)
+
+                else:
+                    self.log.info(f"ELisA logbook: Answering to message ID{self.current_id}")
+                    message = MessageReply(self.current_id)
+                    message.author = user
+                    message.systemsAffected = ["DAQ"]
+                    for attr_name, attr_data in self.message_attributes[command].items():
+                        if attr_data['set_on_reply']:
+                            setattr(message, attr_name, attr_data['value'])
+                    message.body = body
+                    answer = elisa_inst.replyToMessage(message)
+                self.current_id = answer.id
+
+            except ElisaError as ex:
+                self.log.error(f"ELisA logbook: {str(ex)}")
+                self.log.error(answer)
+                raise ex
+
+            except Exception as e:
+                self.log.error(f'Exception thrown while inserting data in elisa:')
+                self.log.error(e)
+                import logging
+                if logging.DEBUG >= logging.root.level:
+                    self.console.print_exception()
+                raise e
+
+            self.log.info(f"ELisA logbook: Sent message (ID{self.current_id})")
+
 
 
     def message_on_start(self, message:str, apparatus:str, run_num:int, run_type:str):
@@ -108,24 +124,29 @@ class ElisaLogbook:
         self.current_run_num = run_num
         self.current_run_type = run_type
 
-        text = f"<p>User {credentials.user} started run {self.current_run_num} of type {self.current_run_type} on {apparatus}</p>"
+        user = self.session_handler.nanorc_user.username
+
+        text = f"<p>User {user} started run {self.current_run_num} of type {self.current_run_type} on {apparatus}</p>"
         if message != "":
-            text += "\n<p>"+credentials.user+": "+message+"</p>"
+            text += f"\n<p>{user}: {message}</p>"
         text += "\n<p>log automatically generated by NanoRC.</p>"
-        
-        title = f"{credentials.user} started new run {self.current_run_num} ({self.current_run_type}) on {apparatus}"
+
+        title = f"{user} started new run {self.current_run_num} ({self.current_run_type}) on {apparatus}"
         self._send_message(subject=title, body=text, command='start')
 
     def add_message(self, message:str, apparatus:str):
+        user = self.session_handler.nanorc_user.username
+
         if message != "":
-            text = "<p>"+credentials.user+": "+message+"</p>"
+            text = f"<p>{user}: {message}</p>"
             self._send_message(subject="User comment", body=text, command='message')
 
-    def message_on_stop(self, message:str, apparatus_id:str):
-        text = f"<p>User {credentials.user} finished run {self.current_run_num} on {apparatus}</p>"
+    def message_on_stop(self, message:str, apparatus:str):
+        user = self.session_handler.nanorc_user.username
+        text = f"<p>User {user} finished run {self.current_run_num} on {apparatus}</p>"
         if message!="":
-            text = "\n<p>"+credentials.user+": "+message+"</p>"
+            text = f"\n<p>{user}: {message}</p>"
         text += "\n<p>log automatically generated by NanoRC.</p>"
-        
-        title = f"{credentials.user} ended run {self.current_run_num} ({self.current_run_type}) on {apparatus}"
+
+        title = f"{user} ended run {self.current_run_num} ({self.current_run_type}) on {apparatus}"
         self._send_message(subject=title, body=text, command='stop')

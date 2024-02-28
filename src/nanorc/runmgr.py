@@ -1,6 +1,5 @@
 import requests
 import json
-from .credmgr import credentials,Authentication
 import logging
 
 class SimpleRunNumberManager:
@@ -21,14 +20,15 @@ class DBRunNumberManager:
         self.log = logging.getLogger(self.__class__.__name__)
         self.run = None
         self.API_SOCKET=socket
-        auth = credentials.get_login("rundb")
-        self.API_USER=auth.user
+        from .credmgr import credentials
+        auth = credentials.get_login("run_number")
+        self.API_USER=auth.username
         self.API_PSWD=auth.password
         self.timeout = 2
-        
+
     def get_run_number(self):
         return self._getnew_run_number()
-    
+
     def _getnew_run_number(self):
         try:
             req = requests.get(self.API_SOCKET+'/runnumber/getnew',
@@ -70,7 +70,7 @@ class DBRunNumberManager:
             error = f"{__name__}: Connection to {self.API_SOCKET} timed out"
             self.log.error(error)
             raise RuntimeError(error) from exc
-        
+
         return req.json()[0][0][0]
 
 
@@ -78,7 +78,7 @@ def test_runmgr():
     rnm = DBRunNumberManager()
     rnm.get_run_number()
     print(f"Run: {rnm.run}")
-    rnm.increment_run_number() 
+    rnm.increment_run_number()
     print(f"Run: {rnm.run} after incrementing")
     date = rnm.update_stop(rnm.run)
     print(f"Run {rnm.run} finished at: {date}")

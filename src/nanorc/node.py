@@ -121,10 +121,18 @@ class SubsystemNode(StatefulNode):
 
         if cmd == 'scripts': # unfortunately I don't see how else to do this
             scripts = self.cfgmgr.boot.get('scripts')
-            script = cp.deepcopy(scripts.get(data['script_name'])) if scripts else None
+
+            def search_script(dico, name):
+                # hopefully that's good enough. This matches "thread_pinning" to "thread_pinning_0"... not ideal
+                for key, value in dico.items():
+                    if key.startswith(name):
+                        return cp.deepcopy(value)
+                return None
+
+            script = search_script(scripts, data['script_name']) if scripts else None
 
             if not script:
-                self.log.error(f"no {data['script_name']} script data in boot.json")
+                # self.log.error(f"no {data['script_name']} script data in boot.json")
                 return {self.name : f"no {data['script_name']} script data in boot.json"}
 
             try:
@@ -325,17 +333,28 @@ class SubsystemNode(StatefulNode):
         self.end_boot(response=response)
 
 
-    def on_exit_conf_ing(self, event) -> NoReturn:
-        self.pin_thread()
+    def _on_exit_callback(self, event) -> NoReturn:
+        scripts = self.cfgmgr.boot.get('scripts', {})
+
+        for script_name, script_data in scripts.items():
+            if 'thread_pin' in script_name.lower():
+                after = script_data.get('after')
+                if after:
+                    after_what = ['end_'+after.lower()]
+                else:
+                    after_what = ['end_conf', 'end_boot']
+                    # the behaviour if one doesn't specify anything.
+
+                if event.event.name.lower() in after_what:
+                    self.pin_thread(script_name)
+                    break
+
         super()._on_exit_callback(event)
 
-    def on_exit_boot_ing(self, event) -> NoReturn:
-        self.pin_thread()
-        super()._on_exit_callback(event)
 
-    def pin_thread(self):
+    def pin_thread(self, script_name):
         scripts = self.cfgmgr.boot.get('scripts')
-        thread_pinning = scripts.get('thread_pinning') if scripts else None
+        thread_pinning = scripts.get(script_name) if scripts else None
         if thread_pinning:
             try:
                 # self.pm.execute_script(thread_pinning)
@@ -543,7 +562,7 @@ class SubsystemNode(StatefulNode):
                             "state": child_node.state,
                             "command": command,
                             "error": r,
-                            "failure_mode": mode_fail, 
+                            "failure_mode": mode_fail,
                         }
                         failed.append(child_node.name)
                         mode_fail.append('command error')

@@ -1,197 +1,474 @@
-import sys, os
-import logging
-from getpass import getpass
-import subprocess
-import logging
-import tempfile
-from pathlib import Path
 
-class Authentication():
-    def __init__(self, service:str, user:str, password:str):
-        self.service = service
-        self.user = user
-        self.password = password
-        self.log = logging.getLogger(self.__class__.__name__)
 
-class CredentialManager:
-    def __init__(self):
-        self.log = logging.getLogger(self.__class__.__name__)
-        self.authentications = []
-        self.user = None
-        self.console = None
-        self.partition_name = None
-        self.partition_number = None
-        self.cache_initialised = False
-        self.krbenv = {}
 
-    def quit(self):
-         if self.cache_initialised and os.path.isdir(self.krb_cache_path):
-             self.stop_partition()
-        #     self.log.info(f'Flushing kerberos ticket in {self.krb_cache_path}')
-        #     import shutil
-        #     shutil.rmtree(self.krb_cache_path)
+def env_for_kerberos(ticket_dir):
+    import os
+    ticket_dir = os.path.expanduser(ticket_dir)
+    env = {'KRB5CCNAME': f'DIR:{ticket_dir}'}
+    return env
 
-    def create_kerb_cache(self):
-        if self.partition_number is None or self.partition_name is None:
-            raise RuntimeError('Partition number (or name) hasn\'t been specified, I cannot create a nanorc kerberos cache')
 
-        self.krb_cache_path = Path(os.path.expanduser(f'~/.nanorc_kerbcache_{self.partition_name}_part{self.partition_number}'))
-        if not os.path.isdir(self.krb_cache_path):
-            os.mkdir(self.krb_cache_path)
-        self.krbenv = {'KRB5CCNAME': f'DIR:{self.krb_cache_path}'}
-        self.cache_initialised = True
+def new_kerberos_ticket(user:str, realm:str, password:str=None, ticket_dir:str="~/"):
+    env = env_for_kerberos(ticket_dir)
+    success = False
+    password_provided = password is not None
 
-    def set_partition(self, partition_number, apparatus_id):
-        self.partition_number = partition_number
-        self.partition_name = apparatus_id # here is the mother of all the partition definition questions...
-        self.create_kerb_cache()
-
-    def stop_partition(self):
-        if os.path.isfile(self.krb_cache_path/'active_partition'):
-            os.remove(self.krb_cache_path/'active_partition')
-
-    def start_partition(self):
-        if not self.cache_initialised: raise RuntimeError('Nanorc\'s kerberos cache wasn\'t initialised!')
-        f = open(self.krb_cache_path/'active_partition', "w")
-        f.write(self.partition_name)
-        f.close()
-
-    def add_login(self, service:str, user:str, password:str):
-        self.authentications.append(Authentication(service, user, password))
-
-    def add_login_from_file(self, service:str, file:str):
-        if not os.path.isfile(os.getcwd()+"/"+file+".py"):
-            self.log.error(f"Couldn't find file {file} in PWD")
-            raise
-
-        sys.path.append(os.getcwd())
-        i = __import__(file, fromlist=[''])
-        self.add_login(service, i.user, i.password)
-        self.log.info(f"Added login data from file: {file}")
-
-    def get_login(self, service:str, user:str):
-        for auth in self.authentications:
-            if service == auth.service and user == auth.user:
-                return auth
-        self.log.error(f"Couldn't find login for service: {service}, user: {user}")
-
-    def get_login(self, service:str):
-        for auth in self.authentications:
-            if service == auth.service:
-                return auth
-        self.log.error(f"Couldn't find login for service: {service}")
-
-    def rm_login(self, service:str, user:str):
-        for auth in self.authentications:
-            if service == auth.service and user == auth.user:
-                self.authentications.remove(auth)
-                return
-
-    def change_user(self, user):
-        if not self.cache_initialised: raise RuntimeError('Nanorc\'s kerberos cache wasn\'t initialised!')
-        if user == self.user:
-            return True
-
-        previous = self.user
-        self.user = user
-
-        if self.check_kerberos_credentials(silent=True):
-            return True
-
-        new_ticket = self.new_kerberos_ticket()
-        if not new_ticket:
-            self.user = previous
-            return False
-        return True
-
-    def partition_in_use(self):
-        if not self.cache_initialised: raise RuntimeError('Nanorc\'s kerberos cache wasn\'t initialised!')
-        if os.path.isfile(self.krb_cache_path/'active_partition'):
-            f = open(self.krb_cache_path/'active_partition', "r")
-            pname = f.read()
-            return pname
-        return None
-
-    def check_kerberos_credentials(self, silent=False):
-        if not self.cache_initialised: raise RuntimeError('Nanorc\'s kerberos cache wasn\'t initialised!')
-        while True:
-            kerb_user = self.get_kerberos_user(silent=silent)
-            if kerb_user:
-                self.log.info(f'Detected kerb ticket for user: \'{kerb_user}\'')
-            else:
-                self.log.info(f'No kerb ticket')
-
-            if not kerb_user:
-                if not silent: self.log.error('CredentialManager: No kerberos ticket!')
-                return False
-            elif kerb_user != self.user: # we enforce the user is thec
-                return False
-            else:
-                return True if subprocess.call(['klist', '-s'], env=self.krbenv) == 0 else False
-
-    def get_kerberos_user(self, silent=False):
-        if not self.cache_initialised: raise RuntimeError('Nanorc\'s kerberos cache wasn\'t initialised!')
-        args=['klist'] # on my mac, we can specify --json and that gives everything nicely in json format... but...
-        proc = subprocess.run(args, capture_output=True, text=True, env=self.krbenv)
-        raw_kerb_info = proc.stdout.split('\n')
-        if not silent: self.log.info(proc.stdout)
-        kerb_user = None
-        for line in raw_kerb_info:
-            split_line = line.split(' ')
-            split_line =  [x for x in split_line if x!='']
-            find_princ = line.find('Default principal')
-            if find_princ!=-1:
-                kerb_user = split_line[2]
-                kerb_user = kerb_user.split('@')[0]
-
-            if kerb_user:
-                return kerb_user
-        return None
-
-    def new_kerberos_ticket(self):
-        if not self.cache_initialised: raise RuntimeError('Nanorc\'s kerberos cache wasn\'t initialised!')
-        success = False
-
-        while not success:
-            print(f'Password for {self.user}@CERN.CH:')
+    while not success:
+        if password is None:
+            print(f'Password for {user}@{realm}:')
             try:
+                from getpass import getpass
                 password = getpass()
+
             except KeyboardInterrupt:
+                print()
                 return False
 
-            p = subprocess.Popen(['kinit', self.user+'@CERN.CH'],
-                                 stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE,
-                                 env=self.krbenv)
-            stdout_data = p.communicate(password.encode())
-            print(stdout_data[-1].decode())
-            success = p.returncode==0
+        import subprocess
 
-        return True
+        p = subprocess.Popen(
+            ['kinit', f'{user}@{realm}'],
+            stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE,
+            env=env
+        )
 
-    def generate_new_sso_cookie(self, website):
-        if not self.cache_initialised: raise RuntimeError('Nanorc\'s kerberos cache wasn\'t initialised!')
-        SSO_COOKIE_PATH=tempfile.NamedTemporaryFile(mode='w', prefix="ssocookie", delete=False).name
+        stdout_data = p.communicate(password.encode())
+        print(stdout_data[-1].decode())
+        success = p.returncode==0
+
+        if not success and password_provided:
+            raise RuntimeError(f'Authentication error for {user}@{realm}. The password provided (likely in configuration file) is incorrect')
+
+    return True
+
+
+
+def get_kerberos_user(silent=False, ticket_dir:str="~/"):
+    import logging
+    log = logging.getLogger('get_kerberos_user')
+
+    env = env_for_kerberos(ticket_dir)
+    args=['klist'] # on my mac, I can specify --json and that gives everything nicely in json format... but...
+    import subprocess
+
+    proc = subprocess.run(args, capture_output=True, text=True, env=env)
+    raw_kerb_info = proc.stdout.split('\n')
+
+
+    if not silent:
+        log.info(proc.stdout)
+
+    kerb_user = None
+    for line in raw_kerb_info:
+        split_line = line.split(' ')
+        split_line =  [x for x in split_line if x!='']
+        find_princ = line.find('Default principal')
+        if find_princ!=-1:
+            kerb_user = split_line[2]
+            kerb_user = kerb_user.split('@')[0]
+
+        if kerb_user:
+            return kerb_user
+    return None
+
+
+
+def check_kerberos_credentials(against_user:str, silent=False, ticket_dir:str="~/"):
+    import logging
+    log = logging.getLogger('check_kerberos_credentials')
+
+    env = env_for_kerberos(ticket_dir)
+
+    kerb_user = get_kerberos_user(
+        silent=silent,
+        ticket_dir=ticket_dir
+    )
+
+    if not silent:
+        if kerb_user:
+            log.info(f'Detected kerberos ticket for user: \'{kerb_user}\'')
+        else:
+            log.info(f'No kerberos ticket found')
+
+    if not kerb_user:
+        if not silent: log.info('No kerberos ticket')
+        return False
+    elif kerb_user != against_user: # we enforce the user is the same
+        if not silent: log.info('Another user is logged in')
+        return False
+    else:
+        import subprocess
+        ticket_is_valid = subprocess.call(['klist', '-s'], env=env) == 0
+        if not silent and not ticket_is_valid:
+            log.info('Kerberos ticket is expired')
+        return ticket_is_valid
+
+
+
+class ServiceAuthentication():
+    def __init__(self, service:str, username:str):
+        super().__init__()
+        self.service = service
+        self.username = username
+
+
+class SimpleAuthentication(ServiceAuthentication):
+    def __init__(self, service:str, username:str, password:str):
+        super().__init__(service, username)
+        self.password = password
+
+
+class ServiceAccountWithKerberos(ServiceAuthentication):
+    def __init__(self, service:str, username:str, password:str, realm:str):
+        super().__init__(service, username)
+        self.password = password
+        self.realm = realm
+
+    def generate_cern_sso_cookie(self, website, kerberos_directory, output_directory):
         args = []
-        env = {}
+        env = {'KRB5CCNAME': f'DIR:{kerberos_directory}'}
+
+
         from nanorc.utils import which
         import sh
+
         if which('cern-get-sso-cookie'):
             executable = sh.Command("cern-get-sso-cookie")
-            args = ["--krb", "-r", "-u", website, "-o", f"{SSO_COOKIE_PATH}"]
+            args = ["--krb", "-r", "-u", website, "-o", output_directory]
         elif which('auth-get-sso-cookie'):
             executable = sh.Command('auth-get-sso-cookie')
-            args = ['-u', website, '-o', f"{SSO_COOKIE_PATH}"]
+            args = ['-u', website, '-o', output_directory]
         else:
-            raise RuntimeError("CredentialManager: Couldn't get SSO cookie, there is no 'cern-get-sso-cookie' or 'auth-get-sso-cookie' on your system!")
+            raise RuntimeError("Couldn't get SSO cookie, there is no 'cern-get-sso-cookie' or 'auth-get-user-token' on your system!")
 
-        env.update(self.krbenv)
         proc = executable(*args, _env=env, _new_session=True)
         if proc.exit_code != 0:
-            self.log.error("CredentialManager: Couldn't get SSO cookie!")
+            self.log.error("Couldn't get SSO cookie!")
             self.log.error("You need to 'kinit' or 'change_user' and try again!")
             self.log.error(f'{executable} stdout: {proc.stdout}')
             self.log.error(f'{executable} stderr: {proc.stderr}')
-            raise RuntimeError("CredentialManager: Couldn't get SSO cookie!")
-        return SSO_COOKIE_PATH
+            raise RuntimeError("Couldn't get SSO cookie!")
+        return output_directory
+
+
+class UserAccountWithKerberos(ServiceAuthentication):
+    def __init__(self, service:str, username:str, realm:str):
+        super().__init__(service, username)
+        self.realm = realm
+
+    def __eq__(self, other):
+        return self.service == other.service and self.realm == other.realm and self.username == other.username
+
+class AuthenticationFactory():
+    @staticmethod
+    def get_from_dict(service:str, auth_data:dict[str,str]):
+        match auth_data['type']:
+            case "simple":
+                return SimpleAuthentication(
+                    service,
+                    auth_data['user'],
+                    auth_data.get('password'),
+                )
+            case "service-account":
+                return ServiceAccountWithKerberos(
+                    service,
+                    auth_data['user'],
+                    auth_data.get('password'),
+                    auth_data['realm'],
+                )
+            case _:
+                raise RuntimeError(f"Authentication method {auth_data['type']} is not supported")
+
+
+
+class CredentialManager:
+    def __init__(self):
+        import logging
+        self.log = logging.getLogger(self.__class__.__name__)
+        self.authentications = []
+
+    def get_nanorc_username(self):
+        user = self.get_login(service='nanorc')
+        if user:
+            return user.username
+        else:
+            import getpass
+            return getpass.getuser()
+
+    def add_login(self, service:str, data:dict[str,str]):
+        self.authentications.append(
+            AuthenticationFactory.get_from_dict(service, data)
+        )
+
+
+    def get_login(self, service:str, user:str=".*"):
+        import re
+
+        for auth in self.authentications:
+            if re.search(service, auth.service) and re.search(user, auth.username):
+                return auth
+        self.log.error(f"Couldn't find login for service: {service}, user: {user}")
+
+
+    def rm_login(self, service:str, user:str=".*"):
+        import re
+
+        from copy import deepcopy as dc
+        auths = dc(self.authentications)
+
+        for auth in auths:
+            if re.search(service, auth.service) and re.search(user, auth.username):
+                self.log.info(f"Removing: '{auth.service}', user: '{auth.username}' from credential manager")
+                self.authentications.remove(auth)
 
 credentials = CredentialManager()
+
+
+class CERNSessionHandler:
+    def __init__(self, console, apparatus_id:str, session_number:int, username:str):
+        self.console = console
+        import logging
+        self.log = logging.getLogger(self.__class__.__name__)
+        self.nanorc_user = UserAccountWithKerberos(
+            service='nanorc',
+            username=username,
+            realm="CERN.CH",
+        )
+
+        self.session_name = apparatus_id
+        self.session_number = session_number
+        self.start_session()
+
+        if not self.authenticate_nanorc_user():
+            self.log.error(f'User \'{username}\' cannot authenticate, exiting...')
+            exit(1)
+
+        if not self.elisa_user_is_authenticated():
+            self.authenticate_elisa_user()
+
+    @staticmethod
+    def __get_session_kerberos_cache_path(session_name:str, session_number:int):
+        import os
+        from pathlib import Path
+
+        return Path(
+            os.path.expanduser(f'~/.nanorc_userkerbcache_{session_name}_session_{session_number}')
+        )
+
+    @staticmethod
+    def __get_elisa_kerberos_cache_path():
+        import os
+        from pathlib import Path
+
+        return Path(
+            os.path.expanduser(f'~/.nanorc_elisakerbcache')
+        )
+
+    @staticmethod
+    def session_is_active(session_name:str, session_number:int):
+        cache_path = CERNSessionHandler.__get_session_kerberos_cache_path(
+            session_name,
+            session_number,
+        )
+        import os
+        return os.path.isfile(cache_path/'active_session')
+
+    @staticmethod
+    def get_kerberos_user_from_session(session_name:str, session_number:int):
+        cache = CERNSessionHandler.__get_session_kerberos_cache_path(
+            session_name,
+            session_number,
+        )
+        return get_kerberos_user(
+            silent=True,
+            ticket_dir = cache,
+        )
+
+    def klist(self):
+        # HACK
+        from subprocess import Popen
+        from subprocess import STDOUT, PIPE
+        from nanorc.credmgr import env_for_kerberos, CERNSessionHandler
+
+        env = env_for_kerberos(
+            CERNSessionHandler.__get_session_kerberos_cache_path(
+                self.session_name, self.session_number
+            )
+        )
+
+        cmd = ['klist']
+        printout = ''
+        for k,v in env.items():
+            printout += f'{k}=\"{v}\" '
+
+        printout += ' '.join(cmd)
+        print(printout+"\n")
+
+        with Popen(
+            cmd,
+            stderr=STDOUT,
+            stdout=PIPE,
+            bufsize=1,
+            text=True,
+            env=env
+        ) as sp:
+            for line in sp.stdout:
+                print(line.replace("\n", ""))
+
+
+
+    def authenticate_nanorc_user(self):
+        session_kerb_cache = CERNSessionHandler.__get_session_kerberos_cache_path(
+            self.session_name,
+            self.session_number,
+        )
+        import os
+
+        if not os.path.isdir(session_kerb_cache):
+            os.mkdir(session_kerb_cache)
+
+        if self.nanorc_user_is_authenticated():
+            # we're authenticated, stop here
+            return True
+
+        return new_kerberos_ticket(
+            user = self.nanorc_user.username,
+            realm = self.nanorc_user.realm,
+            password = None,
+            ticket_dir = session_kerb_cache,
+        )
+
+    def nanorc_user_is_authenticated(self):
+        session_kerb_cache = CERNSessionHandler.__get_session_kerberos_cache_path(
+            self.session_name,
+            self.session_number,
+        )
+        return check_kerberos_credentials(
+            against_user = self.nanorc_user.username,
+            silent = True,
+            ticket_dir = session_kerb_cache,
+        )
+
+    def elisa_user_is_authenticated(self):
+        elisa_user = credentials.get_login('elisa')
+
+        return check_kerberos_credentials(
+            against_user = elisa_user.username,
+            silent = True,
+            ticket_dir = CERNSessionHandler.__get_elisa_kerberos_cache_path(),
+        )
+
+
+    def authenticate_elisa_user(self):
+        elisa_user = credentials.get_login('elisa')
+        elisa_kerb_cache = CERNSessionHandler.__get_elisa_kerberos_cache_path()
+        import os
+
+        if not os.path.isdir(elisa_kerb_cache):
+            os.mkdir(elisa_kerb_cache)
+
+        if self.elisa_user_is_authenticated():
+            # we're authenticated, stop here
+            return True
+
+        return new_kerberos_ticket(
+            user = elisa_user.username,
+            realm = elisa_user.realm,
+            password = elisa_user.password,
+            ticket_dir = elisa_kerb_cache,
+        )
+
+    def generate_elisa_cern_cookie(self, website, cookie_dir):
+        elisa_user = credentials.get_login('elisa')
+        elisa_kerb_cache = CERNSessionHandler.__get_elisa_kerberos_cache_path()
+
+        self.authenticate_elisa_user()
+
+        return elisa_user.generate_cern_sso_cookie(
+            website,
+            elisa_kerb_cache,
+            cookie_dir,
+        )
+
+
+    def stop_session(self):
+        import os
+        session_active_marker = CERNSessionHandler.__get_session_kerberos_cache_path(self.session_name, self.session_number)/'active_session'
+        if os.path.isfile(session_active_marker):
+            os.remove(session_active_marker)
+
+    def quit(self):
+        if self.session_name is not None and self.session_number is not None:
+            self.stop_session()
+
+
+    def create_session_kerberos_cache(self):
+        if self.session_number is None or self.session_name is None:
+            raise RuntimeError('Session number (or name) hasn\'t been specified, cannot create a session kerberos cache')
+
+        user_kerb_cache = CERNSessionHandler.__get_session_kerberos_cache_path(self.session_name, self.session_number)
+        import os
+
+        if not os.path.isdir(user_kerb_cache):
+            os.mkdir(user_kerb_cache)
+
+
+    def start_session(self):
+        in_use = CERNSessionHandler.session_is_active(
+            session_name = self.session_name,
+            session_number = self.session_number,
+        )
+
+        if in_use:
+            kuser = CERNSessionHandler.get_kerberos_user_from_session(
+                session_name = self.session_name,
+                session_number = self.session_number,
+            )
+
+            if kuser is not None and kuser != self.nanorc_user.username:
+                self.console.print(f'[bold red]Session #{self.session_number} on apparatus \'{self.session_name}\' seems to be used by \'{kuser}\', do you want to steal it? Y/N[/bold red]')
+            else:
+                self.console.print(f'[bold red]You seem to already have session #{self.session_number} on apparatus \'{self.session_name}\' active, are you sure you want to proceed? Y/N[/bold red]')
+
+            while True:
+                try:
+                    steal = input().upper()
+                except KeyboardInterrupt:
+                    self.console.print(f'Exiting...')
+                    exit(1)
+                if   steal == 'Y': break
+                elif steal == 'N': exit(0)
+                self.console.print(f'[bold red]Wrong answer! Y or N?[/bold red]')
+
+
+        self.create_session_kerberos_cache()
+        cache_path = CERNSessionHandler.__get_session_kerberos_cache_path(
+            self.session_name,
+            self.session_number,
+        )
+
+        f = open(cache_path/'active_session', "w")
+        f.close()
+
+
+    def change_user(self, user:UserAccountWithKerberos):
+
+        if user == self.nanorc_user.username:
+            return True
+
+        previous_user = self.nanorc_user
+        self.nanorc_user = UserAccountWithKerberos(
+            service = previous_user.service,
+            username = user,
+            realm = previous_user.realm,
+        )
+
+        if not self.authenticate_nanorc_user():
+            self.nanorc_user = previous_user
+            return False
+
+        return True
+
+
+
+
