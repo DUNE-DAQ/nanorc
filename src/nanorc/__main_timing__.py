@@ -222,6 +222,10 @@ def start(ctx, obj, timeout:int, force):
 
 def main():
     from rich.logging import RichHandler
+    import signal
+    from nanorc.utils import signal_handler
+
+    signal.signal(signal.SIGQUIT, handler=signal_handler)
 
     logging.basicConfig(
         level="INFO",

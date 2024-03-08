@@ -7,6 +7,10 @@ from flask import request
 import logging
 
 
+def signal_handler(signal_num, frame):
+    print(f"Ignoring SIGQUIT (Ctrl-\\) - press enter to get shell back")
+
+
 class FlaskManager(threading.Thread):
     def __init__(self, name, app, port):
         threading.Thread.__init__(self)
