@@ -517,7 +517,8 @@ class SubsystemNode(StatefulNode):
 
             failed_ping_count = {app.name:0 for app in appset}
             mode_fail = []
-            failed_ping_thres = 3
+            failed_ping_thres = 5
+            failed_alive_thres = 5
             for _ in range(timeout*10):
                 progress.update(timeout_bar, advance=1)
                 if len(appset)==0:
@@ -529,12 +530,14 @@ class SubsystemNode(StatefulNode):
                     if not child_node.included: continue
                     is_alive = child_node.sup.desc.proc.is_alive()
                     if not is_alive:
-                        failed.append(child_node.name)
-                        mode_fail.append('app died')
-                        child_node.to_error(
-                            command = command,
-                        )
-                        done += [child_node]
+                        failed_alive_count[child_node.name] += 1
+                        if failed_alive_count[child_node.name] > failed_alive_thres:
+                            failed.append(child_node.name)
+                            mode_fail.append('app died')
+                            child_node.to_error(
+                                command = command,
+                            )
+                            done += [child_node]
                         continue
                     is_ping = child_node.sup.commander.ping()
                     if not is_ping:
