@@ -237,12 +237,13 @@ def add_run_start_parameters():
             '--ignore-run-registry-insertion-error', type=bool, is_flag=True, default=False,
             help='Start the run, even if saving the configuration into the run registry fails')(f3)
         f5 = accept_timeout(None)(f4)
-        return click.option('--message', type=str, default="")(f5)
+        f6 = click.option('--run-type', type=click.Choice(['TEST', 'PROD']))(f5)
+        return click.option('--message', type=str, default="")(f6)
      # sigh end
     return add_decorator
 
 def start_defaults_overwrite(kwargs):
-    kwargs['run_type'] = 'TEST'
+    #kwargs['run_type'] = 'TEST'
     kwargs['path'] = None
     return kwargs
 
