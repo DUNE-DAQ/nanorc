@@ -346,7 +346,8 @@ class NanoRC:
 
         stparam = {
             "run":run,
-            "disable_data_storage":disable_data_storage
+            "disable_data_storage":disable_data_storage,
+            "production_vs_test":run_type
         }
 
         if not trigger_rate is None:
