@@ -14,6 +14,17 @@ def new_kerberos_ticket(user:str, realm:str, password:str=None, ticket_dir:str="
     password_provided = password is not None
 
     while not success:
+        import subprocess
+
+        p = subprocess.Popen(
+            ['kinit', f'{user}@{realm}'],
+            stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE,
+            env=env
+        )
+
+        if p.poll() is not None and p.returncode!=0:
+          raise RuntimeError(f'Could not execute kinit {user}@{realm}\n{stdout_data[-1].decode()}')
+
         if password is None:
             print(f'Password for {user}@{realm}:')
             try:
@@ -24,16 +35,12 @@ def new_kerberos_ticket(user:str, realm:str, password:str=None, ticket_dir:str="
                 print()
                 return False
 
-        import subprocess
-
-        p = subprocess.Popen(
-            ['kinit', f'{user}@{realm}'],
-            stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE,
-            env=env
-        )
-
         stdout_data = p.communicate(password.encode())
         print(stdout_data[-1].decode())
+
+        if not password_provided:
+            password = None
+
         success = p.returncode==0
 
         if not success and password_provided:
