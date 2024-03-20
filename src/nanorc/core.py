@@ -355,14 +355,27 @@ class NanoRC:
 
         runtime_start_data = rccmd.StartParams(**stparam).pod() # EnFoRcE tHiS sChEmA aNd DiTcH iT
 
+        messages = []
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
+            messages += [message]
+
+        config_pretty = f'Configuration: {self.cfg.initial_top_cfg.path}\n<ul>'
+
+        for k, v in self.cfg.top_cfg.items():
+            if k == "apparatus_id": continue
+
+            config_pretty += f'<li>{k}: {v.path}</li>'
+
+        config_pretty += '</ul>'
+
+        messages += [config_pretty]
 
         if self.logbook:
             try:
                 self.logbook.message_on_start(
-                    message = message,
-                    apparatus = self.apparatus_id,
+                    messages = messages,
+                    session = self.partition,
                     run_num = run,
                     run_type = run_type,
                 )
@@ -426,8 +439,8 @@ class NanoRC:
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
             try:
                 self.logbook.add_message(
-                    message = message,
-                    apparatus = self.apparatus_id,
+                    messages = [message],
+                    session = self.partition,
                 )
 
             except Exception as e:
@@ -491,8 +504,8 @@ class NanoRC:
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
             try:
                 self.logbook.message_on_stop(
-                    message = message,
-                    apparatus = self.apparatus_id,
+                    messages = [message],
+                    session = self.partition,
                 )
             except Exception as e:
                 self.log.error(f"Couldn't make an entry to the logbook, do it yourself manually at {self.logbook.website}\nError text:\n{str(e)}")
