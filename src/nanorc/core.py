@@ -371,7 +371,10 @@ class NanoRC:
 
         messages += [config_pretty]
 
-        if self.logbook:
+        if message != '' and run_type.lower() != 'prod':
+            self.log.warning('Your message will NOT be stored, as this is not a PROD run')
+
+        if self.logbook and run_type.lower() == 'prod':
             try:
                 self.logbook.message_on_start(
                     messages = messages,
@@ -500,11 +503,22 @@ class NanoRC:
                 self.return_code = self.topnode.return_code
                 return
 
+        messages = []
         if message != "":
             self.log.info(f"Adding the message:\n--------\n{message}\n--------\nto the logbook")
+            messages += [message]
+
+        run_type = 'test'
+        if self.runs:
+            run_type = self.runs[-1].run_type
+
+        if message != '' and run_type.lower() != 'prod':
+            self.log.warning('Your message will NOT be stored, as this is not a PROD run')
+
+        if self.logbook and run_type.lower() == 'prod':
             try:
                 self.logbook.message_on_stop(
-                    messages = [message],
+                    messages = messages,
                     session = self.partition,
                 )
             except Exception as e:
