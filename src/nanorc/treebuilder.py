@@ -95,6 +95,7 @@ class TreeBuilder:
         self.subsystem_port_increment = 50
         from .confserver import ConfServer
         self.conf_server = ConfServer(8547+port_offset)
+        self.initial_top_cfg = top_cfg
         self.apparatus_id, self.top_cfg = TreeBuilder.get_apparatus_and_config(top_cfg)
 
         self.console = console
