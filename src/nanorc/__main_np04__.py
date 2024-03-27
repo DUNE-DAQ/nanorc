@@ -234,7 +234,7 @@ def klist(ctx, obj):
 def add_run_start_parameters():
     # sigh start...
     def add_decorator(function):
-        f1 = click.argument('run-type', required=True, type=click.Choice(['TEST', 'PROD']))(function)
+        f1 = click.option('--run-type', type=click.Choice(['TEST', 'PROD']), default='PROD')(function)
         f2 = click.option('--trigger-rate', type=float, default=None, help='Trigger rate in Hz')(f1)
         f3 = click.option('--disable-data-storage/--enable-data-storage', type=bool, default=False, help='Toggle data storage')(f2)
         f4 = click.option('--ignore-run-registry-insertion-error', type=bool, is_flag=True, default=False, help='Start the run, even if saving the configuration into the run registry fails')(f3)
