@@ -280,7 +280,14 @@ class SubsystemNode(StatefulNode):
                 name=n,
                 console=self.console,
                 log=self.log,
-                sup=AppSupervisor(self.console, d, self.listener, response_host, proxy),
+                sup = AppSupervisor(
+                    console = self.console,
+                    desc = d,
+                    listener = self.listener,
+                    response_host = response_host,
+                    proxy = proxy,
+                    connection_timeout = 10 if event.kwargs['pm'].use_k8spm() else 1,
+                ),
                 parent=self,
                 fsm_conf=self.fsm_conf)
 

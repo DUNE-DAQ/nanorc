@@ -208,7 +208,15 @@ class AppCommander:
     """docstring for DAQAppController"""
 
     def __init__(
-        self, console: Console, app: str, host: str, port: int, response_port: int, response_host: str = None, proxy : tuple = None
+        self,
+        console:Console,
+        app:str,
+        host:str,
+        port:int,
+        response_port:int,
+        response_host:str = None,
+        proxy:tuple = None,
+        connection_timeout:int = 1,
     ):
         self.log = logging.getLogger(app)
         self.console = console
@@ -221,6 +229,7 @@ class AppCommander:
         self.proxy = proxy
         self.response_queue = Queue()
         self.sent_cmd = None
+        self.connection_timeout = connection_timeout
 
     def __del__(self):
         pass
@@ -232,11 +241,11 @@ class AppCommander:
 
         if not self.proxy:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(1)
+            s.settimeout(self.connection_timeout)
         else:
             s = socks.socksocket(socket.AF_INET, socket.SOCK_STREAM)
             s.set_proxy(socks.SOCKS5, self.proxy[0], self.proxy[1])
-            s.settimeout(1)
+            s.settimeout(self.connection_timeout)
         try:
             s.connect((self.app_host, self.app_port))
             s.shutdown(2)
@@ -269,10 +278,10 @@ class AppCommander:
 
         ack = requests.post(
             self.app_url,
-            data=json.dumps(cmd),
-            headers=headers,
-            timeout=1.,
-            proxies={
+            data = json.dumps(cmd),
+            headers = headers,
+            timeout = self.connection_timeout,
+            proxies = {
                 'http': f'socks5h://{self.proxy[0]}:{self.proxy[1]}',
                 'https': f'socks5h://{self.proxy[0]}:{self.proxy[1]}'
             } if self.proxy else None
@@ -320,11 +329,26 @@ class AppSupervisor:
     Tracks the last executed and successful commands
     """
 
-    def __init__(self, console: Console, desc: AppProcessDescriptor, listener: ResponseListener, response_host: str = None, proxy: tuple = None):
+    def __init__(
+        self,
+        console: Console,
+        desc: AppProcessDescriptor,
+        listener: ResponseListener,
+        response_host: str = None,
+        proxy: tuple = None,
+        connection_timeout:int=1,
+    ):
         self.console = console
         self.desc = desc
         self.commander = AppCommander(
-            console, desc.name, desc.host, desc.port, listener.port, response_host, proxy
+            console = console,
+            app = desc.name,
+            host = desc.host,
+            port = desc.port,
+            response_port = listener.port,
+            response_host = response_host,
+            proxy = proxy,
+            connection_timeout = connection_timeout,
         )
         self.last_sent_command = None
         self.last_ok_command = None
